@@ -1,0 +1,39 @@
+{
+    "name": "ROS 2 Jazzy Dev Container",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "workspaceFolder": "/root/ros2_ws",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-iot.vscode-ros",
+                "ms-vscode.cpptools",
+                "ms-python.python",
+                "ms-vscode.cmake-tools",
+                "redhat.vscode-xml",
+                "redhat.vscode-yaml",
+                "smilerobotics.urdf"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "python.defaultInterpreterPath": "/usr/bin/python3",
+                "C_Cpp.default.intelliSenseMode": "linux-gcc-x64"
+            }
+        }
+    },
+    "mounts": [
+        "source=${localWorkspaceFolder},target=/root/ros2_ws,type=bind"
+    ],
+    "runArgs": [
+        "--network=host",
+        "--privileged"
+    ],
+    "containerEnv": {
+        "ROS_DOMAIN_ID": "0",
+        "RMW_IMPLEMENTATION": "rmw_fastrtps_cpp"
+    },
+    "postCreateCommand": "sudo apt-get update && rosdep update --rosdistro=jazzy && rosdep install --from-paths src --ignore-src -r -y || true",
+    "remoteUser": "root"
+}
