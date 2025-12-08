@@ -55,7 +55,7 @@
   <!-- convert to property to use substitution in function -->
   <xacro:property name="initial_positions_file" default="$(arg initial_positions_file)"/>
 
-  <!-- create link fixed to the "world" with tf_prefix for multi-robot support -->
+  <!-- Create robot-specific world link with tf_prefix for multi-robot support -->
   <link name="$(arg tf_prefix)world" />
 
   <xacro:ur_robot
@@ -70,7 +70,7 @@
     safety_pos_margin="$(arg safety_pos_margin)"
     safety_k_position="$(arg safety_k_position)"
     >
-     <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
+     <origin xyz="0 0 0" rpy="0 0 0" />
   </xacro:ur_robot>
 
   <!-- ros2 control instance -->

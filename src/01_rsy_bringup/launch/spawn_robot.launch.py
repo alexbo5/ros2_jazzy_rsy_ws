@@ -27,12 +27,12 @@ def launch_setup(context):
     robot_pitch = LaunchConfiguration("robot_pitch").perform(context)
     robot_yaw = LaunchConfiguration("robot_yaw").perform(context)
 
-    # tf_prefix should end with '_' for proper namespacing
-    tf_prefix = f"{robot_name}_"
+    # tf_prefix uses namespace format with '/' for robot_state_publisher
+    tf_prefix = f"{robot_name}/"
 
     nodes_to_start = []
 
-    # Static TF: world -> robot_world
+    # Static TF: world -> {robot_name}/world (sets robot position in world)
     world_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
@@ -45,7 +45,7 @@ def launch_setup(context):
             "--pitch", robot_pitch,
             "--yaw", robot_yaw,
             "--frame-id", "world",
-            "--child-frame-id", f"{robot_name}_world",
+            "--child-frame-id", f"{robot_name}/world",
         ],
     )
     nodes_to_start.append(world_tf)

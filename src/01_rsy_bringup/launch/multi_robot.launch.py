@@ -40,7 +40,7 @@ def launch_setup(context):
 
     nodes_to_start = []
 
-    # Static TF: world -> robot1_world
+    # Static TF: world -> robot1/world (sets robot1 position in world)
     robot1_world_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
@@ -53,12 +53,12 @@ def launch_setup(context):
             "--pitch", robot1_pitch,
             "--yaw", robot1_yaw,
             "--frame-id", "world",
-            "--child-frame-id", f"{robot1_name}_world",
+            "--child-frame-id", f"{robot1_name}/world",
         ],
     )
     nodes_to_start.append(robot1_world_tf)
 
-    # Static TF: world -> robot2_world
+    # Static TF: world -> robot2/world (sets robot2 position in world)
     robot2_world_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
@@ -71,7 +71,7 @@ def launch_setup(context):
             "--pitch", robot2_pitch,
             "--yaw", robot2_yaw,
             "--frame-id", "world",
-            "--child-frame-id", f"{robot2_name}_world",
+            "--child-frame-id", f"{robot2_name}/world",
         ],
     )
     nodes_to_start.append(robot2_world_tf)
@@ -92,7 +92,7 @@ def launch_setup(context):
                     launch_arguments={
                         "ur_type": robot1_type,
                         "robot_ip": robot1_ip if robot1_ip else "0.0.0.0",
-                        "tf_prefix": f"{robot1_name}_",
+                        "tf_prefix": f"{robot1_name}/",
                         "use_mock_hardware": use_mock_hardware,
                         "launch_rviz": "false",
                         "launch_dashboard_client": "true" if use_mock_hardware == "false" else "false",
@@ -128,7 +128,7 @@ def launch_setup(context):
                     launch_arguments={
                         "ur_type": robot2_type,
                         "robot_ip": robot2_ip if robot2_ip else "0.0.0.0",
-                        "tf_prefix": f"{robot2_name}_",
+                        "tf_prefix": f"{robot2_name}/",
                         "use_mock_hardware": use_mock_hardware,
                         "launch_rviz": "false",
                         "launch_dashboard_client": "true" if use_mock_hardware == "false" else "false",
@@ -183,7 +183,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "robot1_type",
-            default_value="ur5e",
+            default_value="ur3",
             description="Type of robot 1.",
             choices=[
                 "ur3", "ur5", "ur10", "ur3e", "ur5e", "ur7e",
@@ -229,7 +229,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "robot2_type",
-            default_value="ur5e",
+            default_value="ur3e",
             description="Type of robot 2.",
             choices=[
                 "ur3", "ur5", "ur10", "ur3e", "ur5e", "ur7e",
