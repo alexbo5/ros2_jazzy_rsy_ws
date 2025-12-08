@@ -1,0 +1,18 @@
+# Colcon build directories
+build/
+install/
+log/
+
+# IDE
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+
+# ROS generated files
+*.bag
+*.db3
