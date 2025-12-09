@@ -62,14 +62,14 @@ class PathPlanningActionServer(Node):
         # Get parameters
         self._load_parameters()
 
+        # Current joint states for each robot (must be initialized before _setup_robot_configs)
+        self.current_joint_states: Dict[str, List[float]] = {}
+
         # Robot configurations
         self._setup_robot_configs()
 
         # Callback group for async operations
         self.callback_group = ReentrantCallbackGroup()
-
-        # Current joint states for each robot
-        self.current_joint_states: Dict[str, List[float]] = {}
 
         # Setup service clients
         self._setup_service_clients()
