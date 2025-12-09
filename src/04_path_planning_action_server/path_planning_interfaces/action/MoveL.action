@@ -1,0 +1,21 @@
+# MoveL Action - Linear (Cartesian) motion with collision checking
+# The robot moves in a straight line in Cartesian space
+
+# Goal
+geometry_msgs/PoseStamped target_pose       # Target pose relative to world frame
+string robot_name                            # Robot identifier (e.g., "robot1", "robot2")
+float64 velocity_scaling                     # Velocity scaling factor (0.0 - 1.0)
+float64 acceleration_scaling                 # Acceleration scaling factor (0.0 - 1.0)
+bool execute                                 # True: plan and execute, False: plan only
+---
+# Result
+bool success                                 # True if planning/execution succeeded
+string message                               # Status message or error description
+trajectory_msgs/JointTrajectory planned_trajectory  # The planned trajectory
+float64 planning_time                        # Time taken to plan (seconds)
+float64 path_length                          # Total Cartesian path length (meters)
+---
+# Feedback
+float64 progress_percentage                  # Planning/execution progress (0-100)
+string status                                # Current status description
+geometry_msgs/Pose current_pose              # Current end-effector pose during execution

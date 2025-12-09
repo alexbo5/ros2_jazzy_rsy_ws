@@ -1,0 +1,38 @@
+# Path Planning Action Server Configuration
+# All poses are relative to the global world frame
+
+path_planning_action_server:
+  ros__parameters:
+    # Global reference frame
+    world_frame: "world"
+
+    # Ground collision avoidance
+    ground_height: 0.0           # Ground level in world frame (meters)
+    ground_safety_margin: 0.02   # Safety margin above ground (meters)
+
+    # Robot 1 configuration
+    robot1:
+      name: "robot1"
+      namespace: "robot1"
+      base_frame: "robot1/base_link"
+      ee_frame: "robot1/tool0"
+      planning_group: "robot1_manipulator"
+      ur_type: "ur3e"
+
+    # Robot 2 configuration
+    robot2:
+      name: "robot2"
+      namespace: "robot2"
+      base_frame: "robot2/base_link"
+      ee_frame: "robot2/tool0"
+      planning_group: "robot2_manipulator"
+      ur_type: "ur3e"
+
+    # Planning parameters
+    planning_time: 5.0                   # Maximum planning time (seconds)
+    num_planning_attempts: 10            # Number of planning attempts
+    cartesian_max_step: 0.01             # Maximum Cartesian step size (meters)
+    cartesian_jump_threshold: 0.0        # Jump threshold (0 = disabled)
+    goal_joint_tolerance: 0.01           # Joint tolerance (radians)
+    goal_position_tolerance: 0.001       # Position tolerance (meters)
+    goal_orientation_tolerance: 0.01     # Orientation tolerance (radians)

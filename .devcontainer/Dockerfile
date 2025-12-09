@@ -14,10 +14,21 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     ros-jazzy-pose-broadcaster \
     # URDF/Xacro processing
     ros-jazzy-xacro \
+    # MoveIt2 for path planning
+    ros-jazzy-moveit \
+    ros-jazzy-moveit-ros-planning \
+    ros-jazzy-moveit-ros-planning-interface \
+    ros-jazzy-moveit-ros-move-group \
+    ros-jazzy-moveit-planners \
+    ros-jazzy-moveit-planners-ompl \
+    ros-jazzy-moveit-kinematics \
+    ros-jazzy-moveit-simple-controller-manager \
+    ros-jazzy-moveit-configs-utils \
     # Development tools
     git \
     python3-rosdep \
     python3-scipy \
+    python3-numpy \
     python3-colcon-common-extensions \
     python3-pip \
     bash-completion \

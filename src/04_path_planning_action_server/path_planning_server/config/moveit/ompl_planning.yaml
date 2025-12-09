@@ -1,0 +1,91 @@
+# OMPL (Open Motion Planning Library) planning configuration
+
+planner_configs:
+  RRTConnect:
+    type: geometric::RRTConnect
+    range: 0.0  # Max motion added to tree (0 = auto)
+
+  RRTstar:
+    type: geometric::RRTstar
+    range: 0.0
+    goal_bias: 0.05
+    delay_collision_checking: 1
+
+  PRM:
+    type: geometric::PRM
+    max_nearest_neighbors: 10
+
+  PRMstar:
+    type: geometric::PRMstar
+
+  EST:
+    type: geometric::EST
+    range: 0.0
+    goal_bias: 0.05
+
+  LBKPIECE:
+    type: geometric::LBKPIECE
+    range: 0.0
+    border_fraction: 0.9
+    min_valid_path_fraction: 0.5
+
+  BKPIECE:
+    type: geometric::BKPIECE
+    range: 0.0
+    border_fraction: 0.9
+    failed_expansion_score_factor: 0.5
+    min_valid_path_fraction: 0.5
+
+  KPIECE:
+    type: geometric::KPIECE
+    range: 0.0
+    goal_bias: 0.05
+    border_fraction: 0.9
+    failed_expansion_score_factor: 0.5
+    min_valid_path_fraction: 0.5
+
+  SBL:
+    type: geometric::SBL
+    range: 0.0
+
+  BiTRRT:
+    type: geometric::BiTRRT
+    range: 0.0
+    cost_threshold: 1e300
+    frountier_threshold: 0.0
+    frountier_node_ratio: 0.1
+    temp_change_factor: 0.1
+
+# Robot 1 planning group
+robot1_manipulator:
+  default_planner_config: RRTConnect
+  planner_configs:
+    - RRTConnect
+    - RRTstar
+    - PRM
+    - PRMstar
+    - EST
+    - LBKPIECE
+    - BKPIECE
+    - KPIECE
+    - SBL
+    - BiTRRT
+  projection_evaluator: joints(robot1/shoulder_pan_joint,robot1/shoulder_lift_joint)
+  longest_valid_segment_fraction: 0.005
+
+# Robot 2 planning group
+robot2_manipulator:
+  default_planner_config: RRTConnect
+  planner_configs:
+    - RRTConnect
+    - RRTstar
+    - PRM
+    - PRMstar
+    - EST
+    - LBKPIECE
+    - BKPIECE
+    - KPIECE
+    - SBL
+    - BiTRRT
+  projection_evaluator: joints(robot2/shoulder_pan_joint,robot2/shoulder_lift_joint)
+  longest_valid_segment_fraction: 0.005
