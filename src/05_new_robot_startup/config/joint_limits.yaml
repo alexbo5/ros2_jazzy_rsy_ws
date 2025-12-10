@@ -1,0 +1,37 @@
+joint_limits:
+  robot1_shoulder_pan_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot1_shoulder_lift_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot1_elbow_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot1_wrist_1_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot1_wrist_2_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot1_wrist_3_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot2_shoulder_pan_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot2_shoulder_lift_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot2_elbow_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot2_wrist_1_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot2_wrist_2_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  robot2_wrist_3_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0

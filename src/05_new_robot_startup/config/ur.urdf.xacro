@@ -1,7 +1,5 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://wiki.ros.org/xacro" name="$(arg name)">
-  <!-- robot name parameter -->
-  <xacro:arg name="name" default="ur"/>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="dual_ur">
 
   <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
   <!-- ros2 control include -->
@@ -130,7 +128,7 @@
     tool_voltage="$(arg robot1_tool_voltage)"
     tool_parity="$(arg robot1_tool_parity)"
     tool_baud_rate="$(arg robot1_tool_baud_rate)"
-    tool_stop_bits="$(arg robot1_tool_stops_bits)"
+    tool_stop_bits="$(arg robot1_tool_stop_bits)"
     tool_rx_idle_chars="$(arg robot1_tool_rx_idle_chars)"
     tool_tx_idle_chars="$(arg robot1_tool_tx_idle_chars)"
     tool_device_name="$(arg robot1_tool_device_name)"

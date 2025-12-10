@@ -29,6 +29,7 @@
   <depend>moveit_configs_utils</depend>
   <depend>moveit_planners_ompl</depend>
   <depend>moveit_planners_pilz_industrial_motion_planner</depend>
+  <depend>moveit_simple_controller_manager</depend>
 
   <!-- ros2_control -->
   <depend>controller_manager</depend>

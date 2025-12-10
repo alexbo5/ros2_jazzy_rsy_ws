@@ -1,7 +1,8 @@
 import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess
+from launch.actions import ExecuteProcess, RegisterEventHandler, TimerAction
+from launch.event_handlers import OnProcessStart
 from ament_index_python.packages import get_package_share_directory
 from moveit_configs_utils import MoveItConfigsBuilder
 
@@ -9,9 +10,6 @@ def generate_launch_description():
 
     # Get package share directory
     pkg_share = get_package_share_directory("05_new_robot_startup")
-
-    # RViz config path
-    rviz_config_file = os.path.join(pkg_share, "config", "moveit.rviz")
 
     moveit_config = (
         MoveItConfigsBuilder("dual_ur", package_name="05_new_robot_startup")
@@ -49,14 +47,6 @@ def generate_launch_description():
         executable="rviz2",
         name="rviz2",
         output="log",
-        arguments=["-d", rviz_config_file],
-        parameters=[
-            moveit_config.robot_description,
-            moveit_config.robot_description_semantic,
-            moveit_config.robot_description_kinematics,
-            moveit_config.planning_pipelines,
-            moveit_config.joint_limits,
-        ],
     )
 
     ros2_control_node = Node(
@@ -69,9 +59,8 @@ def generate_launch_description():
         output="both",
     )
 
-    # Load controllers
-    load_controllers = []
-    for controller in [
+    # Controller spawners (will be started after ros2_control_node)
+    controllers = [
         "robot1_joint_trajectory_controller",
         "robot1_joint_state_broadcaster",
         "robot1_io_and_status_controller",
@@ -86,21 +75,71 @@ def generate_launch_description():
         "robot2_force_torque_sensor_broadcaster",
         "robot2_tcp_pose_broadcaster",
         "robot2_ur_configuration_controller",
-    ]:
-        load_controllers += [
-            ExecuteProcess(
-                cmd=["ros2 run controller_manager spawner {}".format(controller)],
-                shell=True,
-                output="screen",
-            )
-        ]
+    ]
+
+    load_controllers = ExecuteProcess(
+        cmd=["ros2", "run", "controller_manager", "spawner"] + controllers,
+        output="screen",
+    )
+
+    # Start ros2_control_node after robot_state_publisher has started
+    start_ros2_control = RegisterEventHandler(
+        OnProcessStart(
+            target_action=robot_state_publisher,
+            on_start=[
+                TimerAction(
+                    period=2.0,
+                    actions=[ros2_control_node],
+                )
+            ],
+        )
+    )
+
+    # Start controller spawners after ros2_control_node has started
+    start_controllers = RegisterEventHandler(
+        OnProcessStart(
+            target_action=ros2_control_node,
+            on_start=[
+                TimerAction(
+                    period=3.0,
+                    actions=[load_controllers],
+                )
+            ],
+        )
+    )
+
+    # Start move_group after robot_state_publisher has started
+    start_move_group = RegisterEventHandler(
+        OnProcessStart(
+            target_action=robot_state_publisher,
+            on_start=[
+                TimerAction(
+                    period=1.0,
+                    actions=[move_group_node],
+                )
+            ],
+        )
+    )
+
+    # Start rviz after move_group has started
+    start_rviz = RegisterEventHandler(
+        OnProcessStart(
+            target_action=move_group_node,
+            on_start=[
+                TimerAction(
+                    period=2.0,
+                    actions=[rviz_node],
+                )
+            ],
+        )
+    )
 
     return LaunchDescription(
         [
-            rviz_node,
             robot_state_publisher,
-            move_group_node,
-            ros2_control_node,
+            start_ros2_control,
+            start_controllers,
+            start_move_group,
+            start_rviz,
         ]
-        + load_controllers
     )
