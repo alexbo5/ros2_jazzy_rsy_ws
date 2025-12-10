@@ -9,10 +9,10 @@ from moveit_configs_utils import MoveItConfigsBuilder
 def generate_launch_description():
 
     # Get package share directory
-    pkg_share = get_package_share_directory("05_new_robot_startup")
+    pkg_share = get_package_share_directory("rsy_robot_startup")
 
     moveit_config = (
-        MoveItConfigsBuilder("ur", package_name="05_new_robot_startup")
+        MoveItConfigsBuilder("ur", package_name="rsy_robot_startup")
         .robot_description(file_path="config/ur.urdf.xacro")
         .robot_description_semantic(file_path="config/ur.srdf")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
@@ -39,18 +39,6 @@ def generate_launch_description():
         pkg_share,
         "config",
         "ros2_controllers.yaml",
-    )
-
-    # RViz config path
-    rviz_config_file = os.path.join(pkg_share, "config", "moveit.rviz")
-
-    # RViz node
-    rviz_node = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="log",
-        arguments=["-d", rviz_config_file],
     )
 
     ros2_control_node = Node(
@@ -125,25 +113,11 @@ def generate_launch_description():
         )
     )
 
-    # Start rviz after move_group has started
-    start_rviz = RegisterEventHandler(
-        OnProcessStart(
-            target_action=move_group_node,
-            on_start=[
-                TimerAction(
-                    period=2.0,
-                    actions=[rviz_node],
-                )
-            ],
-        )
-    )
-
     return LaunchDescription(
         [
             robot_state_publisher,
             start_ros2_control,
             start_controllers,
             start_move_group,
-            start_rviz,
         ]
     )
