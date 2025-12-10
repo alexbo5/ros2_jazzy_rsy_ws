@@ -1,0 +1,409 @@
+controller_manager:
+  ros__parameters:
+    # Robot 1 controllers
+    robot1_joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    robot1_io_and_status_controller:
+      type: ur_controllers/GPIOController
+
+    robot1_speed_scaling_state_broadcaster:
+      type: ur_controllers/SpeedScalingStateBroadcaster
+
+    robot1_force_torque_sensor_broadcaster:
+      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+
+    robot1_joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    robot1_scaled_joint_trajectory_controller:
+      type: ur_controllers/ScaledJointTrajectoryController
+
+    robot1_forward_velocity_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+    robot1_forward_effort_controller:
+      type: effort_controllers/JointGroupEffortController
+
+    robot1_forward_position_controller:
+      type: position_controllers/JointGroupPositionController
+
+    robot1_force_mode_controller:
+      type: ur_controllers/ForceModeController
+
+    robot1_freedrive_mode_controller:
+      type: ur_controllers/FreedriveModeController
+
+    robot1_passthrough_trajectory_controller:
+      type: ur_controllers/PassthroughTrajectoryController
+
+    robot1_tcp_pose_broadcaster:
+      type: pose_broadcaster/PoseBroadcaster
+
+    robot1_ur_configuration_controller:
+      type: ur_controllers/URConfigurationController
+
+    robot1_tool_contact_controller:
+      type: ur_controllers/ToolContactController
+
+    robot1_motion_primitive_forward_controller:
+      type: motion_primitives_controllers/MotionPrimitivesForwardController
+
+    # Robot 2 controllers
+    robot2_joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    robot2_io_and_status_controller:
+      type: ur_controllers/GPIOController
+
+    robot2_speed_scaling_state_broadcaster:
+      type: ur_controllers/SpeedScalingStateBroadcaster
+
+    robot2_force_torque_sensor_broadcaster:
+      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+
+    robot2_joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    robot2_scaled_joint_trajectory_controller:
+      type: ur_controllers/ScaledJointTrajectoryController
+
+    robot2_forward_velocity_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+    robot2_forward_effort_controller:
+      type: effort_controllers/JointGroupEffortController
+
+    robot2_forward_position_controller:
+      type: position_controllers/JointGroupPositionController
+
+    robot2_force_mode_controller:
+      type: ur_controllers/ForceModeController
+
+    robot2_freedrive_mode_controller:
+      type: ur_controllers/FreedriveModeController
+
+    robot2_passthrough_trajectory_controller:
+      type: ur_controllers/PassthroughTrajectoryController
+
+    robot2_tcp_pose_broadcaster:
+      type: pose_broadcaster/PoseBroadcaster
+
+    robot2_ur_configuration_controller:
+      type: ur_controllers/URConfigurationController
+
+    robot2_tool_contact_controller:
+      type: ur_controllers/ToolContactController
+
+    robot2_motion_primitive_forward_controller:
+      type: motion_primitives_controllers/MotionPrimitivesForwardController
+
+    enforce_command_limits: false
+
+# Robot 1 controller parameters
+robot1_speed_scaling_state_broadcaster:
+  ros__parameters:
+    state_publish_rate: 100.0
+    tf_prefix: "robot1_"
+
+robot1_io_and_status_controller:
+  ros__parameters:
+    tf_prefix: "robot1_"
+
+robot1_ur_configuration_controller:
+  ros__parameters:
+    tf_prefix: "robot1_"
+
+robot1_force_torque_sensor_broadcaster:
+  ros__parameters:
+    sensor_name: robot1_tcp_fts_sensor
+    state_interface_names:
+      - force.x
+      - force.y
+      - force.z
+      - torque.x
+      - torque.y
+      - torque.z
+    frame_id: robot1_tool0
+    topic_name: ft_data
+
+robot1_joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - robot1_shoulder_pan_joint
+      - robot1_shoulder_lift_joint
+      - robot1_elbow_joint
+      - robot1_wrist_1_joint
+      - robot1_wrist_2_joint
+      - robot1_wrist_3_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 100.0
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    constraints:
+      stopped_velocity_tolerance: 0.2
+      goal_time: 0.0
+      robot1_shoulder_pan_joint: {trajectory: 0.2, goal: 0.1}
+      robot1_shoulder_lift_joint: {trajectory: 0.2, goal: 0.1}
+      robot1_elbow_joint: {trajectory: 0.2, goal: 0.1}
+      robot1_wrist_1_joint: {trajectory: 0.2, goal: 0.1}
+      robot1_wrist_2_joint: {trajectory: 0.2, goal: 0.1}
+      robot1_wrist_3_joint: {trajectory: 0.2, goal: 0.1}
+    speed_scaling:
+      state_interface: robot1_speed_scaling/speed_scaling_factor
+
+robot1_scaled_joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - robot1_shoulder_pan_joint
+      - robot1_shoulder_lift_joint
+      - robot1_elbow_joint
+      - robot1_wrist_1_joint
+      - robot1_wrist_2_joint
+      - robot1_wrist_3_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 100.0
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    constraints:
+      stopped_velocity_tolerance: 0.2
+      goal_time: 0.0
+      robot1_shoulder_pan_joint: { trajectory: 0.2, goal: 0.1 }
+      robot1_shoulder_lift_joint: { trajectory: 0.2, goal: 0.1 }
+      robot1_elbow_joint: { trajectory: 0.2, goal: 0.1 }
+      robot1_wrist_1_joint: { trajectory: 0.2, goal: 0.1 }
+      robot1_wrist_2_joint: { trajectory: 0.2, goal: 0.1 }
+      robot1_wrist_3_joint: { trajectory: 0.2, goal: 0.1 }
+    speed_scaling_interface_name: robot1_speed_scaling/speed_scaling_factor
+
+robot1_passthrough_trajectory_controller:
+  ros__parameters:
+    tf_prefix: "robot1_"
+    joints:
+      - robot1_shoulder_pan_joint
+      - robot1_shoulder_lift_joint
+      - robot1_elbow_joint
+      - robot1_wrist_1_joint
+      - robot1_wrist_2_joint
+      - robot1_wrist_3_joint
+    state_interfaces:
+      - position
+      - velocity
+    speed_scaling_interface_name: robot1_speed_scaling/speed_scaling_factor
+
+robot1_forward_velocity_controller:
+  ros__parameters:
+    joints:
+      - robot1_shoulder_pan_joint
+      - robot1_shoulder_lift_joint
+      - robot1_elbow_joint
+      - robot1_wrist_1_joint
+      - robot1_wrist_2_joint
+      - robot1_wrist_3_joint
+    interface_name: velocity
+
+robot1_forward_effort_controller:
+  ros__parameters:
+    joints:
+      - robot1_shoulder_pan_joint
+      - robot1_shoulder_lift_joint
+      - robot1_elbow_joint
+      - robot1_wrist_1_joint
+      - robot1_wrist_2_joint
+      - robot1_wrist_3_joint
+    interface_name: effort
+
+robot1_forward_position_controller:
+  ros__parameters:
+    joints:
+      - robot1_shoulder_pan_joint
+      - robot1_shoulder_lift_joint
+      - robot1_elbow_joint
+      - robot1_wrist_1_joint
+      - robot1_wrist_2_joint
+      - robot1_wrist_3_joint
+
+robot1_force_mode_controller:
+  ros__parameters:
+    tf_prefix: "robot1_"
+
+robot1_freedrive_mode_controller:
+  ros__parameters:
+    tf_prefix: "robot1_"
+
+robot1_tcp_pose_broadcaster:
+  ros__parameters:
+    frame_id: robot1_base
+    pose_name: robot1_tcp_pose
+    tf:
+      child_frame_id: robot1_tool0_controller
+
+robot1_tool_contact_controller:
+  ros__parameters:
+    tf_prefix: "robot1_"
+
+robot1_motion_primitive_forward_controller:
+  ros__parameters:
+    tf_prefix: "robot1_"
+
+# Robot 2 controller parameters
+robot2_speed_scaling_state_broadcaster:
+  ros__parameters:
+    state_publish_rate: 100.0
+    tf_prefix: "robot2_"
+
+robot2_io_and_status_controller:
+  ros__parameters:
+    tf_prefix: "robot2_"
+
+robot2_ur_configuration_controller:
+  ros__parameters:
+    tf_prefix: "robot2_"
+
+robot2_force_torque_sensor_broadcaster:
+  ros__parameters:
+    sensor_name: robot2_tcp_fts_sensor
+    state_interface_names:
+      - force.x
+      - force.y
+      - force.z
+      - torque.x
+      - torque.y
+      - torque.z
+    frame_id: robot2_tool0
+    topic_name: ft_data
+
+robot2_joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - robot2_shoulder_pan_joint
+      - robot2_shoulder_lift_joint
+      - robot2_elbow_joint
+      - robot2_wrist_1_joint
+      - robot2_wrist_2_joint
+      - robot2_wrist_3_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 100.0
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    constraints:
+      stopped_velocity_tolerance: 0.2
+      goal_time: 0.0
+      robot2_shoulder_pan_joint: {trajectory: 0.2, goal: 0.1}
+      robot2_shoulder_lift_joint: {trajectory: 0.2, goal: 0.1}
+      robot2_elbow_joint: {trajectory: 0.2, goal: 0.1}
+      robot2_wrist_1_joint: {trajectory: 0.2, goal: 0.1}
+      robot2_wrist_2_joint: {trajectory: 0.2, goal: 0.1}
+      robot2_wrist_3_joint: {trajectory: 0.2, goal: 0.1}
+    speed_scaling:
+      state_interface: robot2_speed_scaling/speed_scaling_factor
+
+robot2_scaled_joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - robot2_shoulder_pan_joint
+      - robot2_shoulder_lift_joint
+      - robot2_elbow_joint
+      - robot2_wrist_1_joint
+      - robot2_wrist_2_joint
+      - robot2_wrist_3_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 100.0
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    constraints:
+      stopped_velocity_tolerance: 0.2
+      goal_time: 0.0
+      robot2_shoulder_pan_joint: { trajectory: 0.2, goal: 0.1 }
+      robot2_shoulder_lift_joint: { trajectory: 0.2, goal: 0.1 }
+      robot2_elbow_joint: { trajectory: 0.2, goal: 0.1 }
+      robot2_wrist_1_joint: { trajectory: 0.2, goal: 0.1 }
+      robot2_wrist_2_joint: { trajectory: 0.2, goal: 0.1 }
+      robot2_wrist_3_joint: { trajectory: 0.2, goal: 0.1 }
+    speed_scaling_interface_name: robot2_speed_scaling/speed_scaling_factor
+
+robot2_passthrough_trajectory_controller:
+  ros__parameters:
+    tf_prefix: "robot2_"
+    joints:
+      - robot2_shoulder_pan_joint
+      - robot2_shoulder_lift_joint
+      - robot2_elbow_joint
+      - robot2_wrist_1_joint
+      - robot2_wrist_2_joint
+      - robot2_wrist_3_joint
+    state_interfaces:
+      - position
+      - velocity
+    speed_scaling_interface_name: robot2_speed_scaling/speed_scaling_factor
+
+robot2_forward_velocity_controller:
+  ros__parameters:
+    joints:
+      - robot2_shoulder_pan_joint
+      - robot2_shoulder_lift_joint
+      - robot2_elbow_joint
+      - robot2_wrist_1_joint
+      - robot2_wrist_2_joint
+      - robot2_wrist_3_joint
+    interface_name: velocity
+
+robot2_forward_effort_controller:
+  ros__parameters:
+    joints:
+      - robot2_shoulder_pan_joint
+      - robot2_shoulder_lift_joint
+      - robot2_elbow_joint
+      - robot2_wrist_1_joint
+      - robot2_wrist_2_joint
+      - robot2_wrist_3_joint
+    interface_name: effort
+
+robot2_forward_position_controller:
+  ros__parameters:
+    joints:
+      - robot2_shoulder_pan_joint
+      - robot2_shoulder_lift_joint
+      - robot2_elbow_joint
+      - robot2_wrist_1_joint
+      - robot2_wrist_2_joint
+      - robot2_wrist_3_joint
+
+robot2_force_mode_controller:
+  ros__parameters:
+    tf_prefix: "robot2_"
+
+robot2_freedrive_mode_controller:
+  ros__parameters:
+    tf_prefix: "robot2_"
+
+robot2_tcp_pose_broadcaster:
+  ros__parameters:
+    frame_id: robot2_base
+    pose_name: robot2_tcp_pose
+    tf:
+      child_frame_id: robot2_tool0_controller
+
+robot2_tool_contact_controller:
+  ros__parameters:
+    tf_prefix: "robot2_"
+
+robot2_motion_primitive_forward_controller:
+  ros__parameters:
+    tf_prefix: "robot2_"

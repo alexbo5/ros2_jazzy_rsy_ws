@@ -148,6 +148,27 @@ def launch_setup(context):
         )
         nodes_to_start.append(robot2_launch)
 
+    if robot2_ip or use_mock_hardware == "true":
+        robot2_moveit = GroupAction(
+            actions=[
+                PushRosNamespace(robot2_name),
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(
+                        PathJoinSubstitution([
+                            FindPackageShare("04_moveit_startup"),
+                            "launch",
+                            "ur_moveit.launch.py",
+                        ])
+                    ),
+                    launch_arguments={
+                        "ur_type": robot2_type,
+                        "tf_prefix": f"{robot2_name}/"
+                    }.items(),
+               ),
+            ]
+        )
+        nodes_to_start.append(robot2_moveit)
+
     # Launch centralized RViz
     rviz_node = Node(
         package="rviz2",
@@ -268,7 +289,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "use_mock_hardware",
-            default_value="false",
+            default_value="true",
             description="Use mock hardware for simulation.",
         )
     )

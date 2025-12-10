@@ -1,0 +1,178 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="$(arg name)">
+  <!-- robot name parameter -->
+  <xacro:arg name="name" default="ur"/>
+
+  <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
+  <!-- ros2 control include -->
+  <xacro:include filename="$(find ur_robot_driver)/urdf/ur.ros2_control.xacro" />
+  
+  <xacro:include filename="$(find ur_description)/urdf/inc/ur_transmissions.xacro" />
+
+  <!-- possible 'ur_type' values: ur3, ur3e, ur5, ur5e, ur7e, ur10, ur10e, ur12e, ur16e, ur8long, ur15, ur18, ur20, ur30 -->
+  <!-- the default value should raise an error in case this was called without defining the type -->
+  <xacro:arg name="robot1_ur_type" default="ur3"/>
+  <xacro:arg name="robot1_joint_limit_params" default="$(find ur_description)/config/$(arg robot1_ur_type)/joint_limits.yaml"/>
+  <xacro:arg name="robot1_kinematics_params" default="$(find ur_description)/config/$(arg robot1_ur_type)/default_kinematics.yaml"/>
+  <xacro:arg name="robot1_physical_params" default="$(find ur_description)/config/$(arg robot1_ur_type)/physical_parameters.yaml"/>
+  <xacro:arg name="robot1_visual_params" default="$(find ur_description)/config/$(arg robot1_ur_type)/visual_parameters.yaml"/>
+  <xacro:arg name="robot1_transmission_hw_interface" default=""/>
+  <xacro:arg name="robot1_safety_limits" default="false"/>
+  <xacro:arg name="robot1_safety_pos_margin" default="0.15"/>
+  <xacro:arg name="robot1_safety_k_position" default="20"/>
+
+  <xacro:arg name="robot2_ur_type" default="ur3e"/>
+  <xacro:arg name="robot2_joint_limit_params" default="$(find ur_description)/config/$(arg robot2_ur_type)/joint_limits.yaml"/>
+  <xacro:arg name="robot2_kinematics_params" default="$(find ur_description)/config/$(arg robot2_ur_type)/default_kinematics.yaml"/>
+  <xacro:arg name="robot2_physical_params" default="$(find ur_description)/config/$(arg robot2_ur_type)/physical_parameters.yaml"/>
+  <xacro:arg name="robot2_visual_params" default="$(find ur_description)/config/$(arg robot2_ur_type)/visual_parameters.yaml"/>
+  <xacro:arg name="robot2_transmission_hw_interface" default=""/>
+  <xacro:arg name="robot2_safety_limits" default="false"/>
+  <xacro:arg name="robot2_safety_pos_margin" default="0.15"/>
+  <xacro:arg name="robot2_safety_k_position" default="20"/>
+  
+<!-- ros2_control related parameters for robot1 -->
+<xacro:arg name="robot1_headless_mode" default="false" />
+<xacro:arg name="robot1_robot_ip" default="0.0.0.0" />
+<xacro:arg name="robot1_script_filename" default=""/>
+<xacro:arg name="robot1_output_recipe_filename" default=""/>
+<xacro:arg name="robot1_input_recipe_filename" default=""/>
+<xacro:arg name="robot1_reverse_ip" default="0.0.0.0"/>
+<xacro:arg name="robot1_script_command_port" default="50004"/>
+<xacro:arg name="robot1_reverse_port" default="50001"/>
+<xacro:arg name="robot1_script_sender_port" default="50002"/>
+<xacro:arg name="robot1_trajectory_port" default="50003"/>
+<!--   tool communication related parameters for robot1 -->
+<xacro:arg name="robot1_use_tool_communication" default="false" />
+<xacro:arg name="robot1_tool_voltage" default="0" />
+<xacro:arg name="robot1_tool_parity" default="0" />
+<xacro:arg name="robot1_tool_baud_rate" default="115200" />
+<xacro:arg name="robot1_tool_stop_bits" default="1" />
+<xacro:arg name="robot1_tool_rx_idle_chars" default="1.5" />
+<xacro:arg name="robot1_tool_tx_idle_chars" default="3.5" />
+<xacro:arg name="robot1_tool_device_name" default="/tmp/ttyUR" />
+<xacro:arg name="robot1_tool_tcp_port" default="54321" />
+
+<!-- ros2_control related parameters for robot2 -->
+<xacro:arg name="robot2_headless_mode" default="false" />
+<xacro:arg name="robot2_robot_ip" default="0.0.0.0" />
+<xacro:arg name="robot2_script_filename" default=""/>
+<xacro:arg name="robot2_output_recipe_filename" default=""/>
+<xacro:arg name="robot2_input_recipe_filename" default=""/>
+<xacro:arg name="robot2_reverse_ip" default="0.0.0.0"/>
+<xacro:arg name="robot2_script_command_port" default="50014"/>
+<xacro:arg name="robot2_reverse_port" default="50011"/>
+<xacro:arg name="robot2_script_sender_port" default="50012"/>
+<xacro:arg name="robot2_trajectory_port" default="50013"/>
+<!--   tool communication related parameters for robot2 -->
+<xacro:arg name="robot2_use_tool_communication" default="false" />
+<xacro:arg name="robot2_tool_voltage" default="0" />
+<xacro:arg name="robot2_tool_parity" default="0" />
+<xacro:arg name="robot2_tool_baud_rate" default="115200" />
+<xacro:arg name="robot2_tool_stop_bits" default="1" />
+<xacro:arg name="robot2_tool_rx_idle_chars" default="1.5" />
+<xacro:arg name="robot2_tool_tx_idle_chars" default="3.5" />
+<xacro:arg name="robot2_tool_device_name" default="/tmp/ttyUR2" />
+<xacro:arg name="robot2_tool_tcp_port" default="54322" />
+
+    <!-- Simulation parameters -->
+  <xacro:arg name="use_mock_hardware" default="false" />
+  <xacro:arg name="mock_sensor_commands" default="false" />
+
+  <!-- initial position for simulations (Mock Hardware, Gazebo, Ignition) -->
+  <xacro:arg name="initial_positions_file" default="$(find ur_description)/config/initial_positions.yaml"/>
+
+  <!-- convert to property to use substitution in function -->
+  <xacro:property name="initial_positions_file" default="$(arg initial_positions_file)"/>
+
+  <!-- create link fixed to the "world" -->
+  <link name="world" />
+
+<xacro:ur_robot
+    name="robot1"
+    tf_prefix="robot1_"
+    parent="world"
+    joint_limits_parameters_file="$(arg robot1_joint_limit_params)"
+    kinematics_parameters_file="$(arg robot1_kinematics_params)"
+    physical_parameters_file="$(arg robot1_physical_params)"
+    visual_parameters_file="$(arg robot1_visual_params)"
+    safety_limits="$(arg robot1_safety_limits)"
+    safety_pos_margin="$(arg robot1_safety_pos_margin)"
+    safety_k_position="$(arg robot1_safety_k_position)">
+     <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
+</xacro:ur_robot>
+
+<xacro:ur_robot
+    name="robot2"
+    tf_prefix="robot2_"
+    parent="world"
+    joint_limits_parameters_file="$(arg robot2_joint_limit_params)"
+    kinematics_parameters_file="$(arg robot2_kinematics_params)"
+    physical_parameters_file="$(arg robot2_physical_params)"
+    visual_parameters_file="$(arg robot2_visual_params)"
+    safety_limits="$(arg robot2_safety_limits)"
+    safety_pos_margin="$(arg robot2_safety_pos_margin)"
+    safety_k_position="$(arg robot2_safety_k_position)">
+     <origin xyz="0 -1.5 0" rpy="0 0 0" />          <!-- position robot in the world -->
+</xacro:ur_robot>
+
+<!-- ros2 control instance -->
+<xacro:ur_ros2_control
+    name="robot1"
+    tf_prefix="robot1_"
+    kinematics_parameters_file="$(arg robot1_kinematics_params)"
+    transmission_hw_interface="$(arg robot1_transmission_hw_interface)"
+    use_mock_hardware="$(arg use_mock_hardware)"
+    mock_sensor_commands="$(arg mock_sensor_commands)"
+    headless_mode="$(arg robot1_headless_mode)"
+    initial_positions="${xacro.load_yaml(initial_positions_file)}"
+    use_tool_communication="$(arg robot1_use_tool_communication)"
+    tool_voltage="$(arg robot1_tool_voltage)"
+    tool_parity="$(arg robot1_tool_parity)"
+    tool_baud_rate="$(arg robot1_tool_baud_rate)"
+    tool_stop_bits="$(arg robot1_tool_stops_bits)"
+    tool_rx_idle_chars="$(arg robot1_tool_rx_idle_chars)"
+    tool_tx_idle_chars="$(arg robot1_tool_tx_idle_chars)"
+    tool_device_name="$(arg robot1_tool_device_name)"
+    tool_tcp_port="$(arg robot1_tool_tcp_port)"
+    robot_ip="$(arg robot1_robot_ip)"
+    script_filename="$(arg robot1_script_filename)"
+    output_recipe_filename="$(arg robot1_output_recipe_filename)"
+    input_recipe_filename="$(arg robot1_input_recipe_filename)"
+    reverse_ip="$(arg robot1_reverse_ip)"
+    script_command_port="$(arg robot1_script_command_port)"
+    reverse_port="$(arg robot1_reverse_port)"
+    script_sender_port="$(arg robot1_script_sender_port)"
+    trajectory_port="$(arg robot1_trajectory_port)"
+/>
+
+<xacro:ur_ros2_control
+    name="robot2"
+    tf_prefix="robot2_"
+    kinematics_parameters_file="$(arg robot2_kinematics_params)"
+    transmission_hw_interface="$(arg robot2_transmission_hw_interface)"
+    use_mock_hardware="$(arg use_mock_hardware)"
+    mock_sensor_commands="$(arg mock_sensor_commands)"
+    headless_mode="$(arg robot2_headless_mode)"
+    initial_positions="${xacro.load_yaml(initial_positions_file)}"
+    use_tool_communication="$(arg robot2_use_tool_communication)"
+    tool_voltage="$(arg robot2_tool_voltage)"
+    tool_parity="$(arg robot2_tool_parity)"
+    tool_baud_rate="$(arg robot2_tool_baud_rate)"
+    tool_stop_bits="$(arg robot2_tool_stop_bits)"
+    tool_rx_idle_chars="$(arg robot2_tool_rx_idle_chars)"
+    tool_tx_idle_chars="$(arg robot2_tool_tx_idle_chars)"
+    tool_device_name="$(arg robot2_tool_device_name)"
+    tool_tcp_port="$(arg robot2_tool_tcp_port)"
+    robot_ip="$(arg robot2_robot_ip)"
+    script_filename="$(arg robot2_script_filename)"
+    output_recipe_filename="$(arg robot2_output_recipe_filename)"
+    input_recipe_filename="$(arg robot2_input_recipe_filename)"
+    reverse_ip="$(arg robot2_reverse_ip)"
+    script_command_port="$(arg robot2_script_command_port)"
+    reverse_port="$(arg robot2_reverse_port)"
+    script_sender_port="$(arg robot2_script_sender_port)"
+    trajectory_port="$(arg robot2_trajectory_port)"
+/>
+
+</robot>
