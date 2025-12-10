@@ -1,0 +1,17 @@
+# MoveL Action - Linear (Cartesian) motion
+# Moves the robot TCP linearly to target pose
+
+# Goal
+string robot_name                    # "robot1" or "robot2"
+geometry_msgs/Pose target_pose       # Target pose for the end effector
+string frame_id                      # Reference frame for the pose (default: "world")
+float64 velocity_scaling             # Velocity scaling factor (0.0 to 1.0), default 0.1
+float64 acceleration_scaling         # Acceleration scaling factor (0.0 to 1.0), default 0.1
+---
+# Result
+bool success                         # True if motion completed successfully
+string message                       # Status message
+---
+# Feedback
+float64 progress                     # Progress percentage (0.0 to 100.0)
+geometry_msgs/Pose current_pose      # Current end effector pose during motion

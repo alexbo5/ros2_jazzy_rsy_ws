@@ -1,0 +1,16 @@
+# MoveJ Action - Joint space motion
+# Moves the robot to target joint positions
+
+# Goal
+string robot_name                    # "robot1" or "robot2"
+float64[] joint_positions            # Target joint positions in radians (6 values)
+float64 velocity_scaling             # Velocity scaling factor (0.0 to 1.0), default 0.1
+float64 acceleration_scaling         # Acceleration scaling factor (0.0 to 1.0), default 0.1
+---
+# Result
+bool success                         # True if motion completed successfully
+string message                       # Status message
+---
+# Feedback
+float64 progress                     # Progress percentage (0.0 to 100.0)
+float64[] current_joint_positions    # Current joint positions during motion

@@ -53,15 +53,14 @@ def generate_launch_description():
 
     # Controller spawners (will be started after ros2_control_node)
     controllers = [
+        "joint_state_broadcaster",
         "robot1_joint_trajectory_controller",
-        "robot1_joint_state_broadcaster",
         "robot1_io_and_status_controller",
         "robot1_speed_scaling_state_broadcaster",
         "robot1_force_torque_sensor_broadcaster",
         #"robot1_tcp_pose_broadcaster",
         "robot1_ur_configuration_controller",
         "robot2_joint_trajectory_controller",
-        "robot2_joint_state_broadcaster",
         "robot2_io_and_status_controller",
         "robot2_speed_scaling_state_broadcaster",
         "robot2_force_torque_sensor_broadcaster",
