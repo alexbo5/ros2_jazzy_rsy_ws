@@ -12,7 +12,7 @@ def generate_launch_description():
     pkg_share = get_package_share_directory("05_new_robot_startup")
 
     moveit_config = (
-        MoveItConfigsBuilder("dual_ur", package_name="05_new_robot_startup")
+        MoveItConfigsBuilder("ur", package_name="05_new_robot_startup")
         .robot_description(file_path="config/ur.urdf.xacro")
         .robot_description_semantic(file_path="config/ur.srdf")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
