@@ -41,12 +41,16 @@ def generate_launch_description():
         "ros2_controllers.yaml",
     )
 
+    # RViz config path
+    rviz_config_file = os.path.join(pkg_share, "config", "moveit.rviz")
+
     # RViz node
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
         name="rviz2",
         output="log",
+        arguments=["-d", rviz_config_file],
     )
 
     ros2_control_node = Node(
