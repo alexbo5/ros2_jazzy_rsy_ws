@@ -5,7 +5,8 @@
       "Bash(tree:*)",
       "Bash(python3:*)",
       "Bash(echo:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git config:*)"
     ]
   }
 }
