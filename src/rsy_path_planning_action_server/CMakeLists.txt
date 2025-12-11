@@ -19,7 +19,7 @@ find_package(action_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/MoveJ.action"
   "action/MoveL.action"
-  DEPENDENCIES geometry_msgs std_msgs action_msgs
+  DEPENDENCIES std_msgs action_msgs
 )
 
 # Install Python modules
@@ -28,6 +28,7 @@ ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
   rsy_path_planning_action_server/path_planning_action_server.py
+  rsy_path_planning_action_server/test_client.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -1,9 +1,11 @@
-# MoveJ Action - Joint space motion
-# Moves the robot to target joint positions
+# MoveJ Action - Joint space motion to a Cartesian pose
+# Moves the robot to target pose using joint space interpolation (PTP motion)
 
 # Goal
 string robot_name                    # "robot1" or "robot2"
-float64[] joint_positions            # Target joint positions in radians (6 values)
+float64[16] transformation_matrix    # 4x4 transformation matrix (row-major order)
+                                     # [r00, r01, r02, tx, r10, r11, r12, ty, r20, r21, r22, tz, 0, 0, 0, 1]
+string frame_id                      # Reference frame for the transformation (e.g., "world", "robot1_base_link")
 float64 velocity_scaling             # Velocity scaling factor (0.0 to 1.0), default 0.1
 float64 acceleration_scaling         # Acceleration scaling factor (0.0 to 1.0), default 0.1
 ---
@@ -13,4 +15,4 @@ string message                       # Status message
 ---
 # Feedback
 float64 progress                     # Progress percentage (0.0 to 100.0)
-float64[] current_joint_positions    # Current joint positions during motion
+float64[16] current_transformation   # Current end effector transformation matrix
