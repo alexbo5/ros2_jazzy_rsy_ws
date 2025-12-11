@@ -3,17 +3,27 @@
 Path Planning Action Server for RSY dual robot setup.
 Provides MoveJ (joint space) and MoveL (linear/Cartesian) motion actions.
 Uses 4x4 transformation matrices for pose specification.
+
+This server connects to the existing move_group node via the MoveGroup action interface.
 """
 
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.action import ActionServer, ActionClient, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 
-from moveit.planning import MoveItPy
-from moveit.core.robot_state import RobotState
-
+from moveit_msgs.action import MoveGroup
+from moveit_msgs.msg import (
+    MotionPlanRequest,
+    PlanningOptions,
+    Constraints,
+    PositionConstraint,
+    OrientationConstraint,
+    BoundingVolume,
+    WorkspaceParameters,
+)
+from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import JointState
 
@@ -47,21 +57,23 @@ class PathPlanningActionServer(Node):
             }
         }
 
-        # Initialize MoveItPy - connects to existing move_group node
-        self.get_logger().info('Initializing MoveItPy...')
-        self.moveit = MoveItPy(node_name='moveit_py_planning')
-        self.get_logger().info('MoveItPy initialized successfully')
-
-        # Get planning components for each robot
-        self.planning_components = {}
-        for robot_name, config in self.robot_configs.items():
-            self.planning_components[robot_name] = self.moveit.get_planning_component(
-                config['planning_group']
-            )
-            self.get_logger().info(f'Planning component initialized for {robot_name}')
-
-        # Callback group for concurrent action handling
+        # Callback group for concurrent handling
         self.callback_group = ReentrantCallbackGroup()
+
+        # Create MoveGroup action client to connect to existing move_group node
+        self.get_logger().info('Connecting to move_group action server...')
+        self._move_group_client = ActionClient(
+            self,
+            MoveGroup,
+            'move_action',
+            callback_group=self.callback_group
+        )
+
+        # Wait for move_group to be available
+        if not self._move_group_client.wait_for_server(timeout_sec=10.0):
+            self.get_logger().error('move_group action server not available!')
+            raise RuntimeError('move_group action server not available')
+        self.get_logger().info('Connected to move_group action server')
 
         # Current joint states (updated via subscription)
         self.current_joint_states = {}
@@ -70,7 +82,8 @@ class PathPlanningActionServer(Node):
             JointState,
             '/joint_states',
             self.joint_state_callback,
-            10
+            10,
+            callback_group=self.callback_group
         )
 
         # Create action servers
@@ -285,6 +298,84 @@ class PathPlanningActionServer(Node):
 
         return True, ''
 
+    def create_move_group_goal(self, robot_name: str, target_pose: PoseStamped,
+                                velocity_scaling: float, acceleration_scaling: float,
+                                planner_id: str = 'PTP',
+                                pipeline_id: str = 'pilz_industrial_motion_planner') -> MoveGroup.Goal:
+        """Create a MoveGroup action goal for the specified robot and target pose."""
+        config = self.robot_configs[robot_name]
+
+        goal = MoveGroup.Goal()
+
+        # Motion plan request
+        goal.request.group_name = config['planning_group']
+        goal.request.num_planning_attempts = 10
+        goal.request.allowed_planning_time = 10.0
+        goal.request.max_velocity_scaling_factor = velocity_scaling
+        goal.request.max_acceleration_scaling_factor = acceleration_scaling
+        goal.request.pipeline_id = pipeline_id
+        goal.request.planner_id = planner_id
+
+        # Leave start_state empty to use current state from planning scene
+        # goal.request.start_state is left as default (empty = use current)
+        goal.request.start_state.is_diff = True  # Important: indicates to use current state
+
+        # Set workspace parameters
+        goal.request.workspace_parameters.header.frame_id = 'world'
+        goal.request.workspace_parameters.header.stamp = self.get_clock().now().to_msg()
+        goal.request.workspace_parameters.min_corner.x = -3.0
+        goal.request.workspace_parameters.min_corner.y = -3.0
+        goal.request.workspace_parameters.min_corner.z = -1.0
+        goal.request.workspace_parameters.max_corner.x = 3.0
+        goal.request.workspace_parameters.max_corner.y = 3.0
+        goal.request.workspace_parameters.max_corner.z = 3.0
+
+        # Create goal constraints from target pose
+        constraints = Constraints()
+
+        # Position constraint
+        position_constraint = PositionConstraint()
+        position_constraint.header = target_pose.header
+        position_constraint.link_name = config['ee_frame']
+        position_constraint.target_point_offset.x = 0.0
+        position_constraint.target_point_offset.y = 0.0
+        position_constraint.target_point_offset.z = 0.0
+
+        # Bounding volume (small sphere around target)
+        bounding_volume = BoundingVolume()
+        primitive = SolidPrimitive()
+        primitive.type = SolidPrimitive.SPHERE
+        primitive.dimensions = [0.01]  # 10mm tolerance
+        bounding_volume.primitives.append(primitive)
+        bounding_volume.primitive_poses.append(target_pose.pose)
+        position_constraint.constraint_region = bounding_volume
+        position_constraint.weight = 1.0
+
+        constraints.position_constraints.append(position_constraint)
+
+        # Orientation constraint
+        orientation_constraint = OrientationConstraint()
+        orientation_constraint.header = target_pose.header
+        orientation_constraint.link_name = config['ee_frame']
+        orientation_constraint.orientation = target_pose.pose.orientation
+        orientation_constraint.absolute_x_axis_tolerance = 0.1
+        orientation_constraint.absolute_y_axis_tolerance = 0.1
+        orientation_constraint.absolute_z_axis_tolerance = 0.1
+        orientation_constraint.weight = 1.0
+
+        constraints.orientation_constraints.append(orientation_constraint)
+
+        goal.request.goal_constraints.append(constraints)
+
+        # Planning options
+        goal.planning_options.plan_only = False  # Plan and execute
+        goal.planning_options.look_around = False
+        goal.planning_options.replan = True
+        goal.planning_options.replan_attempts = 5
+        goal.planning_options.replan_delay = 0.5
+
+        return goal
+
     async def execute_movej_callback(self, goal_handle):
         """Execute MoveJ action - joint space (PTP) motion to Cartesian pose."""
         self.get_logger().info('Executing MoveJ goal (PTP motion)...')
@@ -311,8 +402,6 @@ class PathPlanningActionServer(Node):
             result.message = f'Invalid transformation matrix: {error_msg}'
             return result
 
-        # Get planning component and config
-        planning_component = self.planning_components[robot_name]
         config = self.robot_configs[robot_name]
 
         # Set velocity and acceleration scaling
@@ -336,65 +425,52 @@ class PathPlanningActionServer(Node):
             f'  Velocity scaling: {velocity_scaling}, Acceleration scaling: {acceleration_scaling}'
         )
 
-        # Set start state to current
-        planning_component.set_start_state_to_current_state()
-
         # Send initial feedback
         feedback_msg = MoveJ.Feedback()
         feedback_msg.progress = 0.0
         feedback_msg.current_transformation = self.get_identity_matrix()
         goal_handle.publish_feedback(feedback_msg)
 
-        # Set goal state from pose
-        planning_component.set_goal_state(
-            pose_stamped_msg=target_pose,
-            pose_link=config['ee_frame']
+        # Create MoveGroup goal using Pilz PTP planner
+        move_group_goal = self.create_move_group_goal(
+            robot_name, target_pose, velocity_scaling, acceleration_scaling,
+            planner_id='PTP', pipeline_id='pilz_industrial_motion_planner'
         )
 
-        # Plan using Pilz PTP planner for point-to-point motion
-        self.get_logger().info('Attempting Pilz PTP planner...')
-        plan_result = planning_component.plan(
-            planner_id='PTP',
-            planning_pipeline='pilz_industrial_motion_planner',
-            single_plan_parameters={
-                'max_velocity_scaling_factor': velocity_scaling,
-                'max_acceleration_scaling_factor': acceleration_scaling,
-            }
-        )
+        self.get_logger().info('Sending goal to move_group (Pilz PTP)...')
 
-        if not plan_result:
-            self.get_logger().warn('Pilz PTP planning failed, trying OMPL...')
-            # Fallback to OMPL if Pilz fails
-            plan_result = planning_component.plan(
-                single_plan_parameters={
-                    'max_velocity_scaling_factor': velocity_scaling,
-                    'max_acceleration_scaling_factor': acceleration_scaling,
-                }
+        # Send goal to move_group
+        send_goal_future = self._move_group_client.send_goal_async(move_group_goal)
+        goal_response = await send_goal_future
+
+        if not goal_response.accepted:
+            self.get_logger().warn('Pilz PTP rejected, trying OMPL...')
+            # Fallback to OMPL
+            move_group_goal = self.create_move_group_goal(
+                robot_name, target_pose, velocity_scaling, acceleration_scaling,
+                planner_id='RRTConnect', pipeline_id='ompl'
             )
+            send_goal_future = self._move_group_client.send_goal_async(move_group_goal)
+            goal_response = await send_goal_future
 
-        if not plan_result:
-            self.get_logger().error('Planning failed')
-            goal_handle.abort()
-            result = MoveJ.Result()
-            result.success = False
-            result.message = 'Motion planning failed - no valid path found'
-            return result
+            if not goal_response.accepted:
+                self.get_logger().error('Goal rejected by move_group')
+                goal_handle.abort()
+                result = MoveJ.Result()
+                result.success = False
+                result.message = 'Motion goal rejected by move_group'
+                return result
 
-        self.get_logger().info('Plan successful, executing...')
-
-        # Update feedback - planning complete
+        self.get_logger().info('Goal accepted, waiting for result...')
         feedback_msg.progress = 25.0
         goal_handle.publish_feedback(feedback_msg)
 
-        # Execute the trajectory using the appropriate controller
-        trajectory = plan_result.trajectory
-        execute_result = self.moveit.execute(
-            trajectory,
-            controllers=[config['controller']]
-        )
+        # Wait for result
+        result_future = goal_response.get_result_async()
+        move_group_result = await result_future
 
-        # Monitor execution and provide feedback
-        if execute_result:
+        # Check result
+        if move_group_result.result.error_code.val == 1:  # SUCCESS
             feedback_msg.progress = 100.0
             feedback_msg.current_transformation = list(request.transformation_matrix)
             goal_handle.publish_feedback(feedback_msg)
@@ -408,11 +484,12 @@ class PathPlanningActionServer(Node):
             feedback_msg.progress = 0.0
             goal_handle.publish_feedback(feedback_msg)
 
-            self.get_logger().error('Execution failed')
+            error_code = move_group_result.result.error_code.val
+            self.get_logger().error(f'Motion failed with error code: {error_code}')
             goal_handle.abort()
             result = MoveJ.Result()
             result.success = False
-            result.message = 'Motion execution failed'
+            result.message = f'Motion failed with error code: {error_code}'
 
         return result
 
@@ -442,8 +519,6 @@ class PathPlanningActionServer(Node):
             result.message = f'Invalid transformation matrix: {error_msg}'
             return result
 
-        # Get planning component and config
-        planning_component = self.planning_components[robot_name]
         config = self.robot_configs[robot_name]
 
         # Set velocity and acceleration scaling
@@ -467,65 +542,52 @@ class PathPlanningActionServer(Node):
             f'  Velocity scaling: {velocity_scaling}, Acceleration scaling: {acceleration_scaling}'
         )
 
-        # Set start state to current
-        planning_component.set_start_state_to_current_state()
-
         # Send initial feedback
         feedback_msg = MoveL.Feedback()
         feedback_msg.progress = 0.0
         feedback_msg.current_transformation = self.get_identity_matrix()
         goal_handle.publish_feedback(feedback_msg)
 
-        # Set goal state from pose
-        planning_component.set_goal_state(
-            pose_stamped_msg=target_pose,
-            pose_link=config['ee_frame']
+        # Create MoveGroup goal using Pilz LIN planner
+        move_group_goal = self.create_move_group_goal(
+            robot_name, target_pose, velocity_scaling, acceleration_scaling,
+            planner_id='LIN', pipeline_id='pilz_industrial_motion_planner'
         )
 
-        # Plan using Pilz LIN planner for linear motion
-        self.get_logger().info('Attempting Pilz LIN planner...')
-        plan_result = planning_component.plan(
-            planner_id='LIN',
-            planning_pipeline='pilz_industrial_motion_planner',
-            single_plan_parameters={
-                'max_velocity_scaling_factor': velocity_scaling,
-                'max_acceleration_scaling_factor': acceleration_scaling,
-            }
-        )
+        self.get_logger().info('Sending goal to move_group (Pilz LIN)...')
 
-        if not plan_result:
-            self.get_logger().warn('Pilz LIN planning failed, trying OMPL...')
-            # Fallback to OMPL if Pilz fails
-            plan_result = planning_component.plan(
-                single_plan_parameters={
-                    'max_velocity_scaling_factor': velocity_scaling,
-                    'max_acceleration_scaling_factor': acceleration_scaling,
-                }
+        # Send goal to move_group
+        send_goal_future = self._move_group_client.send_goal_async(move_group_goal)
+        goal_response = await send_goal_future
+
+        if not goal_response.accepted:
+            self.get_logger().warn('Pilz LIN rejected, trying OMPL...')
+            # Fallback to OMPL
+            move_group_goal = self.create_move_group_goal(
+                robot_name, target_pose, velocity_scaling, acceleration_scaling,
+                planner_id='RRTConnect', pipeline_id='ompl'
             )
+            send_goal_future = self._move_group_client.send_goal_async(move_group_goal)
+            goal_response = await send_goal_future
 
-        if not plan_result:
-            self.get_logger().error('Planning failed')
-            goal_handle.abort()
-            result = MoveL.Result()
-            result.success = False
-            result.message = 'Motion planning failed - no valid path found'
-            return result
+            if not goal_response.accepted:
+                self.get_logger().error('Goal rejected by move_group')
+                goal_handle.abort()
+                result = MoveL.Result()
+                result.success = False
+                result.message = 'Motion goal rejected by move_group'
+                return result
 
-        self.get_logger().info('Plan successful, executing...')
-
-        # Update feedback - planning complete
+        self.get_logger().info('Goal accepted, waiting for result...')
         feedback_msg.progress = 25.0
         goal_handle.publish_feedback(feedback_msg)
 
-        # Execute the trajectory using the appropriate controller
-        trajectory = plan_result.trajectory
-        execute_result = self.moveit.execute(
-            trajectory,
-            controllers=[config['controller']]
-        )
+        # Wait for result
+        result_future = goal_response.get_result_async()
+        move_group_result = await result_future
 
-        # Monitor execution and provide feedback
-        if execute_result:
+        # Check result
+        if move_group_result.result.error_code.val == 1:  # SUCCESS
             feedback_msg.progress = 100.0
             feedback_msg.current_transformation = list(request.transformation_matrix)
             goal_handle.publish_feedback(feedback_msg)
@@ -539,11 +601,12 @@ class PathPlanningActionServer(Node):
             feedback_msg.progress = 0.0
             goal_handle.publish_feedback(feedback_msg)
 
-            self.get_logger().error('Execution failed')
+            error_code = move_group_result.result.error_code.val
+            self.get_logger().error(f'Motion failed with error code: {error_code}')
             goal_handle.abort()
             result = MoveL.Result()
             result.success = False
-            result.message = 'Motion execution failed'
+            result.message = f'Motion failed with error code: {error_code}'
 
         return result
 

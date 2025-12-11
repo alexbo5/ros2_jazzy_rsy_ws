@@ -3,7 +3,9 @@
     "allow": [
       "Bash(cat:*)",
       "Bash(tree:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(echo:*)",
+      "WebSearch"
     ]
   }
 }

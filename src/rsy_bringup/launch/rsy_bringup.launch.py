@@ -34,7 +34,7 @@ def generate_launch_description():
 
     # Path Planning Action Server - delayed to ensure MoveIt is ready
     path_planning_action_server = TimerAction(
-        period=5.0,  # Wait 5 seconds for MoveIt to initialize
+        period=5.0,
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
