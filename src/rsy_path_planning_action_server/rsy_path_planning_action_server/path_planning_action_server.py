@@ -136,7 +136,7 @@ class PathPlanningActionServer(Node):
         bv = BoundingVolume()
         prim = SolidPrimitive()
         prim.type = SolidPrimitive.SPHERE
-        prim.dimensions = [0.001]
+        prim.dimensions = [0.01]  # 10mm tolerance
         bv.primitives.append(prim)
         p = Pose()
         p.position = pose.pose.position
@@ -149,9 +149,9 @@ class PathPlanningActionServer(Node):
         ori.header = pose.header
         ori.link_name = ee_link
         ori.orientation = pose.pose.orientation
-        ori.absolute_x_axis_tolerance = 0.01
-        ori.absolute_y_axis_tolerance = 0.01
-        ori.absolute_z_axis_tolerance = 0.01
+        ori.absolute_x_axis_tolerance = 0.1  # ~5.7° tolerance
+        ori.absolute_y_axis_tolerance = 0.1
+        ori.absolute_z_axis_tolerance = 0.1
         ori.weight = 1.0
 
         constraints = Constraints()

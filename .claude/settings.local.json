@@ -6,7 +6,8 @@
       "Bash(python3:*)",
       "Bash(echo:*)",
       "WebSearch",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(find:*)"
     ]
   }
 }
