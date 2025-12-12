@@ -6,6 +6,7 @@ import numpy as np
 from dataclasses import dataclass
 
 from rsy_cube_motion.action import RotateFace, HandOver
+from rsy_path_planning.action import MoveJ, MoveL
 
 # Roboter 1 dreht U, F, D; Roboter 2 dreht L, B, R
 ROBOT_FACES = ["U", "F", "D"], ["L", "B", "R"]
@@ -178,6 +179,10 @@ class CubeMotionServer(Node):
         # interner Client: RotateFace kann HandOver aufrufen
         self.hand_over_client = ActionClient(self, HandOver, 'hand_over')
 
+        # Path planning action clients
+        self.move_j_client = ActionClient(self, MoveJ, 'move_j')
+        self.move_l_client = ActionClient(self, MoveL, 'move_l')
+
         self.get_logger().info("Cube Motion Server gestartet.")
 
     def _init_cube_poses(self):
@@ -264,20 +269,30 @@ class CubeMotionServer(Node):
         self.get_logger().info(">>> [HandOver] Ausführen des Griffwechsels")
 
         # Define the handover sequence
+        old_spinning_robot = self._get_robot_name(self.cube_spinning_robot)
+        new_spinning_robot = self._get_robot_name(targeted_cube_spinning_robot)
         old_spinning_robot_approach_from_front = (self.cube_spinning_robot == 1)
         new_spinning_robot_approach_from_front = (self.cube_spinning_robot == 2)
 
+        # Old robot moves to handover position with cube
         old_spinning_robot_target = self.get_gripper_pose(self.handover_pose, approach_from_front=old_spinning_robot_approach_from_front, offset_dist=OFFSET_DIST_HOLD_CUBE)
-        # TODO: MoveJ: old spinning robot, old_spinning_robot_target
+        await self.call_move_j(old_spinning_robot, old_spinning_robot_target)
+
+        # New robot approaches handover position
         new_spinning_robot_pre_target = self.get_gripper_pose(self.handover_pose, approach_from_front=new_spinning_robot_approach_from_front, offset_dist=OFFSET_DIST_PRE_TARGET, twist_angle=np.pi/2)
-        # TODO: MoveJ: new spinning robot, new_spinning_robot_pre_target
+        await self.call_move_j(new_spinning_robot, new_spinning_robot_pre_target)
+
+        # New robot moves linearly to grasp cube
         new_spinning_robot_target = self.get_gripper_pose(self.handover_pose, approach_from_front=new_spinning_robot_approach_from_front, offset_dist=OFFSET_DIST_HOLD_CUBE, twist_angle=np.pi/2)
-        # TODO: MoveL: new spinning robot, new_spinning_robot_target
+        await self.call_move_l(new_spinning_robot, new_spinning_robot_target)
+
         # TODO: Gripper close: new spinning robot
         # TODO: Gripper open: old spinning robot
+
+        # Old robot retracts
         old_spinning_robot_post_target = self.get_gripper_pose(self.handover_pose, approach_from_front=old_spinning_robot_approach_from_front, offset_dist=OFFSET_DIST_PRE_TARGET)
-        # TODO: MoveL: old spinning robot, old_spinning_robot_post_target
-        
+        await self.call_move_l(old_spinning_robot, old_spinning_robot_post_target)
+
         self.cube_spinning_robot = targeted_cube_spinning_robot
 
         result = HandOver.Result()
@@ -311,23 +326,37 @@ class CubeMotionServer(Node):
 
         # Get cube pose for this face
         cube_pose = self.get_cube_pose_for_face(face)
-        
+
         self.get_logger().info(f">>> [RotateFace] Cube pose for face {face}: {cube_pose.position}")
         self.get_logger().info(f">>> [RotateFace] Face normal for face {face}: {cube_pose.orientation_vector}")
 
-        # Define gripper poses for the rotation sequence
+        # Determine which robot holds and which spins
+        spinning_robot = self._get_robot_name(self.cube_spinning_robot)
+        holding_robot = self._get_robot_name(3 - self.cube_spinning_robot)  # other robot
+
+        # Holding robot moves to hold the cube
         cube_holding_target = self.get_gripper_pose(cube_pose, approach_from_front=False, offset_dist=OFFSET_DIST_HOLD_CUBE)
-        # TODO: MoveJ: cube holding robot, cube_holding_target
+        await self.call_move_j(holding_robot, cube_holding_target)
+
+        # Spinning robot approaches the face
         cube_spinning_pre_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_PRE_TARGET)
-        # TODO: MoveJ: cube spinning robot, cube_spinning_pre_target
+        await self.call_move_j(spinning_robot, cube_spinning_pre_target)
+
+        # Spinning robot moves linearly to grasp position
         cube_spinning_start_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_SPIN_CUBE)
-        # TODO: MoveL: cube spinning robot, cube_spinning_start_target
+        await self.call_move_l(spinning_robot, cube_spinning_start_target)
+
         # TODO: Gripper close
+
+        # Spinning robot rotates the face (reorient)
         cube_spinning_end_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_SPIN_CUBE, twist_angle=np.radians(angle))
-        # TODO: Reorient: cube spinning robot, cube_spinning_end_target
+        await self.call_move_l(spinning_robot, cube_spinning_end_target)
+
         # TODO: Gripper open
+
+        # Spinning robot retracts
         cube_spinning_post_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_PRE_TARGET, twist_angle=np.radians(angle))
-        # TODO: MoveL: cube spinning robot, cube_spinning_post_target
+        await self.call_move_l(spinning_robot, cube_spinning_post_target)
 
         result = RotateFace.Result()
         result.success = True
@@ -341,6 +370,66 @@ class CubeMotionServer(Node):
     # -------------------------------
     # interne Hilfsfunktionen
     # -------------------------------
+    def _get_robot_name(self, robot_num):
+        """Convert robot number (1 or 2) to robot name string."""
+        return f"robot{robot_num}"
+
+    async def call_move_j(self, robot_name, gripper_pose):
+        """Call MoveJ action for PTP motion."""
+        if not self.move_j_client.wait_for_server(timeout_sec=5.0):
+            self.get_logger().error(f"[MoveJ] Action server not available")
+            return False
+
+        goal = MoveJ.Goal()
+        goal.robot_name = robot_name
+        goal.x = float(gripper_pose.position[0])
+        goal.y = float(gripper_pose.position[1])
+        goal.z = float(gripper_pose.position[2])
+        goal.qx = float(gripper_pose.quaternion[0])
+        goal.qy = float(gripper_pose.quaternion[1])
+        goal.qz = float(gripper_pose.quaternion[2])
+        goal.qw = float(gripper_pose.quaternion[3])
+
+        goal_handle = await self.move_j_client.send_goal_async(goal)
+        if not goal_handle.accepted:
+            self.get_logger().error(f"[MoveJ] Goal rejected")
+            return False
+
+        result = await goal_handle.get_result_async()
+        if not result.result.success:
+            self.get_logger().error(f"[MoveJ] Failed: {result.result.message}")
+            return False
+
+        return True
+
+    async def call_move_l(self, robot_name, gripper_pose):
+        """Call MoveL action for linear motion."""
+        if not self.move_l_client.wait_for_server(timeout_sec=5.0):
+            self.get_logger().error(f"[MoveL] Action server not available")
+            return False
+
+        goal = MoveL.Goal()
+        goal.robot_name = robot_name
+        goal.x = float(gripper_pose.position[0])
+        goal.y = float(gripper_pose.position[1])
+        goal.z = float(gripper_pose.position[2])
+        goal.qx = float(gripper_pose.quaternion[0])
+        goal.qy = float(gripper_pose.quaternion[1])
+        goal.qz = float(gripper_pose.quaternion[2])
+        goal.qw = float(gripper_pose.quaternion[3])
+
+        goal_handle = await self.move_l_client.send_goal_async(goal)
+        if not goal_handle.accepted:
+            self.get_logger().error(f"[MoveL] Goal rejected")
+            return False
+
+        result = await goal_handle.get_result_async()
+        if not result.result.success:
+            self.get_logger().error(f"[MoveL] Failed: {result.result.message}")
+            return False
+
+        return True
+
     async def call_hand_over(self):
         """Interner Aufruf des HandOver Actionsservers."""
 
