@@ -40,4 +40,5 @@ WORKDIR /root/ros2_ws
 # Setup bashrc with conditional sourcing for custom packages
 RUN echo "source /opt/ros/jazzy/setup.bash" >> /root/.bashrc && \
     echo "[ -f /root/ros2_ws/install/setup.bash ] && source /root/ros2_ws/install/setup.bash" >> /root/.bashrc && \
-    echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> /root/.bashrc
+    echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> /root/.bashrc && \
+    echo "alias startup='cd /root/ros2_ws && colcon build && source install/setup.bash && ros2 launch rsy_bringup rsy_bringup.launch.py'" >> /root/.bashrc
