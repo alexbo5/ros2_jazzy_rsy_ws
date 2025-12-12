@@ -112,15 +112,15 @@
 <link name="coneyor_belt">
   <collision>
     <geometry>
-      <box size="0.2 0.8 0.1"/>
+      <box size="0.8 0.2 0.1"/>
     </geometry>
-    <origin xyz="-0.3275 -0.385 0.05" rpy="0 0 0"/>
+    <origin xyz="-0.385 0.3275 0.05" rpy="0 0 0"/>
   </collision>
   <visual>
     <geometry>
-      <box size="0.2 0.8 0.1"/>
+      <box size="0.8 0.2 0.1"/>
     </geometry>
-    <origin xyz="-0.3275 -0.385 0.05" rpy="0 0 0"/>
+    <origin xyz="-0.385 0.3275 0.05" rpy="0 0 0"/>
     <material name="yellow">
       <color rgba="1.0 1.0 0.0 1.0"/>
     </material>
@@ -143,7 +143,7 @@
     safety_limits="$(arg robot1_safety_limits)"
     safety_pos_margin="$(arg robot1_safety_pos_margin)"
     safety_k_position="$(arg robot1_safety_k_position)">
-     <origin xyz="-0.77 -0.655 0" rpy="0 0 0" />          <!-- position robot in the world -->
+     <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
 </xacro:ur_robot>
 
 <xacro:ur_robot
@@ -157,7 +157,7 @@
     safety_limits="$(arg robot2_safety_limits)"
     safety_pos_margin="$(arg robot2_safety_pos_margin)"
     safety_k_position="$(arg robot2_safety_k_position)">
-     <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
+     <origin xyz="-0.77 0.655 0" rpy="0 0 0" />          <!-- position robot in the world -->
 </xacro:ur_robot>
 
 <!-- ros2 control instance -->
