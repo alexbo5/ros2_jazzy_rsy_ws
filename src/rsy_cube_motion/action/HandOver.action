@@ -1,0 +1,8 @@
+# Goal:
+int8 cube_spinning_robot  # index of the robot which can spin the cube (and is not holding it)
+---
+# Result
+int8 cube_spinning_robot
+bool success
+---
+# Feedback

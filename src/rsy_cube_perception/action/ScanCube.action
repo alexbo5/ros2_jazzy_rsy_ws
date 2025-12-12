@@ -1,0 +1,14 @@
+# Goal: keine zusätzlichen Parameter (optional: camera_index, retries, timeout_ms)
+int32 camera_index
+---
+# Result
+string solution   # den vom Solver zurückgegebenen Zugfolgen-String (z.B. "R U R'")
+string description # menschlich lesbare Beschreibung
+bool success
+string message
+---
+# Feedback
+string current_face
+int32 faces_captured
+int32 total_faces
+string status

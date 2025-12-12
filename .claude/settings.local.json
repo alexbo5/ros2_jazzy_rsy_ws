@@ -7,7 +7,8 @@
       "Bash(echo:*)",
       "WebSearch",
       "Bash(git config:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(mv:*)"
     ]
   }
 }
