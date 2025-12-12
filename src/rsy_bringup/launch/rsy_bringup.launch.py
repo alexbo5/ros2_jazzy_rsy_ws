@@ -11,7 +11,7 @@ def generate_launch_description():
     # Get package share directories
     bringup_pkg_share = get_package_share_directory("rsy_bringup")
     robot_startup_pkg_share = get_package_share_directory("rsy_robot_startup")
-    path_planning_pkg_share = get_package_share_directory("rsy_path_planning_action_server")
+    path_planning_pkg_share = get_package_share_directory("rsy_path_planning")
     cube_motion_pkg_share = get_package_share_directory("rsy_cube_motion")
     cube_perception_pkg_share = get_package_share_directory("rsy_cube_perception")
 

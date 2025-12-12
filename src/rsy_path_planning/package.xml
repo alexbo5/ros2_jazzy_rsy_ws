@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>rsy_path_planning_action_server</name>
+  <name>rsy_path_planning</name>
   <version>0.1.0</version>
   <description>MoveJ/MoveL action server using Pilz planner</description>
   <maintainer email="user@example.com">Alexander</maintainer>

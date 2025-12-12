@@ -13,7 +13,7 @@
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>rsy_robot_startup</exec_depend>
-  <exec_depend>rsy_path_planning_action_server</exec_depend>
+  <exec_depend>rsy_path_planning</exec_depend>
   <exec_depend>rsy_cube_motion</exec_depend>
   <exec_depend>rsy_cube_perception</exec_depend>
 

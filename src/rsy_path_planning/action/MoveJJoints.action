@@ -1,0 +1,13 @@
+# MoveJJoints Action - Point-to-Point (PTP) motion via Pilz planner with joint values
+# Moves the robot to target joint configuration using joint space interpolation
+
+# Goal
+string robot_name       # "robot1" or "robot2"
+float64[] joint_values  # Target joint values [rad] (6 values for UR robot)
+---
+# Result
+bool success            # True if motion completed successfully
+string message          # Status message
+---
+# Feedback
+string status           # Current execution status

@@ -14,7 +14,7 @@ def generate_launch_description():
     # Path Planning Action Server
     # Connects to existing move_group via /move_action
     path_planning_action_server = Node(
-        package='rsy_path_planning_action_server',
+        package='rsy_path_planning',
         executable='path_planning_action_server.py',
         name='path_planning_action_server',
         output='screen',

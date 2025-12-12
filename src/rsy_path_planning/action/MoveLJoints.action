@@ -1,0 +1,13 @@
+# MoveLJoints Action - Linear (LIN) motion via Pilz planner with joint values
+# Moves the robot TCP linearly to target joint configuration (straight line in Cartesian space)
+
+# Goal
+string robot_name       # "robot1" or "robot2"
+float64[] joint_values  # Target joint values [rad] (6 values for UR robot)
+---
+# Result
+bool success            # True if motion completed successfully
+string message          # Status message
+---
+# Feedback
+string status           # Current execution status
