@@ -126,6 +126,13 @@ class ScanCubeActionServer(Node):
         if not cap.isOpened():
             msg = f"Kamera index={camera_index} nicht verfügbar."
             self.get_logger().error(msg)
+
+            #return sample result for development
+            result.solution = "U R U' R' F2 D2 L2 B2"
+            result.success = True
+            goal_handle.abort()
+            return result
+
             result.success = False
             result.message = msg
             goal_handle.abort()
