@@ -50,6 +50,7 @@ def generate_launch_description():
             ("/controller_manager/robot_description", "/robot_description"),
         ],
         output="both",
+        arguments=["--ros-args", "--log-level", "controller_manager:=error"],
     )
 
     # Controller spawners (will be started after ros2_control_node)
