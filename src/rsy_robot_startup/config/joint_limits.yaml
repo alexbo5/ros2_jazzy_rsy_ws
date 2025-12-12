@@ -1,37 +1,97 @@
+# Joint limits for UR3 (robot1) and UR3e (robot2)
+# Based on Universal Robots e-Series User Manual
 joint_limits:
+  # Robot1 (UR3)
   robot1_shoulder_pan_joint:
+    has_position_limits: true
+    min_position: -6.2832  # -360 deg
+    max_position: 6.2832   # +360 deg
+    has_velocity_limits: true
+    max_velocity: 3.1416   # 180 deg/s
     has_acceleration_limits: true
     max_acceleration: 5.0
   robot1_shoulder_lift_joint:
+    has_position_limits: true
+    min_position: -6.2832
+    max_position: 6.2832
+    has_velocity_limits: true
+    max_velocity: 3.1416
     has_acceleration_limits: true
     max_acceleration: 5.0
   robot1_elbow_joint:
+    has_position_limits: true
+    min_position: -3.1416  # -180 deg (limited to avoid planning issues)
+    max_position: 3.1416   # +180 deg
+    has_velocity_limits: true
+    max_velocity: 3.1416
     has_acceleration_limits: true
     max_acceleration: 5.0
   robot1_wrist_1_joint:
+    has_position_limits: true
+    min_position: -6.2832
+    max_position: 6.2832
+    has_velocity_limits: true
+    max_velocity: 6.2832   # 360 deg/s
     has_acceleration_limits: true
     max_acceleration: 5.0
   robot1_wrist_2_joint:
+    has_position_limits: true
+    min_position: -6.2832
+    max_position: 6.2832
+    has_velocity_limits: true
+    max_velocity: 6.2832
     has_acceleration_limits: true
     max_acceleration: 5.0
   robot1_wrist_3_joint:
+    has_position_limits: false  # No position limits per UR spec
+    has_velocity_limits: true
+    max_velocity: 6.2832
     has_acceleration_limits: true
     max_acceleration: 5.0
+  # Robot2 (UR3e)
   robot2_shoulder_pan_joint:
+    has_position_limits: true
+    min_position: -6.2832
+    max_position: 6.2832
+    has_velocity_limits: true
+    max_velocity: 3.1416
     has_acceleration_limits: true
     max_acceleration: 5.0
   robot2_shoulder_lift_joint:
+    has_position_limits: true
+    min_position: -6.2832
+    max_position: 6.2832
+    has_velocity_limits: true
+    max_velocity: 3.1416
     has_acceleration_limits: true
     max_acceleration: 5.0
   robot2_elbow_joint:
+    has_position_limits: true
+    min_position: -3.1416
+    max_position: 3.1416
+    has_velocity_limits: true
+    max_velocity: 3.1416
     has_acceleration_limits: true
     max_acceleration: 5.0
   robot2_wrist_1_joint:
+    has_position_limits: true
+    min_position: -6.2832
+    max_position: 6.2832
+    has_velocity_limits: true
+    max_velocity: 6.2832
     has_acceleration_limits: true
     max_acceleration: 5.0
   robot2_wrist_2_joint:
+    has_position_limits: true
+    min_position: -6.2832
+    max_position: 6.2832
+    has_velocity_limits: true
+    max_velocity: 6.2832
     has_acceleration_limits: true
     max_acceleration: 5.0
   robot2_wrist_3_joint:
+    has_position_limits: false  # No position limits per UR spec
+    has_velocity_limits: true
+    max_velocity: 6.2832
     has_acceleration_limits: true
     max_acceleration: 5.0

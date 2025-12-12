@@ -122,8 +122,8 @@ class PathPlanningActionServer(Node):
         mp.group_name = group
         mp.pipeline_id = 'pilz_industrial_motion_planner'
         mp.planner_id = planner_id
-        mp.num_planning_attempts = 10
-        mp.allowed_planning_time = 5.0
+        mp.num_planning_attempts = 50
+        mp.allowed_planning_time = 15.0
         mp.max_velocity_scaling_factor = 0.1
         mp.max_acceleration_scaling_factor = 0.1
         mp.start_state.is_diff = True

@@ -15,6 +15,7 @@ def generate_launch_description():
         MoveItConfigsBuilder("ur", package_name="rsy_robot_startup")
         .robot_description(file_path="config/ur.urdf.xacro")
         .robot_description_semantic(file_path="config/ur.srdf")
+        .joint_limits(file_path="config/joint_limits.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
         .planning_pipelines(pipelines=["ompl", "pilz_industrial_motion_planner"])
         .to_moveit_configs()
