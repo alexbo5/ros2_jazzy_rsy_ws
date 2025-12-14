@@ -15,16 +15,16 @@ ROBOT_FACES = ["U", "F", "D"], ["L", "B", "R"]
 # Adjust these values later in real-world testing.
 CUBE_POSE_DEFS = {
     # face: (position_xyz, face_normal_vector)
-    "U": ([-0.385, 0.3275, 0.3], [0.0, 0.0, 1.0]),
-    "D": ([-0.385, 0.3275, 0.3], [0.0, 0.0, -1.0]),
-    "F": ([-0.385, 0.3275, 0.3], [0.0, 1.0, 0.0]),
-    "B": ([-0.385, 0.3275, 0.3], [0.0, -1.0, 0.0]),
-    "L": ([-0.385, 0.3275, 0.3], [-1.0, 0.0, 0.0]),
-    "R": ([-0.385, 0.3275, 0.3], [1.0, 0.0, 0.0]),
+    "U": ([-0.385, 0.3275, 0.15], [0.0, 0.0, 1.0]),
+    "D": ([-0.385, 0.3275, 0.15], [0.0, 0.0, -1.0]),
+    "F": ([-0.385, 0.3275, 0.15], [0.0, 1.0, 0.0]),
+    "B": ([-0.385, 0.3275, 0.15], [0.0, -1.0, 0.0]),
+    "L": ([-0.385, 0.3275, 0.15], [-1.0, 0.0, 0.0]),
+    "R": ([-0.385, 0.3275, 0.15], [1.0, 0.0, 0.0]),
 }
 
 HAND_OVER_POSE_DEF = {
-    "position": [-0.385, 0.3275, 0.3],
+    "position": [-0.385, 0.3275, 0.15],
     "orientation_vector": [1.0, 0.0, 0.0]  # approach axis
 }
 
@@ -147,7 +147,7 @@ class CubeMotionServer(Node):
         super().__init__('cube_motion_server')
 
         # Roboter, der den Würfel dreht (1 oder 2)
-        self.cube_spinning_robot = 1
+        self.cube_spinning_robot = 2
 
         # Cube poses for each accessible face (U, D, L, R, F, B)
         # Position: [x, y, z], Orientation: quaternion [x, y, z, w]
@@ -380,6 +380,8 @@ class CubeMotionServer(Node):
             self.get_logger().error(f"[MoveJ] Action server not available")
             return False
 
+        self.get_logger().info(f"[MoveJ] Sending goal to {robot_name}: Pos {gripper_pose.position}, Ori {gripper_pose.quaternion}")
+
         goal = MoveJ.Goal()
         goal.robot_name = robot_name
         goal.x = float(gripper_pose.position[0])
@@ -407,6 +409,8 @@ class CubeMotionServer(Node):
         if not self.move_l_client.wait_for_server(timeout_sec=5.0):
             self.get_logger().error(f"[MoveL] Action server not available")
             return False
+
+        self.get_logger().info(f"[MoveL] Sending goal to {robot_name}: Pos {gripper_pose.position}, Ori {gripper_pose.quaternion}")
 
         goal = MoveL.Goal()
         goal.robot_name = robot_name
