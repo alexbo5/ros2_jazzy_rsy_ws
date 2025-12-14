@@ -22,6 +22,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     ros-jazzy-moveit-planners \
     ros-jazzy-moveit-planners-ompl \
     ros-jazzy-moveit-kinematics \
+    # TRAC-IK for robust inverse kinematics
+    ros-jazzy-trac-ik-kinematics-plugin \
     ros-jazzy-moveit-simple-controller-manager \
     ros-jazzy-moveit-configs-utils \
     # Development tools
