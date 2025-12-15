@@ -44,6 +44,9 @@ TRRT:
   frountier_threshold: 0.0
   frountierNodeRatio: 0.1
 
+# Tolerance for start state bounds checking (in radians)
+start_state_max_bounds_error: 0.2
+
 # The order of the elements in the adapter corresponds to the order they are processed by the motion planning pipeline.
 request_adapters:
   - default_planning_request_adapters/ResolveConstraintFrames

@@ -11,21 +11,44 @@ def generate_launch_description():
     # Get package share directory
     pkg_share = get_package_share_directory("rsy_robot_startup")
 
+    # Custom joint limits for URDF (expanded limits)
+    robot1_joint_limits = os.path.join(pkg_share, "config", "ur3_urdf_joint_limits.yaml")
+    robot2_joint_limits = os.path.join(pkg_share, "config", "ur3e_urdf_joint_limits.yaml")
+
     moveit_config = (
         MoveItConfigsBuilder("ur", package_name="rsy_robot_startup")
-        .robot_description(file_path="config/ur.urdf.xacro")
+        .robot_description(
+            file_path="config/ur.urdf.xacro",
+            mappings={
+                "robot1_joint_limit_params": robot1_joint_limits,
+                "robot2_joint_limit_params": robot2_joint_limits,
+            },
+        )
         .robot_description_semantic(file_path="config/ur.srdf")
+        .robot_description_kinematics(file_path="config/kinematics.yaml")
         .joint_limits(file_path="config/joint_limits.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
         .planning_pipelines(pipelines=["ompl", "pilz_industrial_motion_planner"])
         .to_moveit_configs()
     )
 
+    # Load joint limits manually and wrap in robot_description_planning namespace
+    import yaml
+    joint_limits_path = os.path.join(pkg_share, "config", "joint_limits.yaml")
+    with open(joint_limits_path, 'r') as f:
+        joint_limits_yaml = yaml.safe_load(f)
+
+    # Wrap joint limits in the correct namespace for MoveIt
+    joint_limits_params = {"robot_description_planning": {"joint_limits": joint_limits_yaml}}
+
     move_group_node = Node(
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
-        parameters=[moveit_config.to_dict()],
+        parameters=[
+            moveit_config.to_dict(),
+            joint_limits_params,  # Add joint limits explicitly
+        ],
     )
 
     robot_state_publisher = Node(
