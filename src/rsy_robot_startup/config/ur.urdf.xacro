@@ -7,6 +7,8 @@
   
   <xacro:include filename="$(find ur_description)/urdf/inc/ur_transmissions.xacro" />
 
+  <xacro:include filename="$(find robotiq_description)/urdf/robotiq_2f_85_macro.urdf.xacro" />
+
   <!-- possible 'ur_type' values: ur3, ur3e, ur5, ur5e, ur7e, ur10, ur10e, ur12e, ur16e, ur8long, ur15, ur18, ur20, ur30 -->
   <!-- the default value should raise an error in case this was called without defining the type -->
   <xacro:arg name="robot1_ur_type" default="ur3"/>
@@ -114,13 +116,13 @@
     <geometry>
       <box size="0.8 0.2 0.1"/>
     </geometry>
-    <origin xyz="-0.385 0.3275 0.05" rpy="0 0 0"/>
+    <origin xyz="-0.385 0.3275 -0.05" rpy="0 0 0"/>
   </collision>
   <visual>
     <geometry>
       <box size="0.8 0.2 0.1"/>
     </geometry>
-    <origin xyz="-0.385 0.3275 0.05" rpy="0 0 0"/>
+    <origin xyz="-0.385 0.3275 -0.05" rpy="0 0 0"/>
     <material name="yellow">
       <color rgba="1.0 1.0 0.0 1.0"/>
     </material>

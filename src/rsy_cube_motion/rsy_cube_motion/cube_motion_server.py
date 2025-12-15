@@ -15,16 +15,16 @@ ROBOT_FACES = ["U", "F", "D"], ["L", "B", "R"]
 # Adjust these values later in real-world testing.
 CUBE_POSE_DEFS = {
     # face: (position_xyz, face_normal_vector)
-    "U": ([-0.385, 0.3275, 0.15], [0.0, 0.0, 1.0]),
-    "D": ([-0.385, 0.3275, 0.15], [0.0, 0.0, -1.0]),
-    "F": ([-0.385, 0.3275, 0.15], [0.0, 1.0, 0.0]),
-    "B": ([-0.385, 0.3275, 0.15], [0.0, -1.0, 0.0]),
-    "L": ([-0.385, 0.3275, 0.15], [-1.0, 0.0, 0.0]),
-    "R": ([-0.385, 0.3275, 0.15], [1.0, 0.0, 0.0]),
+    "U": ([-0.385, 0.3275, 0.25], [0.0, 0.0, 1.0]),
+    "D": ([-0.385, 0.3275, 0.25], [0.0, 0.0, -1.0]),
+    "F": ([-0.385, 0.3275, 0.25], [1.0, 0.0, 0.0]),
+    "B": ([-0.385, 0.3275, 0.25], [-1.0, 0.0, 0.0]),
+    "L": ([-0.385, 0.3275, 0.25], [0.0, -1.0, 0.0]),
+    "R": ([-0.385, 0.3275, 0.25], [0.0, 1.0, 0.0]),
 }
 
 HAND_OVER_POSE_DEF = {
-    "position": [-0.385, 0.3275, 0.15],
+    "position": [-0.385, 0.3275, 0.25],
     "orientation_vector": [1.0, 0.0, 0.0]  # approach axis
 }
 
@@ -34,7 +34,7 @@ GRIPPER_FORWARD_DIRECTION = np.array([0.0, 0.0, 1.0])
 # distance (mm) from cube center to gripper contact point
 OFFSET_DIST_HOLD_CUBE = 15    # distance when holding the cube (grasps 2 rows of cube)  
 OFFSET_DIST_SPIN_CUBE = 25    # distance when spinning the cube (grasps 1 row of cube)  
-OFFSET_DIST_PRE_TARGET = 50   # distance when approaching the cube (pre-grasp position)
+OFFSET_DIST_PRE_TARGET = 200   # distance when approaching the cube (pre-grasp position)
 
 
 @dataclass
@@ -225,18 +225,68 @@ class CubeMotionServer(Node):
             # Gripper 2: approach from -approach direction (opposite side)
             pos = cube_pose.position - approach * offset_dist
 
-        # Compute quaternion aligning gripper forward -> approach direction
-        q_align = None
-        if approach_from_front:
-            q_align = quaternion_from_two_vectors(GRIPPER_FORWARD_DIRECTION, approach)
+        # Build an absolute gripper orientation whose local Z (forward) is aligned with the approach axis
+        # and whose rotation around that Z is given by twist_angle.
+        # Determine desired forward (gripper z) direction depending on approach side
+        desired_z = -approach if approach_from_front else approach
+        desired_z = desired_z / np.linalg.norm(desired_z)
+
+        # Pick a stable reference vector not parallel to desired_z
+        ref = np.array([1.0, 0.0, 0.0])
+        if abs(np.dot(ref, desired_z)) > 0.9:
+            ref = np.array([0.0, 1.0, 0.0])
+
+        # Build orthonormal basis: x orthogonal to z, y = z x x
+        x_axis = np.cross(ref, desired_z)
+        x_norm = np.linalg.norm(x_axis)
+        if x_norm < 1e-8:
+            # fallback if numerical issues
+            ref = np.array([0.0, 1.0, 0.0])
+            x_axis = np.cross(ref, desired_z)
+            x_norm = np.linalg.norm(x_axis)
+        x_axis = x_axis / x_norm
+        y_axis = np.cross(desired_z, x_axis)
+
+        # Apply twist around desired_z by rotating x,y in their plane
+        ct = np.cos(twist_angle)
+        st = np.sin(twist_angle)
+        x_rot = ct * x_axis + st * y_axis
+        y_rot = -st * x_axis + ct * y_axis
+        z_rot = desired_z
+
+        # Construct rotation matrix with columns = gripper local axes in world frame
+        R = np.vstack((x_rot, y_rot, z_rot)).T  # shape (3,3)
+
+        # Convert rotation matrix to quaternion [x, y, z, w]
+        trace = np.trace(R)
+        if trace > 0.0:
+            S = np.sqrt(trace + 1.0) * 2.0
+            qw = 0.25 * S
+            qx = (R[2,1] - R[1,2]) / S
+            qy = (R[0,2] - R[2,0]) / S
+            qz = (R[1,0] - R[0,1]) / S
         else:
-            q_align = quaternion_from_two_vectors(GRIPPER_FORWARD_DIRECTION, -approach)
+            if (R[0,0] > R[1,1]) and (R[0,0] > R[2,2]):
+                S = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2.0
+                qw = (R[2,1] - R[1,2]) / S
+                qx = 0.25 * S
+                qy = (R[0,1] + R[1,0]) / S
+                qz = (R[0,2] + R[2,0]) / S
+            elif R[1,1] > R[2,2]:
+                S = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2.0
+                qw = (R[0,2] - R[2,0]) / S
+                qx = (R[0,1] + R[1,0]) / S
+                qy = 0.25 * S
+                qz = (R[1,2] + R[2,1]) / S
+            else:
+                S = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2.0
+                qw = (R[1,0] - R[0,1]) / S
+                qx = (R[0,2] + R[2,0]) / S
+                qy = (R[1,2] + R[2,1]) / S
+                qz = 0.25 * S
 
-        # Apply a twist around the approach axis
-        q_twist = quaternion_from_axis_angle(approach, twist_angle)
-
-        # Final orientations: align then twist
-        q = quaternion_multiply(q_align, q_twist)
+        q = np.array([qx, qy, qz, qw])
+        q = quaternion_normalize(q)
 
         gripper_pose = GripperPose(position=pos, quaternion=quaternion_normalize(q))
 

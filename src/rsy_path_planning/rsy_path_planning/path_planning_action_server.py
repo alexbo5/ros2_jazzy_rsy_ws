@@ -224,12 +224,22 @@ class PathPlanningActionServer(Node):
         mp = req.motion_plan_request
 
         mp.group_name = group
-        mp.pipeline_id = 'pilz_industrial_motion_planner'
-        mp.planner_id = planner_id
-        mp.num_planning_attempts = 50
-        mp.allowed_planning_time = 15.0
-        mp.max_velocity_scaling_factor = 0.1
-        mp.max_acceleration_scaling_factor = 0.1
+        # Use OMPL for PTP (collision-aware path planning), Pilz for LIN (linear motion)
+        if planner_id == 'PTP':
+            mp.pipeline_id = 'ompl'
+            mp.planner_id = 'RRTConnect'  # Can find paths around obstacles
+        else:
+            mp.pipeline_id = 'pilz_industrial_motion_planner'
+            mp.planner_id = planner_id
+        mp.num_planning_attempts = 100
+        mp.allowed_planning_time = 20.0
+        # Different scaling for PTP vs LIN
+        if planner_id == 'PTP':
+            mp.max_velocity_scaling_factor = 0.1
+            mp.max_acceleration_scaling_factor = 0.1
+        else:  # LIN - very conservative to avoid joint limit violations
+            mp.max_velocity_scaling_factor = 0.01
+            mp.max_acceleration_scaling_factor = 0.01
         mp.start_state.is_diff = True
 
         # Position constraint
@@ -240,7 +250,7 @@ class PathPlanningActionServer(Node):
         bv = BoundingVolume()
         prim = SolidPrimitive()
         prim.type = SolidPrimitive.SPHERE
-        prim.dimensions = [0.01]  # 10mm tolerance
+        prim.dimensions = [0.001]  # 1mm tolerance (tighter for precision)
         bv.primitives.append(prim)
         p = Pose()
         p.position = pose.pose.position
@@ -253,9 +263,9 @@ class PathPlanningActionServer(Node):
         ori.header = pose.header
         ori.link_name = ee_link
         ori.orientation = pose.pose.orientation
-        ori.absolute_x_axis_tolerance = 0.1  # ~5.7° tolerance
-        ori.absolute_y_axis_tolerance = 0.1
-        ori.absolute_z_axis_tolerance = 0.1
+        ori.absolute_x_axis_tolerance = 0.01  # ~0.57° tolerance (tighter for precision)
+        ori.absolute_y_axis_tolerance = 0.01
+        ori.absolute_z_axis_tolerance = 0.01
         ori.weight = 1.0
 
         constraints = Constraints()
@@ -271,12 +281,22 @@ class PathPlanningActionServer(Node):
         mp = req.motion_plan_request
 
         mp.group_name = group
-        mp.pipeline_id = 'pilz_industrial_motion_planner'
-        mp.planner_id = planner_id
+        # Use OMPL for PTP (collision-aware path planning), Pilz for LIN (linear motion)
+        if planner_id == 'PTP':
+            mp.pipeline_id = 'ompl'
+            mp.planner_id = 'RRTConnect'  # Can find paths around obstacles
+        else:
+            mp.pipeline_id = 'pilz_industrial_motion_planner'
+            mp.planner_id = planner_id
         mp.num_planning_attempts = 50
         mp.allowed_planning_time = 15.0
-        mp.max_velocity_scaling_factor = 0.1
-        mp.max_acceleration_scaling_factor = 0.1
+        # Different scaling for PTP vs LIN
+        if planner_id == 'PTP':
+            mp.max_velocity_scaling_factor = 0.1
+            mp.max_acceleration_scaling_factor = 0.1
+        else:  # LIN - very conservative to avoid joint limit violations
+            mp.max_velocity_scaling_factor = 0.01
+            mp.max_acceleration_scaling_factor = 0.01
         mp.start_state.is_diff = True
 
         # Joint constraints

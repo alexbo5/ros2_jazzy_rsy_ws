@@ -26,6 +26,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     ros-jazzy-trac-ik-kinematics-plugin \
     ros-jazzy-moveit-simple-controller-manager \
     ros-jazzy-moveit-configs-utils \
+    ros-jazzy-robotiq* \
     # Development tools
     git \
     python3-rosdep \
