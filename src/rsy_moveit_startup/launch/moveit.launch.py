@@ -1,16 +1,11 @@
 """
 MoveIt2 Launch File
-Launches move_group with Pilz Industrial Motion Planner for Cartesian path planning.
+Launches move_group and MoveIt Servo for both robots.
 """
 
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch.actions import TimerAction
 from ament_index_python.packages import get_package_share_directory
 from moveit_configs_utils import MoveItConfigsBuilder
 import yaml
@@ -20,13 +15,6 @@ def generate_launch_description():
     # Package directories
     moveit_pkg = get_package_share_directory("rsy_moveit_startup")
     robot_pkg = get_package_share_directory("rsy_robot_startup")
-
-    # Launch arguments
-    launch_robot_arg = DeclareLaunchArgument(
-        "launch_robot",
-        default_value="false",
-        description="Launch robot_startup (robot_state_publisher + controllers)",
-    )
 
     # Build MoveIt config
     moveit_config = (
@@ -40,16 +28,16 @@ def generate_launch_description():
         .to_moveit_configs()
     )
 
-    # Load joint limits for robot_description_planning namespace
-    joint_limits_path = os.path.join(moveit_pkg, "config", "joint_limits.yaml")
-    with open(joint_limits_path, 'r') as f:
+    # Load joint limits
+    with open(os.path.join(moveit_pkg, "config", "joint_limits.yaml"), 'r') as f:
         joint_limits = yaml.safe_load(f)
 
-    # Include robot launch
-    robot_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(robot_pkg, "launch", "robot.launch.py")),
-        condition=IfCondition(LaunchConfiguration("launch_robot")),
-    )
+    # Load servo configs
+    with open(os.path.join(moveit_pkg, "config", "servo_robot1.yaml"), 'r') as f:
+        servo_params_robot1 = yaml.safe_load(f)
+
+    with open(os.path.join(moveit_pkg, "config", "servo_robot2.yaml"), 'r') as f:
+        servo_params_robot2 = yaml.safe_load(f)
 
     # MoveIt move_group node
     move_group_node = Node(
@@ -62,11 +50,32 @@ def generate_launch_description():
         ],
     )
 
-    # Delay move_group to allow robot to initialize
-    delayed_move_group = TimerAction(period=3.0, actions=[move_group_node])
+    # MoveIt Servo for Robot 1
+    servo_robot1 = Node(
+        package="moveit_servo",
+        executable="servo_node",
+        name="servo_robot1",
+        output="screen",
+        parameters=[
+            moveit_config.to_dict(),
+            servo_params_robot1,
+        ],
+    )
+
+    # MoveIt Servo for Robot 2
+    servo_robot2 = Node(
+        package="moveit_servo",
+        executable="servo_node",
+        name="servo_robot2",
+        output="screen",
+        parameters=[
+            moveit_config.to_dict(),
+            servo_params_robot2,
+        ],
+    )
 
     return LaunchDescription([
-        launch_robot_arg,
-        robot_launch,
-        delayed_move_group,
+        move_group_node,
+        servo_robot1,
+        servo_robot2,
     ])
