@@ -12,12 +12,38 @@ robots:
 
 # Planning parameters
 planning:
-  # Number of planning attempts before failing
+  # Number of planning attempts per retry
   num_attempts: 10
   # Maximum time allowed for planning (seconds)
   allowed_time: 5.0
   # Default reference frame
   default_frame: world
+
+  # Retry configuration for robust planning
+  retry:
+    # Maximum number of planning retries when IK/planning fails
+    max_retries: 3
+    # Delay between retries (seconds) - allows system state to stabilize
+    delay_between_retries: 0.1
+    # Use fallback planner (OMPL) after primary planner fails
+    use_fallback_planner: true
+    # Fallback planner pipeline
+    fallback_pipeline: ompl
+    # Fallback planner algorithm
+    fallback_planner_id: RRTConnect
+
+  # MoveIt Servo fine correction settings
+  servo:
+    # Enable Servo-based fine corrections when close to target
+    enable_fine_correction: false
+    # Position threshold to switch to Servo (meters)
+    position_threshold: 0.05
+    # Max Servo correction time (seconds)
+    max_correction_time: 5.0
+    # Linear velocity for Servo corrections (m/s)
+    correction_linear_velocity: 0.05
+    # Angular velocity for Servo corrections (rad/s)
+    correction_angular_velocity: 0.1
 
 # Velocity and acceleration scaling (0.0 - 1.0)
 # These scale the joint limits defined in MoveIt config
