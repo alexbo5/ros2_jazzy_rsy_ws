@@ -1,0 +1,48 @@
+# Path Planning Configuration
+# All planning-related settings in one place
+
+# Robot configuration
+robots:
+  robot1:
+    planning_group: robot1_ur_manipulator
+    end_effector_link: robot1_tool0
+  robot2:
+    planning_group: robot2_ur_manipulator
+    end_effector_link: robot2_tool0
+
+# Planning parameters
+planning:
+  # Number of planning attempts before failing
+  num_attempts: 10
+  # Maximum time allowed for planning (seconds)
+  allowed_time: 5.0
+  # Default reference frame
+  default_frame: world
+
+# Velocity and acceleration scaling (0.0 - 1.0)
+# These scale the joint limits defined in MoveIt config
+velocity_scaling:
+  ptp: 0.5      # Point-to-point motions
+  linear: 0.3   # Linear Cartesian motions
+
+acceleration_scaling:
+  ptp: 0.5
+  linear: 0.3
+
+# Goal tolerances
+tolerances:
+  # Position tolerance (meters)
+  position: 0.001
+  # Orientation tolerance (radians, ~0.5 degrees)
+  orientation: 0.01
+  # Joint tolerance (radians)
+  joint: 0.01
+
+# Cartesian path settings (for MoveL)
+cartesian:
+  # Maximum step size for Cartesian interpolation (meters)
+  max_step: 0.01
+  # Jump threshold (0 = disabled, recommended for UR robots)
+  jump_threshold: 0.0
+  # Avoid collisions during Cartesian path
+  avoid_collisions: true

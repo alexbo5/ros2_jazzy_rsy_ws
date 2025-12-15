@@ -1,58 +1,35 @@
+# OMPL Planning Configuration
+# Used as fallback for complex obstacle avoidance scenarios
+
 planning_plugins:
   - ompl_interface/OMPLPlanner
 
-# Planning group configurations
 robot1_ur_manipulator:
   default_planner_config: RRTConnect
   planner_configs:
     - RRTConnect
-    - RRTstar
-    - PRMstar
-    - TRRT
   longest_valid_segment_fraction: 0.005
 
 robot2_ur_manipulator:
   default_planner_config: RRTConnect
   planner_configs:
     - RRTConnect
-    - RRTstar
-    - PRMstar
-    - TRRT
   longest_valid_segment_fraction: 0.005
 
-# Planner configurations
+# RRTConnect - fast bidirectional search, good for most cases
 RRTConnect:
   type: geometric::RRTConnect
   range: 0.0
 
-RRTstar:
-  type: geometric::RRTstar
-  range: 0.0
-  goal_bias: 0.05
-  delay_collision_checking: true
+# Tolerance for start state bounds checking (radians)
+start_state_max_bounds_error: 0.1
 
-PRMstar:
-  type: geometric::PRMstar
-  max_nearest_neighbors: 10
-
-TRRT:
-  type: geometric::TRRT
-  range: 0.0
-  goal_bias: 0.05
-  temp_change_factor: 0.1
-  init_temperature: 100
-  frountier_threshold: 0.0
-  frountierNodeRatio: 0.1
-
-# Tolerance for start state bounds checking (in radians)
-start_state_max_bounds_error: 0.2
-
-# The order of the elements in the adapter corresponds to the order they are processed by the motion planning pipeline.
 request_adapters:
   - default_planning_request_adapters/ResolveConstraintFrames
   - default_planning_request_adapters/ValidateWorkspaceBounds
   - default_planning_request_adapters/CheckStartStateBounds
   - default_planning_request_adapters/CheckStartStateCollision
+
 response_adapters:
   - default_planning_response_adapters/AddTimeOptimalParameterization
   - default_planning_response_adapters/ValidateSolution
