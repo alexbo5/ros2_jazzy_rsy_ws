@@ -4,8 +4,11 @@
   <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
   <!-- ros2 control include -->
   <xacro:include filename="$(find ur_robot_driver)/urdf/ur.ros2_control.xacro" />
-  
+
   <xacro:include filename="$(find ur_description)/urdf/inc/ur_transmissions.xacro" />
+
+  <!-- Static Robotiq gripper (visual only) -->
+  <xacro:include filename="$(find rsy_robot_startup)/config/robotiq_2f_85_static.xacro" />
 
   <!-- Robot 1: UR3 configuration -->
   <xacro:arg name="robot1_ur_type" default="ur3"/>
@@ -74,7 +77,7 @@
 <xacro:arg name="robot2_tool_tcp_port" default="54322" />
 
     <!-- Simulation parameters -->
-  <xacro:arg name="use_mock_hardware" default="false" />
+  <xacro:arg name="use_mock_hardware" default="true" />
   <xacro:arg name="mock_sensor_commands" default="false" />
 
   <!-- initial position for simulations (Mock Hardware, Gazebo, Ignition) -->
@@ -159,6 +162,15 @@
     safety_k_position="$(arg robot2_safety_k_position)">
      <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
 </xacro:ur_robot>
+
+<!-- Static Robotiq grippers attached to robot tool0 links -->
+<xacro:robotiq_gripper_static prefix="robot1_" parent="robot1_tool0">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+</xacro:robotiq_gripper_static>
+
+<xacro:robotiq_gripper_static prefix="robot2_" parent="robot2_tool0">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+</xacro:robotiq_gripper_static>
 
 <!-- ros2 control instance -->
 <xacro:ur_ros2_control
