@@ -1,15 +1,26 @@
+# Kinematics Configuration for UR Robots
+# Uses TRAC-IK for robust inverse kinematics
+#
+# TRAC-IK solve types:
+#   Speed    - fastest solution, explores diverse configurations
+#   Distance - minimizes joint movement from seed (prevents spinning)
+#   Manip1/2 - maximizes manipulability
+#
+# Using "Speed" to explore more IK configurations (better collision avoidance)
+# Note: Path planning server handles shortest-path normalization separately
+
 robot1_ur_manipulator:
   kinematics_solver: trac_ik_kinematics_plugin/TRAC_IKKinematicsPlugin
   kinematics_solver_search_resolution: 0.005
-  kinematics_solver_timeout: 0.5       # Short timeout per attempt
-  kinematics_solver_attempts: 100        # More random restarts for better solutions
-  solve_type: Distance                  # Minimize joint movement from seed
-  epsilon: 1e-5                         # Tight tolerance for precision
+  kinematics_solver_timeout: 0.1
+  kinematics_solver_attempts: 50
+  solve_type: Speed
+  epsilon: 1e-5
 
 robot2_ur_manipulator:
   kinematics_solver: trac_ik_kinematics_plugin/TRAC_IKKinematicsPlugin
   kinematics_solver_search_resolution: 0.005
-  kinematics_solver_timeout: 0.5       # Short timeout per attempt
-  kinematics_solver_attempts: 100       # More random restarts for better solutions
-  solve_type: Distance                  # Minimize joint movement from seed
-  epsilon: 1e-5                         # Tight tolerance for precision
+  kinematics_solver_timeout: 0.1
+  kinematics_solver_attempts: 50
+  solve_type: Speed
+  epsilon: 1e-5

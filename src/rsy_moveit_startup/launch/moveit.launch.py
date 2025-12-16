@@ -1,6 +1,9 @@
 """
 MoveIt2 Launch File
-Launches move_group and MoveIt Servo for both robots.
+
+Launches move_group node with:
+- Pilz Industrial Motion Planner (primary - PTP, LIN)
+- OMPL (fallback - obstacle avoidance)
 """
 
 import os
@@ -32,13 +35,6 @@ def generate_launch_description():
     with open(os.path.join(moveit_pkg, "config", "joint_limits.yaml"), 'r') as f:
         joint_limits = yaml.safe_load(f)
 
-    # Load servo configs
-    with open(os.path.join(moveit_pkg, "config", "servo_robot1.yaml"), 'r') as f:
-        servo_params_robot1 = yaml.safe_load(f)
-
-    with open(os.path.join(moveit_pkg, "config", "servo_robot2.yaml"), 'r') as f:
-        servo_params_robot2 = yaml.safe_load(f)
-
     # MoveIt move_group node
     move_group_node = Node(
         package="moveit_ros_move_group",
@@ -50,32 +46,4 @@ def generate_launch_description():
         ],
     )
 
-    # MoveIt Servo for Robot 1
-    servo_robot1 = Node(
-        package="moveit_servo",
-        executable="servo_node",
-        name="servo_robot1",
-        output="screen",
-        parameters=[
-            moveit_config.to_dict(),
-            servo_params_robot1,
-        ],
-    )
-
-    # MoveIt Servo for Robot 2
-    servo_robot2 = Node(
-        package="moveit_servo",
-        executable="servo_node",
-        name="servo_robot2",
-        output="screen",
-        parameters=[
-            moveit_config.to_dict(),
-            servo_params_robot2,
-        ],
-    )
-
-    return LaunchDescription([
-        move_group_node,
-        servo_robot1,
-        servo_robot2,
-    ])
+    return LaunchDescription([move_group_node])
