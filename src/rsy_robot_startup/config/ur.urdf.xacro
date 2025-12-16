@@ -146,7 +146,7 @@
     safety_limits="$(arg robot1_safety_limits)"
     safety_pos_margin="$(arg robot1_safety_pos_margin)"
     safety_k_position="$(arg robot1_safety_k_position)">
-     <origin xyz="0.77 -0.655 0" rpy="0 0 1.570796" />          <!-- position robot in the world -->
+     <origin xyz="0 0 0" rpy="0 0 1.570796" />          <!-- position robot in the world -->
 </xacro:ur_robot>
 
 <xacro:ur_robot
@@ -160,7 +160,7 @@
     safety_limits="$(arg robot2_safety_limits)"
     safety_pos_margin="$(arg robot2_safety_pos_margin)"
     safety_k_position="$(arg robot2_safety_k_position)">
-     <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
+     <origin xyz="-0.77 0.655 0" rpy="0 0 3.141592" />          <!-- position robot in the world -->
 </xacro:ur_robot>
 
 <!-- Static Robotiq grippers attached to robot tool0 links -->
