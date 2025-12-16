@@ -1,12 +1,20 @@
 # Cartesian Limits for Pilz Industrial Motion Planner
-# These limits apply to LIN and CIRC motions
+# Applied to LIN (linear) and CIRC (circular) motions
+#
+# These limits ensure smooth, controlled Cartesian motion
+# Adjust based on your application requirements
 
 cartesian_limits:
   # Maximum translational velocity (m/s)
+  # UR3/UR3e can handle higher, but keep conservative for precision work
   max_trans_vel: 0.5
+
   # Maximum translational acceleration (m/s^2)
   max_trans_acc: 1.5
-  # Maximum translational deceleration (m/s^2, negative)
+
+  # Maximum translational deceleration (m/s^2, typically negative of acceleration)
   max_trans_dec: -1.5
+
   # Maximum rotational velocity (rad/s)
+  # ~57 deg/s - smooth rotation
   max_rot_vel: 1.0

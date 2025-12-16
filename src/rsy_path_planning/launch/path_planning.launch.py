@@ -1,6 +1,11 @@
 """
-Launch file for the path planning action server.
-Loads configuration from config/planning.yaml.
+Path Planning Action Server Launch File
+
+Launches the path planning action server with hybrid planning strategy:
+- MoveJ/MoveJJoints: Pilz PTP -> OMPL fallback (obstacle avoidance)
+- MoveL/MoveLJoints: Pilz LIN -> Cartesian path fallback
+
+Configuration loaded from config/planning.yaml
 """
 
 import os

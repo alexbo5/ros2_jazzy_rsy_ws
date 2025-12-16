@@ -1,29 +1,39 @@
 # Pilz Industrial Motion Planner Configuration
-# Best choice for industrial Cartesian path planning with collision detection
+# Primary planner for path planning action server
 #
-# Supported planners:
-#   PTP  - Point-to-Point (joint space interpolation)
-#   LIN  - Linear (Cartesian linear interpolation)
-#   CIRC - Circular (Cartesian arc interpolation)
+# Planners:
+#   PTP - Point-to-Point (joint-space, deterministic)
+#   LIN - Linear (Cartesian straight-line)
+#   CIRC - Circular (Cartesian arc) [not used by path planning server]
+#
+# Features:
+#   - Deterministic planning (same input = same output)
+#   - Collision checking via planning scene
+#   - Proper velocity/acceleration profiles
+#   - Industrial-grade trajectory generation
 
 planning_plugins:
   - pilz_industrial_motion_planner/CommandPlanner
 
 default_planner_config: PTP
 
-# Tolerance for start state bounds checking (radians)
+# Start state tolerance (radians)
+# Allows small deviations from reported joint positions
 start_state_max_bounds_error: 0.1
 
+# Request adapters - process planning requests
 request_adapters:
   - default_planning_request_adapters/ResolveConstraintFrames
   - default_planning_request_adapters/ValidateWorkspaceBounds
   - default_planning_request_adapters/CheckStartStateBounds
   - default_planning_request_adapters/CheckStartStateCollision
 
+# Response adapters - process planning results
 response_adapters:
   - default_planning_response_adapters/ValidateSolution
   - default_planning_response_adapters/DisplayMotionPath
 
+# Pilz capabilities for sequence planning (optional)
 capabilities: >-
   pilz_industrial_motion_planner/MoveGroupSequenceAction
   pilz_industrial_motion_planner/MoveGroupSequenceService
