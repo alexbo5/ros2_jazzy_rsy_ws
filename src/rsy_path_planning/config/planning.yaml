@@ -1,74 +1,64 @@
 # Path Planning Configuration
-# All planning-related settings in one place
+# - MoveJ/MoveJJoints: OMPL planner for joint-space motions
+# - MoveL/MoveLJoints: computeCartesianPath for linear motions with collision checking
 
-# Robot configuration
-robots:
-  robot1:
-    planning_group: robot1_ur_manipulator
-    end_effector_link: robot1_tool0
-  robot2:
-    planning_group: robot2_ur_manipulator
-    end_effector_link: robot2_tool0
+path_planning_action_server:
+  ros__parameters:
+    # Robot configuration
+    robots:
+      robot1:
+        planning_group: robot1_ur_manipulator
+        end_effector_link: robot1_tool0
+      robot2:
+        planning_group: robot2_ur_manipulator
+        end_effector_link: robot2_tool0
 
-# Planning parameters
-planning:
-  # Number of planning attempts per retry
-  num_attempts: 10
-  # Maximum time allowed for planning (seconds)
-  allowed_time: 5.0
-  # Default reference frame
-  default_frame: world
+    # OMPL Planning parameters (for MoveJ/MoveJJoints)
+    planning:
+      # Number of planning attempts per retry
+      num_attempts: 30
+      # Maximum time allowed for planning (seconds)
+      allowed_time: 20.0
+      # Default reference frame
+      default_frame: world
+      # OMPL planner algorithm (RRTConnect, RRT*, PRM, BiTRRT, etc.)
+      planner_id: RRTConnect
 
-  # Retry configuration for robust planning
-  retry:
-    # Maximum number of planning retries when IK/planning fails
-    max_retries: 3
-    # Delay between retries (seconds) - allows system state to stabilize
-    delay_between_retries: 0.1
-    # Use fallback planner (OMPL) after primary planner fails
-    use_fallback_planner: true
-    # Fallback planner pipeline
-    fallback_pipeline: ompl
-    # Fallback planner algorithm
-    fallback_planner_id: RRTConnect
+      # Retry configuration for robust planning
+      retry:
+        # Maximum number of planning retries when IK/planning fails
+        max_retries: 5
+        # Delay between retries (seconds) - allows IK seed randomization
+        delay_between_retries: 0.5
 
-  # MoveIt Servo fine correction settings
-  servo:
-    # Enable Servo-based fine corrections when close to target
-    enable_fine_correction: false
-    # Position threshold to switch to Servo (meters)
-    position_threshold: 0.05
-    # Max Servo correction time (seconds)
-    max_correction_time: 5.0
-    # Linear velocity for Servo corrections (m/s)
-    correction_linear_velocity: 0.05
-    # Angular velocity for Servo corrections (rad/s)
-    correction_angular_velocity: 0.1
+    # Cartesian path settings (for MoveL/MoveLJoints)
+    cartesian:
+      # Maximum step size for waypoint interpolation (meters)
+      # Smaller = more waypoints = smoother path but slower planning
+      max_step: 0.01
+      # Jump threshold (0.0 = disabled, recommended for UR robots)
+      # Detects and rejects paths with large joint jumps
+      jump_threshold: 0.0
+      # Check for collisions along the path
+      avoid_collisions: true
+      # Minimum fraction of path that must be achieved (0.0-1.0)
+      # If less than this fraction is collision-free, planning fails
+      min_fraction: 0.95
 
-# Velocity and acceleration scaling (0.0 - 1.0)
-# These scale the joint limits defined in MoveIt config
-velocity_scaling:
-  ptp: 0.5      # Point-to-point motions
-  linear: 0.3   # Linear Cartesian motions
+    # Velocity and acceleration scaling (0.0 - 1.0)
+    velocity_scaling:
+      ptp: 0.5      # Point-to-point (MoveJ) motions
+      linear: 0.3   # Linear Cartesian (MoveL) motions
 
-acceleration_scaling:
-  ptp: 0.5
-  linear: 0.3
+    acceleration_scaling:
+      ptp: 0.5
+      linear: 0.3
 
-# Goal tolerances
-tolerances:
-  # Position tolerance (meters)
-  position: 0.001
-  # Orientation tolerance (radians, ~0.5 degrees)
-  orientation: 0.01
-  # Joint tolerance (radians)
-  joint: 0.01
-
-# Cartesian path settings (for MoveL)
-cartesian:
-  # Maximum step size for Cartesian interpolation (meters)
-  max_step: 0.01
-  # Jump threshold (0 = disabled, recommended for UR robots)
-  jump_threshold: 0.0
-  # Avoid collisions during Cartesian path
-  avoid_collisions: true
+    # Goal tolerances
+    tolerances:
+      # Position tolerance (meters)
+      position: 0.001
+      # Orientation tolerance (radians)
+      orientation: 0.01
+      # Joint tolerance (radians)
+      joint: 0.01

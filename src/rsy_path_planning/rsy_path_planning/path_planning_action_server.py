@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
 Path Planning Action Server
-Provides MoveJ (PTP) and MoveL (LIN) motion actions using Pilz Industrial Motion Planner.
+- MoveJ/MoveJJoints: OMPL planner for joint-space motions
+- MoveL/MoveLJoints: Cartesian path planning for linear motions
+
 Features:
 - Configurable retry logic for robust IK/planning
-- Fallback planner (OMPL) when primary planner fails
-- Optional MoveIt Servo integration for fine corrections
-All planning parameters are loaded from config/planning.yaml.
+- Collision-checked Cartesian paths via computeCartesianPath
 """
 
-import asyncio
+import time
 import math
 import rclpy
 from rclpy.node import Node
@@ -17,17 +17,17 @@ from rclpy.action import ActionServer, ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 
-from moveit_msgs.srv import GetMotionPlan
+from moveit_msgs.srv import GetMotionPlan, GetCartesianPath, GetPositionFK
 from moveit_msgs.msg import (
     Constraints, PositionConstraint, OrientationConstraint,
-    BoundingVolume, JointConstraint, MoveItErrorCodes
+    BoundingVolume, JointConstraint, MoveItErrorCodes, RobotState
 )
 from moveit_msgs.action import ExecuteTrajectory
 from shape_msgs.msg import SolidPrimitive
-from geometry_msgs.msg import PoseStamped, Pose, TwistStamped
-from std_srvs.srv import SetBool
+from geometry_msgs.msg import PoseStamped, Pose
 from sensor_msgs.msg import JointState
 import tf2_ros
+from tf2_ros import TransformException
 
 from rsy_path_planning.action import MoveJ, MoveL, MoveJJoints, MoveLJoints
 
@@ -36,10 +36,14 @@ class PathPlanningActionServer(Node):
 
     # MoveIt error codes that indicate IK/planning failures worth retrying
     RETRYABLE_ERRORS = {
+        MoveItErrorCodes.FAILURE,
         MoveItErrorCodes.PLANNING_FAILED,
         MoveItErrorCodes.INVALID_MOTION_PLAN,
         MoveItErrorCodes.NO_IK_SOLUTION,
         MoveItErrorCodes.GOAL_IN_COLLISION,
+        MoveItErrorCodes.GOAL_VIOLATES_PATH_CONSTRAINTS,
+        MoveItErrorCodes.START_STATE_IN_COLLISION,
+        MoveItErrorCodes.START_STATE_VIOLATES_PATH_CONSTRAINTS,
         MoveItErrorCodes.TIMED_OUT,
     }
 
@@ -52,26 +56,30 @@ class PathPlanningActionServer(Node):
 
         cb = ReentrantCallbackGroup()
 
-        # Service and action clients
+        # Service clients
         self._plan_client = self.create_client(
             GetMotionPlan, '/plan_kinematic_path', callback_group=cb
         )
+        self._cartesian_client = self.create_client(
+            GetCartesianPath, '/compute_cartesian_path', callback_group=cb
+        )
+        self._fk_client = self.create_client(
+            GetPositionFK, '/compute_fk', callback_group=cb
+        )
+
+        # Action client for trajectory execution
         self._exec_client = ActionClient(
             self, ExecuteTrajectory, '/execute_trajectory', callback_group=cb
         )
 
+        # Wait for services
+        self.get_logger().info('Waiting for planning services...')
         self._plan_client.wait_for_service(timeout_sec=30.0)
+        self._cartesian_client.wait_for_service(timeout_sec=30.0)
+        self._fk_client.wait_for_service(timeout_sec=30.0)
         self._exec_client.wait_for_server(timeout_sec=30.0)
 
-        # Servo publishers and services (per robot)
-        self._servo_twist_pubs = {}
-        self._servo_start_clients = {}
-        self._servo_stop_clients = {}
-
-        if self.servo['enable_fine_correction']:
-            self._setup_servo_clients(cb)
-
-        # TF buffer for pose checking
+        # TF buffer for getting current pose
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
 
@@ -87,9 +95,10 @@ class PathPlanningActionServer(Node):
         ActionServer(self, MoveJJoints, 'move_j_joints', execute_callback=self._exec_movej_joints, callback_group=cb)
         ActionServer(self, MoveLJoints, 'move_l_joints', execute_callback=self._exec_movel_joints, callback_group=cb)
 
-        self.get_logger().info('Path Planning Server ready: /move_j, /move_l, /move_j_joints, /move_l_joints')
-        self.get_logger().info(f'Retry config: max_retries={self.retry["max_retries"]}, '
-                               f'fallback_planner={self.retry["use_fallback_planner"]}')
+        self.get_logger().info('Path Planning Server ready')
+        self.get_logger().info(f'  MoveJ/MoveJJoints: OMPL ({self.planning["planner_id"]})')
+        self.get_logger().info(f'  MoveL/MoveLJoints: Cartesian path planning')
+        self.get_logger().info(f'  Retry config: max_retries={self.retry["max_retries"]}')
 
     def _declare_parameters(self):
         """Declare all parameters with defaults."""
@@ -99,24 +108,21 @@ class PathPlanningActionServer(Node):
         self.declare_parameter('robots.robot2.planning_group', 'robot2_ur_manipulator')
         self.declare_parameter('robots.robot2.end_effector_link', 'robot2_tool0')
 
-        # Planning parameters
+        # OMPL Planning parameters
         self.declare_parameter('planning.num_attempts', 10)
         self.declare_parameter('planning.allowed_time', 5.0)
         self.declare_parameter('planning.default_frame', 'world')
+        self.declare_parameter('planning.planner_id', 'RRTConnect')
 
         # Retry configuration
         self.declare_parameter('planning.retry.max_retries', 3)
         self.declare_parameter('planning.retry.delay_between_retries', 0.1)
-        self.declare_parameter('planning.retry.use_fallback_planner', True)
-        self.declare_parameter('planning.retry.fallback_pipeline', 'ompl')
-        self.declare_parameter('planning.retry.fallback_planner_id', 'RRTConnect')
 
-        # Servo configuration
-        self.declare_parameter('planning.servo.enable_fine_correction', False)
-        self.declare_parameter('planning.servo.position_threshold', 0.05)
-        self.declare_parameter('planning.servo.max_correction_time', 5.0)
-        self.declare_parameter('planning.servo.correction_linear_velocity', 0.05)
-        self.declare_parameter('planning.servo.correction_angular_velocity', 0.1)
+        # Cartesian path settings
+        self.declare_parameter('cartesian.max_step', 0.01)
+        self.declare_parameter('cartesian.jump_threshold', 0.0)
+        self.declare_parameter('cartesian.avoid_collisions', True)
+        self.declare_parameter('cartesian.min_fraction', 0.95)
 
         # Velocity/acceleration scaling
         self.declare_parameter('velocity_scaling.ptp', 0.5)
@@ -142,7 +148,6 @@ class PathPlanningActionServer(Node):
             },
         }
 
-        # Joint names derived from planning group prefix
         self.joint_names = {
             'robot1': [f'robot1_{j}' for j in [
                 'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
@@ -158,32 +163,29 @@ class PathPlanningActionServer(Node):
             'num_attempts': self.get_parameter('planning.num_attempts').value,
             'allowed_time': self.get_parameter('planning.allowed_time').value,
             'default_frame': self.get_parameter('planning.default_frame').value,
+            'planner_id': self.get_parameter('planning.planner_id').value,
         }
 
         self.retry = {
             'max_retries': self.get_parameter('planning.retry.max_retries').value,
             'delay_between_retries': self.get_parameter('planning.retry.delay_between_retries').value,
-            'use_fallback_planner': self.get_parameter('planning.retry.use_fallback_planner').value,
-            'fallback_pipeline': self.get_parameter('planning.retry.fallback_pipeline').value,
-            'fallback_planner_id': self.get_parameter('planning.retry.fallback_planner_id').value,
         }
 
-        self.servo = {
-            'enable_fine_correction': self.get_parameter('planning.servo.enable_fine_correction').value,
-            'position_threshold': self.get_parameter('planning.servo.position_threshold').value,
-            'max_correction_time': self.get_parameter('planning.servo.max_correction_time').value,
-            'correction_linear_velocity': self.get_parameter('planning.servo.correction_linear_velocity').value,
-            'correction_angular_velocity': self.get_parameter('planning.servo.correction_angular_velocity').value,
+        self.cartesian = {
+            'max_step': self.get_parameter('cartesian.max_step').value,
+            'jump_threshold': self.get_parameter('cartesian.jump_threshold').value,
+            'avoid_collisions': self.get_parameter('cartesian.avoid_collisions').value,
+            'min_fraction': self.get_parameter('cartesian.min_fraction').value,
         }
 
         self.vel_scale = {
-            'PTP': self.get_parameter('velocity_scaling.ptp').value,
-            'LIN': self.get_parameter('velocity_scaling.linear').value,
+            'ptp': self.get_parameter('velocity_scaling.ptp').value,
+            'linear': self.get_parameter('velocity_scaling.linear').value,
         }
 
         self.acc_scale = {
-            'PTP': self.get_parameter('acceleration_scaling.ptp').value,
-            'LIN': self.get_parameter('acceleration_scaling.linear').value,
+            'ptp': self.get_parameter('acceleration_scaling.ptp').value,
+            'linear': self.get_parameter('acceleration_scaling.linear').value,
         }
 
         self.tolerances = {
@@ -192,65 +194,60 @@ class PathPlanningActionServer(Node):
             'joint': self.get_parameter('tolerances.joint').value,
         }
 
-    def _setup_servo_clients(self, cb):
-        """Setup Servo publishers and service clients for each robot."""
-        for robot_name in self.robots:
-            # Twist command publisher for Servo
-            self._servo_twist_pubs[robot_name] = self.create_publisher(
-                TwistStamped,
-                f'/{robot_name}_servo/delta_twist_cmds',
-                10
-            )
-
-            # Servo start/stop services
-            self._servo_start_clients[robot_name] = self.create_client(
-                SetBool,
-                f'/{robot_name}_servo/start_servo',
-                callback_group=cb
-            )
-            self._servo_stop_clients[robot_name] = self.create_client(
-                SetBool,
-                f'/{robot_name}_servo/stop_servo',
-                callback_group=cb
-            )
-
-        self.get_logger().info('Servo clients initialized for fine corrections')
-
     def _joint_state_callback(self, msg):
         """Store current joint states."""
         for i, name in enumerate(msg.name):
             self._current_joint_states[name] = msg.position[i]
 
+    def _get_current_robot_state(self, robot_name):
+        """Get current robot state for a specific robot."""
+        robot_state = RobotState()
+        joint_names = self.joint_names[robot_name]
+        positions = []
+
+        for name in joint_names:
+            if name in self._current_joint_states:
+                positions.append(self._current_joint_states[name])
+            else:
+                self.get_logger().warn(f'Joint {name} not found in current state')
+                positions.append(0.0)
+
+        robot_state.joint_state.name = joint_names
+        robot_state.joint_state.position = positions
+        return robot_state
+
     # === Action Callbacks ===
 
     async def _exec_movej(self, goal_handle):
-        return await self._execute_pose(goal_handle, 'PTP', MoveJ)
+        """MoveJ: Joint-space motion to Cartesian target using OMPL."""
+        return await self._execute_ompl_pose(goal_handle, MoveJ)
 
     async def _exec_movel(self, goal_handle):
-        return await self._execute_pose(goal_handle, 'LIN', MoveL)
+        """MoveL: Cartesian linear motion using computeCartesianPath."""
+        return await self._execute_cartesian_pose(goal_handle, MoveL)
 
     async def _exec_movej_joints(self, goal_handle):
-        return await self._execute_joints(goal_handle, 'PTP', MoveJJoints)
+        """MoveJJoints: Joint-space motion to joint target using OMPL."""
+        return await self._execute_ompl_joints(goal_handle, MoveJJoints)
 
     async def _exec_movel_joints(self, goal_handle):
-        return await self._execute_joints(goal_handle, 'LIN', MoveLJoints)
+        """MoveLJoints: Cartesian linear motion to joint target."""
+        return await self._execute_cartesian_joints(goal_handle, MoveLJoints)
 
-    # === Motion Execution ===
+    # === OMPL Planning (MoveJ) ===
 
-    async def _execute_pose(self, goal_handle, planner_id, action_type):
-        """Execute motion to Cartesian pose target with retry logic."""
+    async def _execute_ompl_pose(self, goal_handle, action_type):
+        """Execute joint-space motion to Cartesian pose using OMPL."""
         req = goal_handle.request
         result = action_type.Result()
         feedback = action_type.Feedback()
 
-        # Validate robot
         if req.robot_name not in self.robots:
             return self._abort(goal_handle, result, f'Unknown robot: {req.robot_name}')
 
         robot = self.robots[req.robot_name]
         frame = req.frame_id or self.planning['default_frame']
 
-        # Build target pose
         pose = PoseStamped()
         pose.header.frame_id = frame
         pose.header.stamp = self.get_clock().now().to_msg()
@@ -263,42 +260,25 @@ class PathPlanningActionServer(Node):
         pose.pose.orientation.w = req.qw
 
         self.get_logger().info(
-            f'{planner_id} {req.robot_name}: pos=({req.x:.3f}, {req.y:.3f}, {req.z:.3f})'
+            f'MoveJ {req.robot_name}: ({req.x:.3f}, {req.y:.3f}, {req.z:.3f}) via OMPL'
         )
 
-        # Plan with retry logic
-        trajectory = await self._plan_with_retry(
-            goal_handle, feedback, robot, pose, planner_id, 'pose'
+        trajectory = await self._plan_ompl_with_retry(
+            goal_handle, feedback, robot, pose, 'pose'
         )
 
         if trajectory is None:
-            return self._abort(
-                goal_handle, result,
-                f'Planning failed after {self.retry["max_retries"]} retries'
-            )
+            return self._abort(goal_handle, result,
+                f'OMPL planning failed after {self.retry["max_retries"]} retries')
 
-        # Execute
-        exec_result = await self._execute_trajectory(
-            goal_handle, result, feedback, trajectory
-        )
+        return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
 
-        # Optional: Fine correction with Servo
-        if (exec_result.success and
-            self.servo['enable_fine_correction'] and
-            action_type == MoveL):  # Only for linear moves
-            await self._servo_fine_correction(
-                req.robot_name, pose, feedback, goal_handle
-            )
-
-        return exec_result
-
-    async def _execute_joints(self, goal_handle, planner_id, action_type):
-        """Execute motion to joint target with retry logic."""
+    async def _execute_ompl_joints(self, goal_handle, action_type):
+        """Execute joint-space motion to joint target using OMPL."""
         req = goal_handle.request
         result = action_type.Result()
         feedback = action_type.Feedback()
 
-        # Validate robot
         if req.robot_name not in self.robots:
             return self._abort(goal_handle, result, f'Unknown robot: {req.robot_name}')
 
@@ -306,132 +286,246 @@ class PathPlanningActionServer(Node):
         joint_values = list(req.joint_values)
 
         if len(joint_values) != len(joint_names):
-            return self._abort(
-                goal_handle, result,
-                f'Expected {len(joint_names)} joints, got {len(joint_values)}'
-            )
+            return self._abort(goal_handle, result,
+                f'Expected {len(joint_names)} joints, got {len(joint_values)}')
 
         robot = self.robots[req.robot_name]
 
         self.get_logger().info(
-            f'{planner_id} Joints {req.robot_name}: {[f"{v:.2f}" for v in joint_values]}'
+            f'MoveJJoints {req.robot_name}: {[f"{v:.2f}" for v in joint_values]} via OMPL'
         )
 
-        # Plan with retry logic
-        trajectory = await self._plan_with_retry(
-            goal_handle, feedback, robot, (joint_names, joint_values), planner_id, 'joints'
+        trajectory = await self._plan_ompl_with_retry(
+            goal_handle, feedback, robot, (joint_names, joint_values), 'joints'
         )
 
         if trajectory is None:
-            return self._abort(
-                goal_handle, result,
-                f'Planning failed after {self.retry["max_retries"]} retries'
-            )
+            return self._abort(goal_handle, result,
+                f'OMPL planning failed after {self.retry["max_retries"]} retries')
 
-        # Execute
-        return await self._execute_trajectory(
-            goal_handle, result, feedback, trajectory
-        )
+        return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
 
-    async def _plan_with_retry(self, goal_handle, feedback, robot, target, planner_id, target_type):
-        """
-        Plan motion with configurable retry logic.
-
-        Retry strategy:
-        1. Try primary planner (Pilz) up to max_retries times
-        2. If all retries fail and fallback is enabled, try OMPL planner
-
-        Args:
-            goal_handle: Action goal handle
-            feedback: Feedback message
-            robot: Robot configuration dict
-            target: PoseStamped (for pose) or (joint_names, joint_values) tuple (for joints)
-            planner_id: 'PTP' or 'LIN'
-            target_type: 'pose' or 'joints'
-
-        Returns:
-            Trajectory if successful, None otherwise
-        """
-        last_error_code = None
-
-        # Primary planner attempts
+    async def _plan_ompl_with_retry(self, goal_handle, feedback, robot, target, target_type):
+        """Plan with OMPL with retry logic - progressively increase planning resources."""
+        # Different strategies: increase attempts and time on each retry
+        strategies = [
+            {'num_attempts': self.planning['num_attempts'], 'allowed_time': self.planning['allowed_time'], 'planner': 'RRTstar'},
+            {'num_attempts': self.planning['num_attempts'] * 2, 'allowed_time': self.planning['allowed_time'] * 1.5, 'planner': 'RRTstar'},
+            {'num_attempts': self.planning['num_attempts'] * 3, 'allowed_time': self.planning['allowed_time'] * 2.0, 'planner': 'RRTstar'},
+            {'num_attempts': self.planning['num_attempts'] * 5, 'allowed_time': self.planning['allowed_time'] * 3.0, 'planner': 'BiTRRT'},
+            {'num_attempts': self.planning['num_attempts'] * 5, 'allowed_time': self.planning['allowed_time'] * 3.0, 'planner': 'PRM'},
+        ]
+        
         for attempt in range(1, self.retry['max_retries'] + 1):
-            feedback.status = f'Planning (attempt {attempt}/{self.retry["max_retries"]})...'
+            strategy = strategies[min(attempt - 1, len(strategies) - 1)]
+            
+            feedback.status = f'OMPL Planning (attempt {attempt}/{self.retry["max_retries"]})...'
             goal_handle.publish_feedback(feedback)
 
-            # Build request based on target type
             if target_type == 'pose':
-                plan_req = self._build_pose_request(
-                    robot, target, planner_id,
-                    pipeline='pilz_industrial_motion_planner'
-                )
+                plan_req = self._build_ompl_pose_request(robot, target, strategy)
             else:
                 joint_names, joint_values = target
-                plan_req = self._build_joints_request(
-                    robot, joint_names, joint_values, planner_id,
-                    pipeline='pilz_industrial_motion_planner'
-                )
-
-            plan_resp = await self._plan_client.call_async(plan_req)
-            error_code = plan_resp.motion_plan_response.error_code.val
-            last_error_code = error_code
-
-            if error_code == MoveItErrorCodes.SUCCESS:
-                self.get_logger().info(f'Planning succeeded on attempt {attempt}')
-                return plan_resp.motion_plan_response.trajectory
-
-            # Log the failure
-            error_name = self._get_error_name(error_code)
-            self.get_logger().warn(
-                f'Planning attempt {attempt} failed: {error_name} (code {error_code})'
-            )
-
-            # Only retry for retryable errors
-            if error_code not in self.RETRYABLE_ERRORS:
-                self.get_logger().error(f'Non-retryable error, aborting: {error_name}')
-                break
-
-            # Delay between retries
-            if attempt < self.retry['max_retries']:
-                await asyncio.sleep(self.retry['delay_between_retries'])
-
-        # Fallback planner attempt
-        if self.retry['use_fallback_planner']:
-            feedback.status = f'Trying fallback planner ({self.retry["fallback_planner_id"]})...'
-            goal_handle.publish_feedback(feedback)
+                plan_req = self._build_ompl_joints_request(robot, joint_names, joint_values, strategy)
 
             self.get_logger().info(
-                f'Primary planner failed, trying fallback: {self.retry["fallback_pipeline"]}/{self.retry["fallback_planner_id"]}'
+                f'OMPL attempt {attempt}: planner={strategy["planner"]}, '
+                f'attempts={strategy["num_attempts"]}, time={strategy["allowed_time"]:.1f}s'
             )
-
-            # Build request with fallback planner
-            if target_type == 'pose':
-                plan_req = self._build_pose_request(
-                    robot, target, self.retry['fallback_planner_id'],
-                    pipeline=self.retry['fallback_pipeline']
-                )
-            else:
-                joint_names, joint_values = target
-                plan_req = self._build_joints_request(
-                    robot, joint_names, joint_values, self.retry['fallback_planner_id'],
-                    pipeline=self.retry['fallback_pipeline']
-                )
 
             plan_resp = await self._plan_client.call_async(plan_req)
             error_code = plan_resp.motion_plan_response.error_code.val
 
             if error_code == MoveItErrorCodes.SUCCESS:
-                self.get_logger().info('Fallback planner succeeded')
+                self.get_logger().info(f'OMPL planning succeeded on attempt {attempt}')
                 return plan_resp.motion_plan_response.trajectory
-            else:
-                error_name = self._get_error_name(error_code)
-                self.get_logger().error(f'Fallback planner also failed: {error_name}')
+
+            error_name = self._get_error_name(error_code)
+            self.get_logger().warn(f'OMPL attempt {attempt} failed: {error_name}')
+
+            if error_code not in self.RETRYABLE_ERRORS:
+                break
+
+            if attempt < self.retry['max_retries']:
+                time.sleep(self.retry['delay_between_retries'])
 
         return None
 
+    # === Cartesian Path Planning (MoveL) ===
+
+    async def _execute_cartesian_pose(self, goal_handle, action_type):
+        """Execute Cartesian linear motion to pose target."""
+        req = goal_handle.request
+        result = action_type.Result()
+        feedback = action_type.Feedback()
+
+        if req.robot_name not in self.robots:
+            return self._abort(goal_handle, result, f'Unknown robot: {req.robot_name}')
+
+        robot = self.robots[req.robot_name]
+        frame = req.frame_id or self.planning['default_frame']
+
+        target_pose = Pose()
+        target_pose.position.x = req.x
+        target_pose.position.y = req.y
+        target_pose.position.z = req.z
+        target_pose.orientation.x = req.qx
+        target_pose.orientation.y = req.qy
+        target_pose.orientation.z = req.qz
+        target_pose.orientation.w = req.qw
+
+        self.get_logger().info(
+            f'MoveL {req.robot_name}: ({req.x:.3f}, {req.y:.3f}, {req.z:.3f}) via Cartesian path'
+        )
+
+        trajectory = await self._plan_cartesian_with_retry(
+            goal_handle, feedback, req.robot_name, robot, [target_pose], frame
+        )
+
+        if trajectory is None:
+            return self._abort(goal_handle, result,
+                f'Cartesian planning failed after {self.retry["max_retries"]} retries')
+
+        return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
+
+    async def _execute_cartesian_joints(self, goal_handle, action_type):
+        """Execute Cartesian linear motion to joint target."""
+        req = goal_handle.request
+        result = action_type.Result()
+        feedback = action_type.Feedback()
+
+        if req.robot_name not in self.robots:
+            return self._abort(goal_handle, result, f'Unknown robot: {req.robot_name}')
+
+        joint_names = self.joint_names[req.robot_name]
+        joint_values = list(req.joint_values)
+
+        if len(joint_values) != len(joint_names):
+            return self._abort(goal_handle, result,
+                f'Expected {len(joint_names)} joints, got {len(joint_values)}')
+
+        robot = self.robots[req.robot_name]
+
+        # Compute FK to get target Cartesian pose
+        feedback.status = 'Computing FK for target joints...'
+        goal_handle.publish_feedback(feedback)
+
+        target_pose = await self._compute_fk(robot, joint_names, joint_values)
+        if target_pose is None:
+            return self._abort(goal_handle, result, 'FK computation failed')
+
+        self.get_logger().info(
+            f'MoveLJoints {req.robot_name}: ({target_pose.position.x:.3f}, '
+            f'{target_pose.position.y:.3f}, {target_pose.position.z:.3f}) via Cartesian path'
+        )
+
+        trajectory = await self._plan_cartesian_with_retry(
+            goal_handle, feedback, req.robot_name, robot,
+            [target_pose], self.planning['default_frame']
+        )
+
+        if trajectory is None:
+            return self._abort(goal_handle, result,
+                f'Cartesian planning failed after {self.retry["max_retries"]} retries')
+
+        return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
+
+    async def _plan_cartesian_with_retry(self, goal_handle, feedback, robot_name, robot, waypoints, frame):
+        """Plan Cartesian path with retry logic."""
+        for attempt in range(1, self.retry['max_retries'] + 1):
+            feedback.status = f'Cartesian planning (attempt {attempt}/{self.retry["max_retries"]})...'
+            goal_handle.publish_feedback(feedback)
+
+            # Build Cartesian path request
+            cart_req = GetCartesianPath.Request()
+            cart_req.header.frame_id = frame
+            cart_req.header.stamp = self.get_clock().now().to_msg()
+            cart_req.group_name = robot['group']
+            cart_req.link_name = robot['ee_link']
+            cart_req.waypoints = waypoints
+            cart_req.max_step = self.cartesian['max_step']
+            cart_req.jump_threshold = self.cartesian['jump_threshold']
+            cart_req.avoid_collisions = self.cartesian['avoid_collisions']
+            cart_req.start_state = self._get_current_robot_state(robot_name)
+
+            cart_resp = await self._cartesian_client.call_async(cart_req)
+
+            fraction = cart_resp.fraction
+            error_code = cart_resp.error_code.val
+
+            self.get_logger().info(
+                f'Cartesian attempt {attempt}: fraction={fraction:.2%}, error={error_code}'
+            )
+
+            if error_code == MoveItErrorCodes.SUCCESS and fraction >= self.cartesian['min_fraction']:
+                self.get_logger().info(
+                    f'Cartesian planning succeeded: {fraction:.1%} of path achieved'
+                )
+                # Apply velocity scaling to the trajectory
+                return self._scale_trajectory(cart_resp.solution, 'linear')
+
+            if fraction < self.cartesian['min_fraction']:
+                self.get_logger().warn(
+                    f'Cartesian attempt {attempt}: only {fraction:.1%} achieved '
+                    f'(need {self.cartesian["min_fraction"]:.0%})'
+                )
+
+            if error_code != MoveItErrorCodes.SUCCESS:
+                error_name = self._get_error_name(error_code)
+                self.get_logger().warn(f'Cartesian attempt {attempt} error: {error_name}')
+
+            if attempt < self.retry['max_retries']:
+                time.sleep(self.retry['delay_between_retries'])
+
+        return None
+
+    def _scale_trajectory(self, trajectory, motion_type):
+        """Scale trajectory velocities and accelerations."""
+        vel_scale = self.vel_scale.get(motion_type, 0.5)
+        acc_scale = self.acc_scale.get(motion_type, 0.5)
+
+        # Scale time from start for each point
+        for point in trajectory.joint_trajectory.points:
+            # Scale time
+            original_time = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9
+            scaled_time = original_time / vel_scale
+            point.time_from_start.sec = int(scaled_time)
+            point.time_from_start.nanosec = int((scaled_time % 1) * 1e9)
+
+            # Scale velocities
+            point.velocities = [v * vel_scale for v in point.velocities]
+
+            # Scale accelerations if present
+            if point.accelerations:
+                point.accelerations = [a * acc_scale for a in point.accelerations]
+
+        return trajectory
+
+    async def _compute_fk(self, robot, joint_names, joint_values):
+        """Compute forward kinematics to get Cartesian pose from joint values."""
+        fk_request = GetPositionFK.Request()
+        fk_request.header.frame_id = self.planning['default_frame']
+        fk_request.header.stamp = self.get_clock().now().to_msg()
+        fk_request.fk_link_names = [robot['ee_link']]
+        fk_request.robot_state.joint_state.name = joint_names
+        fk_request.robot_state.joint_state.position = joint_values
+
+        try:
+            fk_response = await self._fk_client.call_async(fk_request)
+            if fk_response.error_code.val == MoveItErrorCodes.SUCCESS:
+                return fk_response.pose_stamped[0].pose
+            else:
+                self.get_logger().error(f'FK failed: {fk_response.error_code.val}')
+                return None
+        except Exception as e:
+            self.get_logger().error(f'FK service call failed: {e}')
+            return None
+
+    # === Trajectory Execution ===
+
     async def _execute_trajectory(self, goal_handle, result, feedback, trajectory):
         """Execute a planned trajectory."""
-        feedback.status = 'Executing...'
+        feedback.status = 'Executing trajectory...'
         goal_handle.publish_feedback(feedback)
 
         exec_goal = ExecuteTrajectory.Goal()
@@ -455,103 +549,27 @@ class PathPlanningActionServer(Node):
 
         return result
 
-    async def _servo_fine_correction(self, robot_name, target_pose, feedback, goal_handle):
-        """
-        Use MoveIt Servo to make fine corrections to reach exact target pose.
-
-        This is useful when the trajectory execution ends slightly off target.
-        Servo provides real-time closed-loop control for fine adjustments.
-        """
-        if robot_name not in self._servo_twist_pubs:
-            self.get_logger().warn(f'Servo not configured for {robot_name}')
-            return
-
-        feedback.status = 'Fine correction with Servo...'
-        goal_handle.publish_feedback(feedback)
-
-        robot = self.robots[robot_name]
-        ee_link = robot['ee_link']
-
-        # Start servo
-        if robot_name in self._servo_start_clients:
-            if self._servo_start_clients[robot_name].service_is_ready():
-                start_req = SetBool.Request()
-                start_req.data = True
-                await self._servo_start_clients[robot_name].call_async(start_req)
-                await asyncio.sleep(0.1)  # Give servo time to start
-
-        start_time = self.get_clock().now()
-        max_duration = rclpy.duration.Duration(seconds=self.servo['max_correction_time'])
-
-        try:
-            while (self.get_clock().now() - start_time) < max_duration:
-                # Get current pose
-                try:
-                    transform = self._tf_buffer.lookup_transform(
-                        target_pose.header.frame_id,
-                        ee_link,
-                        rclpy.time.Time()
-                    )
-                except tf2_ros.LookupException:
-                    self.get_logger().warn('TF lookup failed during Servo correction')
-                    break
-
-                # Calculate position error
-                dx = target_pose.pose.position.x - transform.transform.translation.x
-                dy = target_pose.pose.position.y - transform.transform.translation.y
-                dz = target_pose.pose.position.z - transform.transform.translation.z
-
-                pos_error = math.sqrt(dx*dx + dy*dy + dz*dz)
-
-                # Check if within tolerance
-                if pos_error < self.tolerances['position']:
-                    self.get_logger().info('Servo fine correction complete')
-                    break
-
-                # Calculate velocity commands (proportional control)
-                vel_scale = min(pos_error / self.servo['position_threshold'], 1.0)
-
-                twist = TwistStamped()
-                twist.header.stamp = self.get_clock().now().to_msg()
-                twist.header.frame_id = ee_link
-
-                # Normalize and scale velocity
-                if pos_error > 0.001:
-                    twist.twist.linear.x = (dx / pos_error) * self.servo['correction_linear_velocity'] * vel_scale
-                    twist.twist.linear.y = (dy / pos_error) * self.servo['correction_linear_velocity'] * vel_scale
-                    twist.twist.linear.z = (dz / pos_error) * self.servo['correction_linear_velocity'] * vel_scale
-
-                self._servo_twist_pubs[robot_name].publish(twist)
-                await asyncio.sleep(0.01)  # 100 Hz
-
-        finally:
-            # Stop servo - send zero twist
-            twist = TwistStamped()
-            twist.header.stamp = self.get_clock().now().to_msg()
-            twist.header.frame_id = ee_link
-            self._servo_twist_pubs[robot_name].publish(twist)
-
-            # Stop servo service
-            if robot_name in self._servo_stop_clients:
-                if self._servo_stop_clients[robot_name].service_is_ready():
-                    stop_req = SetBool.Request()
-                    stop_req.data = True
-                    await self._servo_stop_clients[robot_name].call_async(stop_req)
-
     # === Request Building ===
 
-    def _build_pose_request(self, robot, pose, planner_id, pipeline='pilz_industrial_motion_planner'):
-        """Build motion plan request for pose target."""
+    def _build_ompl_pose_request(self, robot, pose, strategy=None):
+        """Build OMPL motion plan request for pose target."""
         req = GetMotionPlan.Request()
         mp = req.motion_plan_request
 
+        if strategy is None:
+            strategy = {
+                'planner': self.planning['planner_id'],
+                'num_attempts': self.planning['num_attempts'],
+                'allowed_time': self.planning['allowed_time']
+            }
+
         mp.group_name = robot['group']
-        mp.pipeline_id = pipeline
-        mp.planner_id = planner_id
-        mp.num_planning_attempts = self.planning['num_attempts']
-        mp.allowed_planning_time = self.planning['allowed_time']
-        mp.max_velocity_scaling_factor = self.vel_scale.get(planner_id, 0.5)
-        mp.max_acceleration_scaling_factor = self.acc_scale.get(planner_id, 0.5)
+        mp.pipeline_id = 'ompl'
+        mp.planner_id = strategy['planner']
+        mp.num_planning_attempts = strategy['num_attempts']
+        mp.allowed_planning_time = strategy['allowed_time']
+        mp.max_velocity_scaling_factor = self.vel_scale['ptp']
+        mp.max_acceleration_scaling_factor = self.acc_scale['ptp']
         mp.start_state.is_diff = True
 
         # Position constraint
@@ -589,19 +607,25 @@ class PathPlanningActionServer(Node):
 
         return req
 
-    def _build_joints_request(self, robot, joint_names, joint_values, planner_id,
-                               pipeline='pilz_industrial_motion_planner'):
-        """Build motion plan request for joint target."""
+    def _build_ompl_joints_request(self, robot, joint_names, joint_values, strategy=None):
+        """Build OMPL motion plan request for joint target."""
         req = GetMotionPlan.Request()
         mp = req.motion_plan_request
 
+        if strategy is None:
+            strategy = {
+                'planner': self.planning['planner_id'],
+                'num_attempts': self.planning['num_attempts'],
+                'allowed_time': self.planning['allowed_time']
+            }
+
         mp.group_name = robot['group']
-        mp.pipeline_id = pipeline
-        mp.planner_id = planner_id
-        mp.num_planning_attempts = self.planning['num_attempts']
-        mp.allowed_planning_time = self.planning['allowed_time']
-        mp.max_velocity_scaling_factor = self.vel_scale.get(planner_id, 0.5)
-        mp.max_acceleration_scaling_factor = self.acc_scale.get(planner_id, 0.5)
+        mp.pipeline_id = 'ompl'
+        mp.planner_id = strategy['planner']
+        mp.num_planning_attempts = strategy['num_attempts']
+        mp.allowed_planning_time = strategy['allowed_time']
+        mp.max_velocity_scaling_factor = self.vel_scale['ptp']
+        mp.max_acceleration_scaling_factor = self.acc_scale['ptp']
         mp.start_state.is_diff = True
 
         constraints = Constraints()
@@ -634,27 +658,12 @@ class PathPlanningActionServer(Node):
             MoveItErrorCodes.FAILURE: 'FAILURE',
             MoveItErrorCodes.PLANNING_FAILED: 'PLANNING_FAILED',
             MoveItErrorCodes.INVALID_MOTION_PLAN: 'INVALID_MOTION_PLAN',
-            MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE: 'MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE',
             MoveItErrorCodes.CONTROL_FAILED: 'CONTROL_FAILED',
-            MoveItErrorCodes.UNABLE_TO_AQUIRE_SENSOR_DATA: 'UNABLE_TO_AQUIRE_SENSOR_DATA',
             MoveItErrorCodes.TIMED_OUT: 'TIMED_OUT',
-            MoveItErrorCodes.PREEMPTED: 'PREEMPTED',
             MoveItErrorCodes.START_STATE_IN_COLLISION: 'START_STATE_IN_COLLISION',
-            MoveItErrorCodes.START_STATE_VIOLATES_PATH_CONSTRAINTS: 'START_STATE_VIOLATES_PATH_CONSTRAINTS',
             MoveItErrorCodes.GOAL_IN_COLLISION: 'GOAL_IN_COLLISION',
-            MoveItErrorCodes.GOAL_VIOLATES_PATH_CONSTRAINTS: 'GOAL_VIOLATES_PATH_CONSTRAINTS',
-            MoveItErrorCodes.GOAL_CONSTRAINTS_VIOLATED: 'GOAL_CONSTRAINTS_VIOLATED',
-            MoveItErrorCodes.INVALID_GROUP_NAME: 'INVALID_GROUP_NAME',
-            MoveItErrorCodes.INVALID_GOAL_CONSTRAINTS: 'INVALID_GOAL_CONSTRAINTS',
-            MoveItErrorCodes.INVALID_ROBOT_STATE: 'INVALID_ROBOT_STATE',
-            MoveItErrorCodes.INVALID_LINK_NAME: 'INVALID_LINK_NAME',
-            MoveItErrorCodes.INVALID_OBJECT_NAME: 'INVALID_OBJECT_NAME',
-            MoveItErrorCodes.FRAME_TRANSFORM_FAILURE: 'FRAME_TRANSFORM_FAILURE',
-            MoveItErrorCodes.COLLISION_CHECKING_UNAVAILABLE: 'COLLISION_CHECKING_UNAVAILABLE',
-            MoveItErrorCodes.ROBOT_STATE_STALE: 'ROBOT_STATE_STALE',
-            MoveItErrorCodes.SENSOR_INFO_STALE: 'SENSOR_INFO_STALE',
-            MoveItErrorCodes.COMMUNICATION_FAILURE: 'COMMUNICATION_FAILURE',
             MoveItErrorCodes.NO_IK_SOLUTION: 'NO_IK_SOLUTION',
+            MoveItErrorCodes.INVALID_GROUP_NAME: 'INVALID_GROUP_NAME',
         }
         return error_names.get(error_code, f'UNKNOWN_{error_code}')
 

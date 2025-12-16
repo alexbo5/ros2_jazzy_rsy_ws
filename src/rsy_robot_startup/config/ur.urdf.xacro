@@ -31,11 +31,11 @@
   
 <!-- ros2_control related parameters for robot1 -->
 <xacro:arg name="robot1_headless_mode" default="false" />
-<xacro:arg name="robot1_robot_ip" default="0.0.0.0" />
+<xacro:arg name="robot1_robot_ip" default="192.168.0.51" />
 <xacro:arg name="robot1_script_filename" default=""/>
 <xacro:arg name="robot1_output_recipe_filename" default=""/>
 <xacro:arg name="robot1_input_recipe_filename" default=""/>
-<xacro:arg name="robot1_reverse_ip" default="0.0.0.0"/>
+<xacro:arg name="robot1_reverse_ip" default="192.168.0.2"/>
 <xacro:arg name="robot1_script_command_port" default="50004"/>
 <xacro:arg name="robot1_reverse_port" default="50001"/>
 <xacro:arg name="robot1_script_sender_port" default="50002"/>
@@ -53,11 +53,11 @@
 
 <!-- ros2_control related parameters for robot2 -->
 <xacro:arg name="robot2_headless_mode" default="false" />
-<xacro:arg name="robot2_robot_ip" default="0.0.0.0" />
+<xacro:arg name="robot2_robot_ip" default="192.168.0.11" />
 <xacro:arg name="robot2_script_filename" default=""/>
 <xacro:arg name="robot2_output_recipe_filename" default=""/>
 <xacro:arg name="robot2_input_recipe_filename" default=""/>
-<xacro:arg name="robot2_reverse_ip" default="0.0.0.0"/>
+<xacro:arg name="robot2_reverse_ip" default="192.168.0.2"/>
 <xacro:arg name="robot2_script_command_port" default="50014"/>
 <xacro:arg name="robot2_reverse_port" default="50011"/>
 <xacro:arg name="robot2_script_sender_port" default="50012"/>
@@ -74,7 +74,7 @@
 <xacro:arg name="robot2_tool_tcp_port" default="54322" />
 
     <!-- Simulation parameters -->
-  <xacro:arg name="use_mock_hardware" default="true" />
+  <xacro:arg name="use_mock_hardware" default="false" />
   <xacro:arg name="mock_sensor_commands" default="false" />
 
   <!-- initial position for simulations (Mock Hardware, Gazebo, Ignition) -->
@@ -143,7 +143,7 @@
     safety_limits="$(arg robot1_safety_limits)"
     safety_pos_margin="$(arg robot1_safety_pos_margin)"
     safety_k_position="$(arg robot1_safety_k_position)">
-     <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
+     <origin xyz="0.77 -0.655 0" rpy="0 0 1.570796" />          <!-- position robot in the world -->
 </xacro:ur_robot>
 
 <xacro:ur_robot
@@ -157,7 +157,7 @@
     safety_limits="$(arg robot2_safety_limits)"
     safety_pos_margin="$(arg robot2_safety_pos_margin)"
     safety_k_position="$(arg robot2_safety_k_position)">
-     <origin xyz="-0.77 0.655 0" rpy="0 0 0" />          <!-- position robot in the world -->
+     <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
 </xacro:ur_robot>
 
 <!-- ros2 control instance -->

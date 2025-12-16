@@ -2,66 +2,67 @@
 # MoveIt Servo Configuration for Dual UR Robots
 ###############################################
 
-use_gazebo: false
+moveit_servo:
+  use_gazebo: false
 
-## Properties of incoming commands
-command_in_type: "speed_units"  # "unitless" = [-1:1] joystick, "speed_units" = m/s and rad/s
-scale:
-  linear: 0.5      # Max linear velocity [m/s]
-  rotational: 0.5  # Max angular velocity [rad/s]
-  joint: 0.5       # Max joint velocity scaling
+  ## Properties of incoming commands
+  command_in_type: "speed_units"  # "unitless" = [-1:1] joystick, "speed_units" = m/s and rad/s
+  scale:
+    linear: 0.5      # Max linear velocity [m/s]
+    rotational: 0.5  # Max angular velocity [rad/s]
+    joint: 0.5       # Max joint velocity scaling
 
-# Latency compensation - increases timestep to move target pose farther [seconds]
-system_latency_compensation: 0.04
+  # Latency compensation - increases timestep to move target pose farther [seconds]
+  system_latency_compensation: 0.04
 
-## Properties of outgoing commands
-publish_period: 0.01  # 100 Hz publish rate [seconds]
-low_latency_mode: false
+  ## Properties of outgoing commands
+  publish_period: 0.01  # 100 Hz publish rate [seconds]
+  low_latency_mode: false
 
-# Output command type
-command_out_type: trajectory_msgs/JointTrajectory
+  # Output command type
+  command_out_type: trajectory_msgs/JointTrajectory
 
-# What to publish
-publish_joint_positions: true
-publish_joint_velocities: true
-publish_joint_accelerations: false
+  # What to publish
+  publish_joint_positions: true
+  publish_joint_velocities: true
+  publish_joint_accelerations: false
 
-## Smoothing filter
-smoothing_filter_plugin_name: "online_signal_smoothing::ButterworthFilterPlugin"
+  ## Smoothing filter
+  smoothing_filter_plugin_name: "online_signal_smoothing::ButterworthFilterPlugin"
 
-# Planning scene monitor (false because move_group is primary)
-is_primary_planning_scene_monitor: false
+  # Planning scene monitor (false because move_group is primary)
+  is_primary_planning_scene_monitor: false
 
-## Incoming Joint State properties
-low_pass_filter_coeff: 10.0
+  ## Incoming Joint State properties
+  low_pass_filter_coeff: 10.0
 
-## MoveIt properties - Robot 1
-move_group_name: robot1_ur_manipulator
-planning_frame: world
-ee_frame: robot1_tool0
-robot_link_command_frame: robot1_tool0
+  ## MoveIt properties - Robot 1
+  move_group_name: robot1_ur_manipulator
+  planning_frame: world
+  ee_frame: robot1_tool0
+  robot_link_command_frame: robot1_tool0
 
-## Stopping behaviour
-incoming_command_timeout: 0.1  # Stop if no command for this many seconds
-num_outgoing_halt_msgs_to_publish: 4
+  ## Stopping behaviour
+  incoming_command_timeout: 0.1  # Stop if no command for this many seconds
+  num_outgoing_halt_msgs_to_publish: 4
 
-## Singularity handling
-lower_singularity_threshold: 100.0   # Start decelerating
-hard_stop_singularity_threshold: 200.0  # Full stop
+  ## Singularity handling
+  lower_singularity_threshold: 100.0   # Start decelerating
+  hard_stop_singularity_threshold: 200.0  # Full stop
 
-# Joint limit buffer [radians]
-joint_limit_margins: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+  # Joint limit buffer [radians]
+  joint_limit_margins: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
 
-## Topic names
-cartesian_command_in_topic: ~/delta_twist_cmds
-joint_command_in_topic: ~/delta_joint_cmds
-joint_topic: /joint_states
-status_topic: ~/status
-command_out_topic: /robot1_scaled_joint_trajectory_controller/joint_trajectory
+  ## Topic names
+  cartesian_command_in_topic: ~/delta_twist_cmds
+  joint_command_in_topic: ~/delta_joint_cmds
+  joint_topic: /joint_states
+  status_topic: ~/status
+  command_out_topic: /robot1_scaled_joint_trajectory_controller/joint_trajectory
 
-## Collision checking
-check_collisions: true
-collision_check_rate: 10.0  # [Hz]
-collision_check_type: threshold_distance
-self_collision_proximity_threshold: 0.01   # [m]
-scene_collision_proximity_threshold: 0.02  # [m]
+  ## Collision checking
+  check_collisions: true
+  collision_check_rate: 10.0  # [Hz]
+  collision_check_type: threshold_distance
+  self_collision_proximity_threshold: 0.01   # [m]
+  scene_collision_proximity_threshold: 0.02  # [m]

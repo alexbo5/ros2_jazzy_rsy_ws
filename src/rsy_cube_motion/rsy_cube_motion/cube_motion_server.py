@@ -15,16 +15,16 @@ ROBOT_FACES = ["U", "F", "D"], ["L", "B", "R"]
 # Adjust these values later in real-world testing.
 CUBE_POSE_DEFS = {
     # face: (position_xyz, face_normal_vector)
-    "U": ([-0.385, 0.3275, 0.25], [0.0, 0.0, 1.0]),
-    "D": ([-0.385, 0.3275, 0.25], [0.0, 0.0, -1.0]),
-    "F": ([-0.385, 0.3275, 0.25], [1.0, 0.0, 0.0]),
-    "B": ([-0.385, 0.3275, 0.25], [-1.0, 0.0, 0.0]),
-    "L": ([-0.385, 0.3275, 0.25], [0.0, -1.0, 0.0]),
-    "R": ([-0.385, 0.3275, 0.25], [0.0, 1.0, 0.0]),
+    "U": ([-0.385, 0.3275, 0.30], [0.0, 0.0, 1.0]),
+    "D": ([-0.385, 0.3275, 0.30], [0.0, 0.0, -1.0]),
+    "F": ([-0.385, 0.3275, 0.30], [1.0, 0.0, 0.0]),
+    "B": ([-0.385, 0.3275, 0.30], [-1.0, 0.0, 0.0]),
+    "L": ([-0.385, 0.3275, 0.30], [0.0, -1.0, 0.0]),
+    "R": ([-0.385, 0.3275, 0.30], [0.0, 1.0, 0.0]),
 }
 
 HAND_OVER_POSE_DEF = {
-    "position": [-0.385, 0.3275, 0.25],
+    "position": [-0.385, 0.3275, 0.30],
     "orientation_vector": [1.0, 0.0, 0.0]  # approach axis
 }
 
@@ -34,7 +34,7 @@ GRIPPER_FORWARD_DIRECTION = np.array([0.0, 0.0, 1.0])
 # distance (mm) from cube center to gripper contact point
 OFFSET_DIST_HOLD_CUBE = 15    # distance when holding the cube (grasps 2 rows of cube)  
 OFFSET_DIST_SPIN_CUBE = 25    # distance when spinning the cube (grasps 1 row of cube)  
-OFFSET_DIST_PRE_TARGET = 200   # distance when approaching the cube (pre-grasp position)
+OFFSET_DIST_PRE_TARGET = 50   # distance when approaching the cube (pre-grasp position)
 
 
 @dataclass
