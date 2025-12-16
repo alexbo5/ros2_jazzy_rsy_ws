@@ -45,11 +45,14 @@ class PathPlanningActionServer(Node):
     CONTINUOUS_JOINT_INDICES = [0, 3, 4, 5]  # shoulder_pan, wrist_1, wrist_2, wrist_3
 
     # MoveIt error codes worth retrying with different planner
-    COLLISION_ERRORS = {
+    # Includes collision errors and IK failures (IK can fail due to collision during solve)
+    RETRYABLE_ERRORS = {
         MoveItErrorCodes.PLANNING_FAILED,
         MoveItErrorCodes.INVALID_MOTION_PLAN,
         MoveItErrorCodes.GOAL_IN_COLLISION,
         MoveItErrorCodes.START_STATE_IN_COLLISION,
+        MoveItErrorCodes.NO_IK_SOLUTION,  # IK can fail due to collision during solve
+        MoveItErrorCodes.FAILURE,  # Generic failure, worth retrying with OMPL
     }
 
     def __init__(self):
@@ -306,7 +309,7 @@ class PathPlanningActionServer(Node):
         error_name = self._get_error_name(error_code)
         self.get_logger().warn(f'Pilz PTP failed: {error_name}, trying OMPL...')
 
-        if error_code not in self.COLLISION_ERRORS:
+        if error_code not in self.RETRYABLE_ERRORS:
             return self._abort(goal_handle, result, f'PTP planning failed: {error_name}')
 
         # Fall back to OMPL
@@ -370,7 +373,7 @@ class PathPlanningActionServer(Node):
         error_name = self._get_error_name(error_code)
         self.get_logger().warn(f'Pilz PTP failed: {error_name}, trying OMPL...')
 
-        if error_code not in self.COLLISION_ERRORS:
+        if error_code not in self.RETRYABLE_ERRORS:
             return self._abort(goal_handle, result, f'PTP planning failed: {error_name}')
 
         # Fall back to OMPL

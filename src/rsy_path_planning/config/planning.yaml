@@ -56,13 +56,13 @@ path_planning_action_server:
     # ==========================================================================
     velocity_scaling:
       # PTP (Point-to-Point) motions
-      ptp: 0.5
+      ptp: 0.3
       # LIN (Linear Cartesian) motions
-      lin: 0.3
+      lin: 0.1
 
     acceleration_scaling:
-      ptp: 0.5
-      lin: 0.3
+      ptp: 0.3
+      lin: 0.1
 
     # ==========================================================================
     # Goal Tolerances
