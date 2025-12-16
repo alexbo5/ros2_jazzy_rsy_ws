@@ -20,7 +20,97 @@ Visualization Manager:
       Enabled: true
       Frame Timeout: 15
       Frames:
-        All Enabled: true
+        All Enabled: false
+        coneyor_belt:
+          Value: false
+        ground_plane:
+          Value: false
+        robot1_base_link:
+          Value: true
+        robot1_base_link_inertia:
+          Value: false
+        robot1_forearm_link:
+          Value: false
+        robot1_robotiq_85_base_link:
+          Value: false
+        robot1_robotiq_85_left_finger_link:
+          Value: false
+        robot1_robotiq_85_left_finger_tip_link:
+          Value: false
+        robot1_robotiq_85_left_inner_knuckle_link:
+          Value: false
+        robot1_robotiq_85_left_knuckle_link:
+          Value: false
+        robot1_robotiq_85_right_finger_link:
+          Value: false
+        robot1_robotiq_85_right_finger_tip_link:
+          Value: false
+        robot1_robotiq_85_right_inner_knuckle_link:
+          Value: false
+        robot1_robotiq_85_right_knuckle_link:
+          Value: false
+        robot1_flange:
+          Value: false
+        robot1_ft_frame:
+          Value: false
+        robot1_shoulder_link:
+          Value: false
+        robot1_tcp:
+          Value: true
+        robot1_tool0:
+          Value: false
+        robot1_upper_arm_link:
+          Value: false
+        robot1_wrist_1_link:
+          Value: false
+        robot1_wrist_2_link:
+          Value: false
+        robot1_wrist_3_link:
+          Value: false
+        robot2_base_link:
+          Value: true
+        robot2_base_link_inertia:
+          Value: false
+        robot2_forearm_link:
+          Value: false
+        robot2_robotiq_85_base_link:
+          Value: false
+        robot2_robotiq_85_left_finger_link:
+          Value: false
+        robot2_robotiq_85_left_finger_tip_link:
+          Value: false
+        robot2_robotiq_85_left_inner_knuckle_link:
+          Value: false
+        robot2_robotiq_85_left_knuckle_link:
+          Value: false
+        robot2_robotiq_85_right_finger_link:
+          Value: false
+        robot2_robotiq_85_right_finger_tip_link:
+          Value: false
+        robot2_robotiq_85_right_inner_knuckle_link:
+          Value: false
+        robot2_robotiq_85_right_knuckle_link:
+          Value: false
+        robot2_flange:
+          Value: false
+        robot2_ft_frame:
+          Value: false
+        robot2_shoulder_link:
+          Value: false
+        robot2_tcp:
+          Value: true
+        robot2_tool0:
+          Value: false
+        robot2_upper_arm_link:
+          Value: false
+        robot2_wrist_1_link:
+          Value: false
+        robot2_wrist_2_link:
+          Value: false
+        robot2_wrist_3_link:
+          Value: false
+        world:
+          Value: true
       Marker Scale: 0.3
       Name: TF
       Show Arrows: true

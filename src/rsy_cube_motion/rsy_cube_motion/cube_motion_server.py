@@ -24,7 +24,7 @@ CUBE_POSE_DEFS = {
 }
 
 HAND_OVER_POSE_DEF = {
-    "position": [-0.385, 0.3275, 0.25],
+    "position": [-0.385, 0.3275, 0.35],
     "orientation_vector": [1.0, 0.0, 0.0]  # approach axis
 }
 

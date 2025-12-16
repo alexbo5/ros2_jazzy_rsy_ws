@@ -115,12 +115,14 @@ class ScanCubeActionServer(Node):
         show_preview = bool(self.get_parameter("show_preview").value)
 
         # Parameter aus Goal lesen
-        camera_index = 0
+        camera_index = 99
         try:
             camera_index = int(goal_handle.request.camera_index)
         except Exception:
             camera_index = 0
 
+
+        camera_index = 99
         # Versuche Kamera zu öffnen
         cap = cv2.VideoCapture(camera_index)
         if not cap.isOpened():

@@ -4,28 +4,29 @@
   <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
   <!-- ros2 control include -->
   <xacro:include filename="$(find ur_robot_driver)/urdf/ur.ros2_control.xacro" />
-  
+
   <xacro:include filename="$(find ur_description)/urdf/inc/ur_transmissions.xacro" />
 
-  <xacro:include filename="$(find robotiq_description)/urdf/robotiq_2f_85_macro.urdf.xacro" />
+  <!-- Static Robotiq gripper (visual only) -->
+  <xacro:include filename="$(find rsy_robot_startup)/config/robotiq_2f_85_static.xacro" />
 
-  <!-- possible 'ur_type' values: ur3, ur3e, ur5, ur5e, ur7e, ur10, ur10e, ur12e, ur16e, ur8long, ur15, ur18, ur20, ur30 -->
-  <!-- the default value should raise an error in case this was called without defining the type -->
+  <!-- Robot 1: UR3 configuration -->
   <xacro:arg name="robot1_ur_type" default="ur3"/>
-  <xacro:arg name="robot1_joint_limit_params" default="$(find ur_description)/config/$(arg robot1_ur_type)/joint_limits.yaml"/>
-  <xacro:arg name="robot1_kinematics_params" default="$(find ur_description)/config/$(arg robot1_ur_type)/default_kinematics.yaml"/>
-  <xacro:arg name="robot1_physical_params" default="$(find ur_description)/config/$(arg robot1_ur_type)/physical_parameters.yaml"/>
-  <xacro:arg name="robot1_visual_params" default="$(find ur_description)/config/$(arg robot1_ur_type)/visual_parameters.yaml"/>
+  <xacro:arg name="robot1_joint_limit_params" default="$(find rsy_robot_startup)/config/urdf_joint_limits.yaml"/>
+  <xacro:arg name="robot1_kinematics_params" default="$(find ur_description)/config/ur3/default_kinematics.yaml"/>
+  <xacro:arg name="robot1_physical_params" default="$(find ur_description)/config/ur3/physical_parameters.yaml"/>
+  <xacro:arg name="robot1_visual_params" default="$(find ur_description)/config/ur3/visual_parameters.yaml"/>
   <xacro:arg name="robot1_transmission_hw_interface" default=""/>
   <xacro:arg name="robot1_safety_limits" default="false"/>
   <xacro:arg name="robot1_safety_pos_margin" default="0.15"/>
   <xacro:arg name="robot1_safety_k_position" default="20"/>
 
+  <!-- Robot 2: UR3e configuration -->
   <xacro:arg name="robot2_ur_type" default="ur3e"/>
-  <xacro:arg name="robot2_joint_limit_params" default="$(find ur_description)/config/$(arg robot2_ur_type)/joint_limits.yaml"/>
-  <xacro:arg name="robot2_kinematics_params" default="$(find ur_description)/config/$(arg robot2_ur_type)/default_kinematics.yaml"/>
-  <xacro:arg name="robot2_physical_params" default="$(find ur_description)/config/$(arg robot2_ur_type)/physical_parameters.yaml"/>
-  <xacro:arg name="robot2_visual_params" default="$(find ur_description)/config/$(arg robot2_ur_type)/visual_parameters.yaml"/>
+  <xacro:arg name="robot2_joint_limit_params" default="$(find rsy_robot_startup)/config/urdf_joint_limits.yaml"/>
+  <xacro:arg name="robot2_kinematics_params" default="$(find ur_description)/config/ur3e/default_kinematics.yaml"/>
+  <xacro:arg name="robot2_physical_params" default="$(find ur_description)/config/ur3e/physical_parameters.yaml"/>
+  <xacro:arg name="robot2_visual_params" default="$(find ur_description)/config/ur3e/visual_parameters.yaml"/>
   <xacro:arg name="robot2_transmission_hw_interface" default=""/>
   <xacro:arg name="robot2_safety_limits" default="false"/>
   <xacro:arg name="robot2_safety_pos_margin" default="0.15"/>
@@ -33,11 +34,11 @@
   
 <!-- ros2_control related parameters for robot1 -->
 <xacro:arg name="robot1_headless_mode" default="false" />
-<xacro:arg name="robot1_robot_ip" default="0.0.0.0" />
+<xacro:arg name="robot1_robot_ip" default="192.168.0.51" />
 <xacro:arg name="robot1_script_filename" default=""/>
 <xacro:arg name="robot1_output_recipe_filename" default=""/>
 <xacro:arg name="robot1_input_recipe_filename" default=""/>
-<xacro:arg name="robot1_reverse_ip" default="0.0.0.0"/>
+<xacro:arg name="robot1_reverse_ip" default="192.168.0.2"/>
 <xacro:arg name="robot1_script_command_port" default="50004"/>
 <xacro:arg name="robot1_reverse_port" default="50001"/>
 <xacro:arg name="robot1_script_sender_port" default="50002"/>
@@ -55,11 +56,11 @@
 
 <!-- ros2_control related parameters for robot2 -->
 <xacro:arg name="robot2_headless_mode" default="false" />
-<xacro:arg name="robot2_robot_ip" default="0.0.0.0" />
+<xacro:arg name="robot2_robot_ip" default="192.168.0.11" />
 <xacro:arg name="robot2_script_filename" default=""/>
 <xacro:arg name="robot2_output_recipe_filename" default=""/>
 <xacro:arg name="robot2_input_recipe_filename" default=""/>
-<xacro:arg name="robot2_reverse_ip" default="0.0.0.0"/>
+<xacro:arg name="robot2_reverse_ip" default="192.168.0.2"/>
 <xacro:arg name="robot2_script_command_port" default="50014"/>
 <xacro:arg name="robot2_reverse_port" default="50011"/>
 <xacro:arg name="robot2_script_sender_port" default="50012"/>
@@ -116,13 +117,13 @@
     <geometry>
       <box size="0.8 0.2 0.1"/>
     </geometry>
-    <origin xyz="-0.385 0.3275 -0.05" rpy="0 0 0"/>
+    <origin xyz="-0.385 0.3275 0.05" rpy="0 0 0"/>
   </collision>
   <visual>
     <geometry>
       <box size="0.8 0.2 0.1"/>
     </geometry>
-    <origin xyz="-0.385 0.3275 -0.05" rpy="0 0 0"/>
+    <origin xyz="-0.385 0.3275 0.05" rpy="0 0 0"/>
     <material name="yellow">
       <color rgba="1.0 1.0 0.0 1.0"/>
     </material>
@@ -132,6 +133,56 @@
 <joint name="world_to_coneyor_belt" type="fixed">
   <parent link="world"/>
   <child link="coneyor_belt"/>
+</joint>
+
+<!-- ITEM Profile 1 -->
+<link name="item_profile_1">
+  <collision>
+    <geometry>
+      <box size="0.04 0.04 1.0"/>
+    </geometry>
+    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.04 0.04 1.0"/>
+    </geometry>
+    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+    <material name="yellow">
+      <color rgba="1.0 1.0 0.0 1.0"/>
+    </material>
+  </visual>
+</link>
+
+<joint name="world_to_item_profile_1" type="fixed">
+  <parent link="world"/>
+  <child link="item_profile_1"/>
+  <origin xyz="0.30 -0.30 0" rpy="0 0 0"/>
+</joint>
+
+<!-- ITEM Profile 2 -->
+<link name="item_profile_2">
+  <collision>
+    <geometry>
+      <box size="0.04 0.04 1.0"/>
+    </geometry>
+    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.04 0.04 1.0"/>
+    </geometry>
+    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+    <material name="yellow">
+      <color rgba="1.0 1.0 0.0 1.0"/>
+    </material>
+  </visual>
+</link>
+
+<joint name="world_to_item_profile_2" type="fixed">
+  <parent link="world"/>
+  <child link="item_profile_2"/>
+  <origin xyz="-1.07 0.955 0" rpy="0 0 0"/>
 </joint>
 
 <xacro:ur_robot
@@ -145,7 +196,7 @@
     safety_limits="$(arg robot1_safety_limits)"
     safety_pos_margin="$(arg robot1_safety_pos_margin)"
     safety_k_position="$(arg robot1_safety_k_position)">
-     <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
+     <origin xyz="0 0 0" rpy="0 0 1.570796" />          <!-- position robot in the world -->
 </xacro:ur_robot>
 
 <xacro:ur_robot
@@ -159,8 +210,32 @@
     safety_limits="$(arg robot2_safety_limits)"
     safety_pos_margin="$(arg robot2_safety_pos_margin)"
     safety_k_position="$(arg robot2_safety_k_position)">
-     <origin xyz="-0.77 0.655 0" rpy="0 0 0" />          <!-- position robot in the world -->
+     <origin xyz="-0.77 0.655 0" rpy="0 0 3.141592" />          <!-- position robot in the world -->
 </xacro:ur_robot>
+
+<!-- Static Robotiq grippers attached to robot tool0 links -->
+<xacro:robotiq_gripper_static prefix="robot1_" parent="robot1_tool0">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+</xacro:robotiq_gripper_static>
+
+<xacro:robotiq_gripper_static prefix="robot2_" parent="robot2_tool0">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+</xacro:robotiq_gripper_static>
+
+<!-- TCP (Tool Center Point) links - 16.5cm from tool0 in z direction -->
+<link name="robot1_tcp" />
+<joint name="robot1_tool0_to_tcp" type="fixed">
+    <parent link="robot1_tool0" />
+    <child link="robot1_tcp" />
+    <origin xyz="0 0 0.165" rpy="0 0 0" />
+</joint>
+
+<link name="robot2_tcp" />
+<joint name="robot2_tool0_to_tcp" type="fixed">
+    <parent link="robot2_tool0" />
+    <child link="robot2_tcp" />
+    <origin xyz="0 0 0.165" rpy="0 0 0" />
+</joint>
 
 <!-- ros2 control instance -->
 <xacro:ur_ros2_control
