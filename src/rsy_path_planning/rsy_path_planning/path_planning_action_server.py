@@ -104,9 +104,9 @@ class PathPlanningActionServer(Node):
         """Declare all parameters with defaults."""
         # Robot config
         self.declare_parameter('robots.robot1.planning_group', 'robot1_ur_manipulator')
-        self.declare_parameter('robots.robot1.end_effector_link', 'robot1_tool0')
+        self.declare_parameter('robots.robot1.end_effector_link', 'robot1_tcp')
         self.declare_parameter('robots.robot2.planning_group', 'robot2_ur_manipulator')
-        self.declare_parameter('robots.robot2.end_effector_link', 'robot2_tool0')
+        self.declare_parameter('robots.robot2.end_effector_link', 'robot2_tcp')
 
         # OMPL Planning parameters
         self.declare_parameter('planning.num_attempts', 10)

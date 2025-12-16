@@ -172,6 +172,21 @@
     <origin xyz="0 0 0" rpy="0 0 0" />
 </xacro:robotiq_gripper_static>
 
+<!-- TCP (Tool Center Point) links - 16.5cm from tool0 in z direction -->
+<link name="robot1_tcp" />
+<joint name="robot1_tool0_to_tcp" type="fixed">
+    <parent link="robot1_tool0" />
+    <child link="robot1_tcp" />
+    <origin xyz="0 0 0.165" rpy="0 0 0" />
+</joint>
+
+<link name="robot2_tcp" />
+<joint name="robot2_tool0_to_tcp" type="fixed">
+    <parent link="robot2_tool0" />
+    <child link="robot2_tcp" />
+    <origin xyz="0 0 0.165" rpy="0 0 0" />
+</joint>
+
 <!-- ros2 control instance -->
 <xacro:ur_ros2_control
     name="robot1"

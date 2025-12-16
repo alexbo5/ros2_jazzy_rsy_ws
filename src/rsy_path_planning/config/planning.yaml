@@ -8,10 +8,10 @@ path_planning_action_server:
     robots:
       robot1:
         planning_group: robot1_ur_manipulator
-        end_effector_link: robot1_tool0
+        end_effector_link: robot1_tcp
       robot2:
         planning_group: robot2_ur_manipulator
-        end_effector_link: robot2_tool0
+        end_effector_link: robot2_tcp
 
     # OMPL Planning parameters (for MoveJ/MoveJJoints)
     planning:

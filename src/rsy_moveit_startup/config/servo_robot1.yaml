@@ -39,8 +39,8 @@ moveit_servo:
   ## MoveIt properties - Robot 1
   move_group_name: robot1_ur_manipulator
   planning_frame: world
-  ee_frame: robot1_tool0
-  robot_link_command_frame: robot1_tool0
+  ee_frame: robot1_tcp
+  robot_link_command_frame: robot1_tcp
 
   ## Stopping behaviour
   incoming_command_timeout: 0.1  # Stop if no command for this many seconds
