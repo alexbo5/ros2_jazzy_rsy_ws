@@ -37,6 +37,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     bash-completion \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python packages
+RUN pip3 install --break-system-packages kociemba
+
 # Workspace (will be mounted)
 WORKDIR /root/ros2_ws
 

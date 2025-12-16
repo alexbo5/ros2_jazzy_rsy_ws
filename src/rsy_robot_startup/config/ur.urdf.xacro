@@ -135,6 +135,56 @@
   <child link="coneyor_belt"/>
 </joint>
 
+<!-- ITEM Profile 1 -->
+<link name="item_profile_1">
+  <collision>
+    <geometry>
+      <box size="0.04 0.04 1.0"/>
+    </geometry>
+    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.04 0.04 1.0"/>
+    </geometry>
+    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+    <material name="yellow">
+      <color rgba="1.0 1.0 0.0 1.0"/>
+    </material>
+  </visual>
+</link>
+
+<joint name="world_to_item_profile_1" type="fixed">
+  <parent link="world"/>
+  <child link="item_profile_1"/>
+  <origin xyz="0.30 -0.30 0" rpy="0 0 0"/>
+</joint>
+
+<!-- ITEM Profile 2 -->
+<link name="item_profile_2">
+  <collision>
+    <geometry>
+      <box size="0.04 0.04 1.0"/>
+    </geometry>
+    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.04 0.04 1.0"/>
+    </geometry>
+    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+    <material name="yellow">
+      <color rgba="1.0 1.0 0.0 1.0"/>
+    </material>
+  </visual>
+</link>
+
+<joint name="world_to_item_profile_2" type="fixed">
+  <parent link="world"/>
+  <child link="item_profile_2"/>
+  <origin xyz="-1.07 0.955 0" rpy="0 0 0"/>
+</joint>
+
 <xacro:ur_robot
     name="robot1"
     tf_prefix="robot1_"

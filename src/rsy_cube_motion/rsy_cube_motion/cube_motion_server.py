@@ -24,7 +24,7 @@ CUBE_POSE_DEFS = {
 }
 
 HAND_OVER_POSE_DEF = {
-    "position": [-0.385, 0.3275, 0.30],
+    "position": [-0.385, 0.3275, 0.35],
     "orientation_vector": [1.0, 0.0, 0.0]  # approach axis
 }
 
@@ -34,7 +34,7 @@ GRIPPER_FORWARD_DIRECTION = np.array([0.0, 0.0, 1.0])
 # distance (mm) from cube center to gripper contact point
 OFFSET_DIST_HOLD_CUBE = 15    # distance when holding the cube (grasps 2 rows of cube)  
 OFFSET_DIST_SPIN_CUBE = 25    # distance when spinning the cube (grasps 1 row of cube)  
-OFFSET_DIST_PRE_TARGET = 50   # distance when approaching the cube (pre-grasp position)
+OFFSET_DIST_PRE_TARGET = 80   # distance when approaching the cube (pre-grasp position)
 
 
 @dataclass
