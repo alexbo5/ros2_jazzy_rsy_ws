@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from rsy_cube_motion.action import RotateFace, HandOver
 from rsy_path_planning.action import MoveJ, MoveL
+from rsy_gripper_controller.srv import RobotiqGripper
 
 # Roboter 1 dreht U, F, D; Roboter 2 dreht L, B, R
 ROBOT_FACES = ["U", "F", "D"], ["L", "B", "R"]
@@ -183,6 +184,12 @@ class CubeMotionServer(Node):
         self.move_j_client = ActionClient(self, MoveJ, 'move_j')
         self.move_l_client = ActionClient(self, MoveL, 'move_l')
 
+        # Gripper service clients
+        self.gripper_clients = {
+            'robot1': self.create_client(RobotiqGripper, 'robot1_robotiq_gripper'),
+            'robot2': self.create_client(RobotiqGripper, 'robot2_robotiq_gripper'),
+        }
+
         self.get_logger().info("Cube Motion Server gestartet.")
 
     def _init_cube_poses(self):
@@ -336,8 +343,11 @@ class CubeMotionServer(Node):
         new_spinning_robot_target = self.get_gripper_pose(self.handover_pose, approach_from_front=new_spinning_robot_approach_from_front, offset_dist=OFFSET_DIST_HOLD_CUBE, twist_angle=np.pi/2)
         await self.call_move_l(new_spinning_robot, new_spinning_robot_target)
 
-        # TODO: Gripper close: new spinning robot
-        # TODO: Gripper open: old spinning robot
+        # Gripper close: new spinning robot grabs the cube
+        await self.gripper_close(new_spinning_robot)
+
+        # Gripper open: old spinning robot releases the cube
+        await self.gripper_open(old_spinning_robot)
 
         # Old robot retracts
         old_spinning_robot_post_target = self.get_gripper_pose(self.handover_pose, approach_from_front=old_spinning_robot_approach_from_front, offset_dist=OFFSET_DIST_PRE_TARGET)
@@ -396,13 +406,15 @@ class CubeMotionServer(Node):
         cube_spinning_start_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_SPIN_CUBE)
         await self.call_move_l(spinning_robot, cube_spinning_start_target)
 
-        # TODO: Gripper close
+        # Gripper close: spinning robot grabs the face to rotate
+        await self.gripper_close(spinning_robot)
 
         # Spinning robot rotates the face (reorient)
         cube_spinning_end_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_SPIN_CUBE, twist_angle=np.radians(angle))
         await self.call_move_l(spinning_robot, cube_spinning_end_target)
 
-        # TODO: Gripper open
+        # Gripper open: spinning robot releases the face after rotation
+        await self.gripper_open(spinning_robot)
 
         # Spinning robot retracts
         cube_spinning_post_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_PRE_TARGET, twist_angle=np.radians(angle))
@@ -502,6 +514,49 @@ class CubeMotionServer(Node):
 
         if not result.result.success:
             self.get_logger().error("[HandOver] Fehler beim Umgreifen!")
+
+    async def call_gripper(self, robot_name: str, action: str) -> bool:
+        """Call gripper service for a specific robot.
+
+        Args:
+            robot_name: 'robot1' or 'robot2'
+            action: 'OPEN' or 'CLOSE'
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if robot_name not in self.gripper_clients:
+            self.get_logger().error(f"[Gripper] Unknown robot: {robot_name}")
+            return False
+
+        client = self.gripper_clients[robot_name]
+
+        if not client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error(f"[Gripper] Service {robot_name}_robotiq_gripper not available")
+            return False
+
+        request = RobotiqGripper.Request()
+        request.action = action
+
+        self.get_logger().info(f"[Gripper] {robot_name}: {action}")
+
+        future = client.call_async(request)
+        result = await future
+
+        if result.success:
+            self.get_logger().info(f"[Gripper] {robot_name} {action} successful: {result.message}")
+            return True
+        else:
+            self.get_logger().error(f"[Gripper] {robot_name} {action} failed: {result.message}")
+            return False
+
+    async def gripper_open(self, robot_name: str) -> bool:
+        """Open gripper for specified robot."""
+        return await self.call_gripper(robot_name, "OPEN")
+
+    async def gripper_close(self, robot_name: str) -> bool:
+        """Close gripper for specified robot."""
+        return await self.call_gripper(robot_name, "CLOSE")
 
 
 def main(args=None):

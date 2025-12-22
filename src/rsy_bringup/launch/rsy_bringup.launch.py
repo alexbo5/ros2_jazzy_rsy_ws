@@ -19,6 +19,7 @@ def generate_launch_description():
     path_planning_pkg = get_package_share_directory("rsy_path_planning")
     cube_motion_pkg = get_package_share_directory("rsy_cube_motion")
     cube_perception_pkg = get_package_share_directory("rsy_cube_perception")
+    gripper_pkg = get_package_share_directory("rsy_gripper_controller")
 
     # 1. Robot startup (robot_state_publisher + controllers)
     robot_launch = IncludeLaunchDescription(
@@ -30,7 +31,12 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(os.path.join(moveit_pkg, "launch", "moveit.launch.py"))
     )
 
-    # 3. RViz
+    # 3. Gripper servers for both robots
+    gripper_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(gripper_pkg, "launch", "gripper.launch.py"))
+    )
+
+    # 4. RViz
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
@@ -39,7 +45,7 @@ def generate_launch_description():
         arguments=["-d", os.path.join(bringup_pkg, "config", "moveit.rviz")],
     )
 
-    # 4. Application nodes (delayed to ensure MoveIt is ready)
+    # 5. Application nodes (delayed to ensure MoveIt is ready)
     app_delay = 5.0
 
     path_planning_launch = TimerAction(
@@ -66,6 +72,7 @@ def generate_launch_description():
     return LaunchDescription([
         robot_launch,
         moveit_launch,
+        gripper_launch,
         rviz_node,
         path_planning_launch,
         cube_motion_launch,
