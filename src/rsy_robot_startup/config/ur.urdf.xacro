@@ -76,6 +76,14 @@
 <xacro:arg name="robot2_tool_device_name" default="/tmp/ttyUR2" />
 <xacro:arg name="robot2_tool_tcp_port" default="54322" />
 
+<!-- Robot2 position relative to world frame -->
+<xacro:arg name="robot2_x" default="-0.77" />
+<xacro:arg name="robot2_y" default="0.655" />
+<xacro:arg name="robot2_z" default="0" />
+<xacro:arg name="robot2_roll" default="0" />
+<xacro:arg name="robot2_pitch" default="0" />
+<xacro:arg name="robot2_yaw" default="3.141592" />
+
     <!-- Simulation parameters -->
   <xacro:arg name="use_mock_hardware" default="true" />
   <xacro:arg name="mock_sensor_commands" default="false" />
@@ -160,7 +168,7 @@
     safety_limits="$(arg robot2_safety_limits)"
     safety_pos_margin="$(arg robot2_safety_pos_margin)"
     safety_k_position="$(arg robot2_safety_k_position)">
-     <origin xyz="-0.77 0.655 0" rpy="0 0 3.141592" />          <!-- position robot in the world -->
+     <origin xyz="$(arg robot2_x) $(arg robot2_y) $(arg robot2_z)" rpy="$(arg robot2_roll) $(arg robot2_pitch) $(arg robot2_yaw)" />
 </xacro:ur_robot>
 
 <!-- Static Robotiq grippers attached to robot tool0 links -->

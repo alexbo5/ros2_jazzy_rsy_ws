@@ -1,8 +1,15 @@
+"""
+Robot startup launch file.
+Launches robot_state_publisher with URDF and ros2_control with controllers.
+Accepts configuration for mock hardware mode and robot IPs.
+"""
+
 import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess, RegisterEventHandler, TimerAction
+from launch.actions import ExecuteProcess, RegisterEventHandler, TimerAction, DeclareLaunchArgument
 from launch.event_handlers import OnProcessStart
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.descriptions import ParameterValue
 from launch.substitutions import Command
@@ -12,12 +19,62 @@ def generate_launch_description():
     # Get package share directory
     pkg_share = get_package_share_directory("rsy_robot_startup")
 
+    # Declare launch arguments
+    use_mock_hardware_arg = DeclareLaunchArgument(
+        'use_mock_hardware',
+        default_value='true',
+        description='Use mock hardware for simulation'
+    )
+
+    robot1_robot_ip_arg = DeclareLaunchArgument(
+        'robot1_robot_ip',
+        default_value='192.168.0.51',
+        description='IP address of robot1'
+    )
+
+    robot2_robot_ip_arg = DeclareLaunchArgument(
+        'robot2_robot_ip',
+        default_value='192.168.0.11',
+        description='IP address of robot2'
+    )
+
+    # Robot2 position arguments
+    robot2_x_arg = DeclareLaunchArgument(
+        'robot2_x', default_value='-0.77', description='Robot2 X position'
+    )
+    robot2_y_arg = DeclareLaunchArgument(
+        'robot2_y', default_value='0.655', description='Robot2 Y position'
+    )
+    robot2_z_arg = DeclareLaunchArgument(
+        'robot2_z', default_value='0', description='Robot2 Z position'
+    )
+    robot2_roll_arg = DeclareLaunchArgument(
+        'robot2_roll', default_value='0', description='Robot2 roll orientation'
+    )
+    robot2_pitch_arg = DeclareLaunchArgument(
+        'robot2_pitch', default_value='0', description='Robot2 pitch orientation'
+    )
+    robot2_yaw_arg = DeclareLaunchArgument(
+        'robot2_yaw', default_value='3.141592', description='Robot2 yaw orientation'
+    )
+
     # URDF file path
     urdf_xacro_path = os.path.join(pkg_share, "config", "ur.urdf.xacro")
 
-    # Process xacro to get robot description
+    # Process xacro with arguments to get robot description
     robot_description = ParameterValue(
-        Command(["xacro ", urdf_xacro_path]),
+        Command([
+            "xacro ", urdf_xacro_path,
+            " use_mock_hardware:=", LaunchConfiguration('use_mock_hardware'),
+            " robot1_robot_ip:=", LaunchConfiguration('robot1_robot_ip'),
+            " robot2_robot_ip:=", LaunchConfiguration('robot2_robot_ip'),
+            " robot2_x:=", LaunchConfiguration('robot2_x'),
+            " robot2_y:=", LaunchConfiguration('robot2_y'),
+            " robot2_z:=", LaunchConfiguration('robot2_z'),
+            " robot2_roll:=", LaunchConfiguration('robot2_roll'),
+            " robot2_pitch:=", LaunchConfiguration('robot2_pitch'),
+            " robot2_yaw:=", LaunchConfiguration('robot2_yaw'),
+        ]),
         value_type=str
     )
 
@@ -94,6 +151,17 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            # Launch arguments
+            use_mock_hardware_arg,
+            robot1_robot_ip_arg,
+            robot2_robot_ip_arg,
+            robot2_x_arg,
+            robot2_y_arg,
+            robot2_z_arg,
+            robot2_roll_arg,
+            robot2_pitch_arg,
+            robot2_yaw_arg,
+            # Nodes and actions
             robot_state_publisher,
             start_ros2_control,
             start_controllers,

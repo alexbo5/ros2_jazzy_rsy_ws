@@ -3,6 +3,7 @@ Launch file for dual robot gripper action servers.
 
 This launch file starts gripper action servers for both robot1 and robot2.
 Each server uses prefix-based naming (e.g., robot1_robotiq_gripper, robot2_robotiq_gripper).
+Supports mock hardware mode for testing without physical grippers.
 """
 
 from launch import LaunchDescription
@@ -12,6 +13,13 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    # Declare launch argument for mock hardware mode
+    use_mock_hardware_arg = DeclareLaunchArgument(
+        'use_mock_hardware',
+        default_value='false',
+        description='Use mock hardware instead of real grippers'
+    )
+
     # Declare launch arguments for robot1
     robot1_ip_arg = DeclareLaunchArgument(
         'robot1_gripper_ip',
@@ -48,6 +56,7 @@ def generate_launch_description():
             'port': LaunchConfiguration('robot1_gripper_port'),
             'robot_prefix': 'robot1',
             'timeout': 3.0,
+            'use_mock_hardware': LaunchConfiguration('use_mock_hardware'),
         }],
         output='screen',
     )
@@ -62,12 +71,14 @@ def generate_launch_description():
             'port': LaunchConfiguration('robot2_gripper_port'),
             'robot_prefix': 'robot2',
             'timeout': 3.0,
+            'use_mock_hardware': LaunchConfiguration('use_mock_hardware'),
         }],
         output='screen',
     )
 
     return LaunchDescription([
         # Launch arguments
+        use_mock_hardware_arg,
         robot1_ip_arg,
         robot1_port_arg,
         robot2_ip_arg,
