@@ -43,6 +43,8 @@ class CubeSolver(Node):
                 self.get_logger().error("Cube motion action server not available")
                 return
             
+            self.get_logger().info("Next move: " + move)
+
             goal = RotateFace.Goal()
             goal.move = move
             send_goal_future = self.face_rotation_client.send_goal_async(goal)
@@ -60,8 +62,9 @@ class CubeSolver(Node):
             if res is None:
                 self.get_logger().error("Failed to get result from cube motion server")
                 return
-
-            self.get_logger().info(move)
+            if (not res.result.success):
+                self.get_logger().error("Face rotation failed")
+                return    # abort entire solving when one movement failed 
 
         self.get_logger().info("Cube solved!")
 

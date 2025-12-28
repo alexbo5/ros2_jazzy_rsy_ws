@@ -15,12 +15,12 @@ ROBOT_FACES = ["U", "F", "D"], ["L", "B", "R"]
 # Adjust these values later in real-world testing.
 CUBE_POSE_DEFS = {
     # face: (position_xyz, face_normal_vector, holding_angle)
-    "U": ([-0.385, 0.3275, 0.25], [1.0, 0.0, 0.0], [90]),
-    "D": ([-0.385, 0.3275, 0.25], [1.0, 0.0, 0.0], [90]),
-    "F": ([-0.385, 0.3275, 0.25], [1.0, 0.0, 0.0], [180]),
-    "B": ([-0.385, 0.3275, 0.25], [-1.0, 0.0, 0.0], [180]),
-    "L": ([-0.385, 0.3275, 0.25], [-1.0, 0.0, 0.0], [90]),
-    "R": ([-0.385, 0.3275, 0.25], [-1.0, 0.0, 0.0], [90]),
+    "U": ([-0.385, 0.3275, 0.5], [1.0, 0.0, 0.0], [90]),
+    "D": ([-0.385, 0.3275, 0.5], [1.0, 0.0, 0.0], [90]),
+    "F": ([-0.385, 0.3275, 0.5], [1.0, 0.0, 0.0], [180]),
+    "B": ([-0.385, 0.3275, 0.5], [-1.0, 0.0, 0.0], [180]),
+    "L": ([-0.385, 0.3275, 0.5], [-1.0, 0.0, 0.0], [90]),
+    "R": ([-0.385, 0.3275, 0.5], [-1.0, 0.0, 0.0], [90]),
 }
 
 HAND_OVER_POSE_DEF = {
@@ -32,9 +32,9 @@ HAND_OVER_POSE_DEF = {
 GRIPPER_FORWARD_DIRECTION = np.array([0.0, 0.0, 1.0])
 
 # distance (mm) from cube center to gripper contact point
-OFFSET_DIST_HOLD_CUBE = 15 + 50    # distance when holding the cube (grasps 2 rows of cube)  
-OFFSET_DIST_SPIN_CUBE = 25 + 50    # distance when spinning the cube (grasps 1 row of cube)  
-OFFSET_DIST_PRE_TARGET = 50 + 50   # distance when approaching the cube (pre-grasp position)
+OFFSET_DIST_HOLD_CUBE = 15    # distance when holding the cube (grasps 2 rows of cube)  
+OFFSET_DIST_SPIN_CUBE = 25    # distance when spinning the cube (grasps 1 row of cube)  
+OFFSET_DIST_PRE_TARGET = 50   # distance when approaching the cube (pre-grasp position)
 
 
 @dataclass
@@ -401,6 +401,7 @@ class CubeMotionServer(Node):
     # -------------------------------
     async def execute_rotate_face(self, goal_handle):
 
+        success = True
         move = goal_handle.request.move
         self.get_logger().info(f">>> [RotateFace] Receive move {move}")
 
@@ -425,30 +426,30 @@ class CubeMotionServer(Node):
 
         # Holding robot moves to hold the cube
         cube_holding_target = self.get_gripper_pose(cube_pose, approach_direction=cube_pose.holding_angle, offset_dist=OFFSET_DIST_HOLD_CUBE)
-        await self.call_move_j(holding_robot, cube_holding_target)
+        success = success and await self.call_move_j(holding_robot, cube_holding_target)
 
         # Spinning robot approaches the face
         cube_spinning_pre_target = self.get_gripper_pose(cube_pose, approach_direction=0.0, offset_dist=OFFSET_DIST_PRE_TARGET)
-        await self.call_move_j(spinning_robot, cube_spinning_pre_target)
+        success = success and await self.call_move_j(spinning_robot, cube_spinning_pre_target)
 
         # Spinning robot moves linearly to grasp position
         cube_spinning_start_target = self.get_gripper_pose(cube_pose, approach_direction=0.0, offset_dist=OFFSET_DIST_SPIN_CUBE)
-        await self.call_move_l(spinning_robot, cube_spinning_start_target)
+        success = success and await self.call_move_l(spinning_robot, cube_spinning_start_target)
 
         # TODO: Gripper close
 
         # Spinning robot rotates the face (reorient)
         cube_spinning_end_target = self.get_gripper_pose(cube_pose, approach_direction=0.0, offset_dist=OFFSET_DIST_SPIN_CUBE, twist_angle=np.radians(angle))
-        await self.call_move_l(spinning_robot, cube_spinning_end_target)
+        success = success and await self.call_move_l(spinning_robot, cube_spinning_end_target)
 
         # TODO: Gripper open
 
         # Spinning robot retracts
         cube_spinning_post_target = self.get_gripper_pose(cube_pose, approach_direction=0.0, offset_dist=OFFSET_DIST_PRE_TARGET, twist_angle=np.radians(angle))
-        await self.call_move_l(spinning_robot, cube_spinning_post_target)
+        success = success and await self.call_move_l(spinning_robot, cube_spinning_post_target)
 
         result = RotateFace.Result()
-        result.success = True
+        result.success = success
         self.get_logger().info(">>> [RotateFace] abgeschlossen.")
         if (result.success):
             goal_handle.succeed()
