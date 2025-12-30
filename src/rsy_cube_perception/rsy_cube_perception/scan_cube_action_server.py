@@ -128,7 +128,7 @@ class ScanCubeActionServer(Node):
             self.get_logger().error(msg)
 
             #return sample result for development
-            result.solution = "F D' U B R"
+            result.solution = "D F U R B L D R D2 R' D R2"
             result.success = True
             goal_handle.abort()
             return result
