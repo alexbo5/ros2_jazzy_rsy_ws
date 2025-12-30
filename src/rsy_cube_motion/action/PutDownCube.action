@@ -1,0 +1,7 @@
+# Goal: Put down the cube to the rest position
+# Robot 2 always puts down the cube
+---
+# Result
+bool success
+---
+# Feedback
