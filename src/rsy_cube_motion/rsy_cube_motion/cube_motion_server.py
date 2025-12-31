@@ -5,7 +5,7 @@ from rclpy.action import ActionServer, ActionClient
 import numpy as np
 from dataclasses import dataclass
 
-from rsy_cube_motion.action import RotateFace, HandOver, TakeUpCube, PutDownCube
+from rsy_cube_motion.action import RotateFace, HandOver, TakeUpCube, PutDownCube, PresentCubeFace
 from rsy_path_planning.action import MoveJ, MoveL
 
 # Roboter 1 dreht U, F, D; Roboter 2 dreht L, B, R
@@ -22,7 +22,7 @@ CUBE_POSE_DEFS = {
     # face: (position_xyz, face_normal_orientation=[nx, ny, nz, rotation_rad], holding_angle)
     "U": ([-0.385, 0.3275, 0.5], [1.0, 0.0, 0.0, 3.14159], [90]),
     "D": ([-0.385, 0.3275, 0.5], [1.0, 0.0, 0.0, 0.0], [-90]),
-    "F": ([-0.385, 0.3275, 0.5], [1.0, 0.0, 0.0, 0.7], [180]),
+    "F": ([-0.385, 0.3275, 0.5], [1.0, 0.0, 0.0, 0.0], [180]),
     "B": ([-0.385, 0.3275, 0.5], [-1.0, 0.0, 0.0, 0.0], [180]),
     "L": ([-0.385, 0.3275, 0.5], [-1.0, 0.0, 0.0, 3.14159], [-90]),
     "R": ([-0.385, 0.3275, 0.5], [-1.0, 0.0, 0.0, 0.0], [90]),
@@ -38,6 +38,18 @@ HAND_OVER_POSE_DEF = {
 CUBE_REST_POSE_DEF = {
     "position": [-0.2, 0.655, 0.1],  # Rest position
     "orientation_vector": [-1.0, 0.0, 0.0]  # approach axis
+}
+
+# Presentation poses - each face is presented to the camera (facing upward in Z direction)
+# These poses are used by PresentCubeFace action to show each face for scanning
+# Format: face -> (position, face_normal_orientation, robot_holding_angle)
+CUBE_PRESENT_POSES = {
+    "U": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, -3.14159/2.0], [-90]),
+    "D": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, 3.14159/2.0], [90]),
+    "F": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, 0.0], [180]),
+    "B": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, 0.0], [180]),
+    "L": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, -3.14159/2.0], [90]),
+    "R": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, 3.14159/2.0], [-90]),
 }
 
 # Define gripper reference forward vector in gripper's local frame (tool Z-axis?)
@@ -246,6 +258,14 @@ class CubeMotionServer(Node):
             PutDownCube,
             'put_down_cube',
             self.execute_put_down_cube
+        )
+
+        # ActionServer: Würfel face präsentieren
+        self.present_server = ActionServer(
+            self,
+            PresentCubeFace,
+            'present_cube_face',
+            self.execute_present_cube_face
         )
 
         # interner Client: RotateFace kann HandOver aufrufen
@@ -762,6 +782,102 @@ class CubeMotionServer(Node):
             success = False
         
         result = PutDownCube.Result()
+        result.success = success
+        
+        if result.success:
+            goal_handle.succeed()
+        else:
+            goal_handle.abort()
+        
+        return result
+
+    # -------------------------------
+    # PRESENT CUBE FACE ACTION
+    # -------------------------------
+    async def execute_present_cube_face(self, goal_handle):
+        """
+        Present a specific cube face to the camera for scanning.
+        The desired face is positioned facing upward (normal pointing up).
+        The holding robot defined for that face will hold the cube.
+        
+        Sequence:
+        1. Determine which robot should hold for this face
+        2. Perform handover if necessary
+        3. Move holding robot to presentation pose
+        4. Face is now ready for camera scanning
+        """
+        face = goal_handle.request.face
+        self.get_logger().info(f">>> [PresentCubeFace] Present face {face}...")
+        
+        success = True
+        
+        try:
+            # Validate face
+            if face not in CUBE_PRESENT_POSES:
+                raise ValueError(f"Unknown face: {face}. Valid faces are: U, D, F, B, L, R")
+            
+            # Get the presentation pose for this face
+            present_pose_data = CUBE_PRESENT_POSES[face]
+            present_pos, face_normal_orientation, holding_angle = present_pose_data
+            
+            present_pose = CubePose(
+                position=np.array(present_pos),
+                face_normal_orientation=np.array(face_normal_orientation, dtype=float),
+                holding_angle=float(holding_angle[0]) if isinstance(holding_angle, (list, tuple)) else float(holding_angle)
+            )
+            
+            # Determine which robot should hold for this face
+            # Determine holding robot based on ROBOT_FACES
+            # ROBOT_FACES defines faces for spinning robot, so holding robot is the opposite
+            if face in ROBOT_FACES[0]:  # face is in robot 1's spinning list
+                holding_robot_id = 2  # robot 2 holds
+            elif face in ROBOT_FACES[1]:  # face is in robot 2's spinning list
+                holding_robot_id = 1  # robot 1 holds
+            else:
+                raise ValueError(f"Face {face} not found in ROBOT_FACES")
+            holding_robot_name = self._get_robot_name(holding_robot_id)
+            
+            self.get_logger().info(f">>> [PresentCubeFace] Face {face} will be held by {holding_robot_name}")
+            
+            # Perform handover if necessary
+            if holding_robot_id == 1:
+                # Robot 1 should hold (cube_spinning_robot should be 2)
+                if self.cube_spinning_robot != 2:
+                    self.get_logger().info(f">>> [PresentCubeFace] Performing handover to make Robot 1 hold...")
+                    await self.call_hand_over()
+                    
+                    if self.cube_spinning_robot != 2:
+                        raise RuntimeError("Handover failed: Robot 1 is not holding")
+                    
+                    self.get_logger().info(f">>> [PresentCubeFace] Handover completed.")
+            else:  # holding_robot_id == 2
+                # Robot 2 should hold (cube_spinning_robot should be 1)
+                if self.cube_spinning_robot != 1:
+                    self.get_logger().info(f">>> [PresentCubeFace] Performing handover to make Robot 2 hold...")
+                    await self.call_hand_over()
+                    
+                    if self.cube_spinning_robot != 1:
+                        raise RuntimeError("Handover failed: Robot 2 is not holding")
+                    
+                    self.get_logger().info(f">>> [PresentCubeFace] Handover completed.")
+            
+            # Move to presentation position
+            present_target = self.get_gripper_pose(
+                present_pose,
+                approach_direction=present_pose.holding_angle,
+                offset_dist=OFFSET_DIST_HOLD_CUBE
+            )
+            success = success and await self.call_move_j(holding_robot_name, present_target)
+            if not success:
+                raise RuntimeError(f"Failed to move {holding_robot_name} to presentation position")
+            
+            self.get_logger().info(f">>> [PresentCubeFace] Face {face} is now presented for scanning.")
+            
+        except Exception as e:
+            self.get_logger().error(f">>> [PresentCubeFace] Fehler: {str(e)}")
+            success = False
+        
+        result = PresentCubeFace.Result()
         result.success = success
         
         if result.success:

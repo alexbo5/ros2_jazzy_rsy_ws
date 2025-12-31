@@ -30,6 +30,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/RotateFace.action"
   "action/TakeUpCube.action"
   "action/PutDownCube.action"
+  "action/PresentCubeFace.action"
 )
 
 install(PROGRAMS

@@ -1,0 +1,15 @@
+# Action to calibrate camera by selecting cube position in image coordinates
+# Opens a GUI showing the camera image where user can select the cube location
+# Saves the calibration data permanently for future scanning
+int32 camera_index
+---
+# Result: selected cube position in image coordinates
+bool success
+string message
+int32 x  # top-left x coordinate of cube region
+int32 y  # top-left y coordinate of cube region
+int32 size  # size of the cube region (width/height)
+---
+# Feedback
+string status
+string window_title
