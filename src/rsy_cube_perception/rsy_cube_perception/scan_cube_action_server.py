@@ -628,6 +628,48 @@ class CubePerceptionServer(Node):
         
         return final
 
+    def _execute_mock_scan(self, goal_handle, feedback_msg, result):
+        """Execute mock cube scan without camera connection."""
+        self.get_logger().info("[MOCK] Simulating cube scan...")
+
+        # Get mock solution from parameters
+        mock_solution = str(self.get_parameter("mock_cube_solution").value)
+        mock_description = str(self.get_parameter("mock_cube_description").value)
+
+        # Simulate scanning each face with feedback
+        total_faces = len(FACE_ORDER)
+        for i, face in enumerate(CAPTURE_ORDER):
+            feedback_msg.current_face = face
+            feedback_msg.faces_captured = i
+            feedback_msg.total_faces = total_faces
+            feedback_msg.status = f"[MOCK] Simulating scan of face {face}..."
+            goal_handle.publish_feedback(feedback_msg)
+            self.get_logger().info(f"[MOCK] Simulating face {face} ({i+1}/{total_faces})")
+
+            # Check for cancellation
+            if goal_handle.is_cancel_requested:
+                result.success = False
+                result.message = "Goal cancelled by client."
+                goal_handle.canceled()
+                return result
+
+            # Simulate processing time
+            time.sleep(0.5)
+
+        # Return mock result
+        result.solution = mock_solution
+        result.description = describe_solution(mock_solution) if not mock_description else mock_description
+        result.success = True
+        result.message = "[MOCK] Cube scan simulation completed successfully."
+
+        feedback_msg.faces_captured = total_faces
+        feedback_msg.status = "[MOCK] Fertig."
+        goal_handle.publish_feedback(feedback_msg)
+
+        self.get_logger().info(f"[MOCK] Returning solution: {mock_solution}")
+        goal_handle.succeed()
+        return result
+
 
 def main(args=None):
     rclpy.init(args=args)

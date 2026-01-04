@@ -1,14 +1,13 @@
 """
 MoveIt2 Launch File
-
-Launches move_group node with:
-- Pilz Industrial Motion Planner (primary - PTP, LIN)
-- OMPL (fallback - obstacle avoidance)
+Launches move_group for both robots.
 """
 
 import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
 from moveit_configs_utils import MoveItConfigsBuilder
 import yaml
@@ -18,6 +17,13 @@ def generate_launch_description():
     # Package directories
     moveit_pkg = get_package_share_directory("rsy_moveit_startup")
     robot_pkg = get_package_share_directory("rsy_robot_startup")
+
+    # Declare launch arguments
+    use_mock_hardware_arg = DeclareLaunchArgument(
+        'use_mock_hardware',
+        default_value='true',
+        description='Use mock hardware for simulation'
+    )
 
     # Build MoveIt config
     moveit_config = (
@@ -46,4 +52,7 @@ def generate_launch_description():
         ],
     )
 
-    return LaunchDescription([move_group_node])
+    return LaunchDescription([
+        use_mock_hardware_arg,
+        move_group_node,
+    ])

@@ -1,0 +1,37 @@
+# RSY System Configuration
+# This file configures the behavior of all system components
+
+# Hardware simulation mode
+# When true, skips connections to real hardware (grippers, cameras)
+use_mock_hardware: true
+
+# Robot network configuration
+robot1:
+  robot_ip: "192.168.0.51"
+  gripper_ip: "192.168.1.10"
+  gripper_port: 63352
+
+robot2:
+  robot_ip: "192.168.0.11"
+  gripper_ip: "192.168.1.11"
+  gripper_port: 63352
+  # Position relative to world frame (meters and radians)
+  position:
+    x: -0.77
+    y: 0.655
+    z: 0.0
+  orientation:
+    roll: 0.0
+    pitch: 0.0
+    yaw: 3.141592  # 180 degrees - facing opposite direction
+
+# Camera configuration
+camera:
+  index: 0
+  show_preview: true
+
+# Mock data for simulation mode
+mock:
+  # Kociemba solution to return when use_mock_hardware is true
+  cube_solution: "R U R' U'"
+  cube_description: "Mock cube solution for testing"
