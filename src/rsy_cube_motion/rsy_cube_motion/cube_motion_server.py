@@ -15,17 +15,17 @@ ROBOT_FACES = ["U", "F", "D"], ["L", "B", "R"]
 # Compact, editable definition of cube-access poses (positions + face normal vector).
 # Adjust these values later in real-world testing.
 CUBE_POSE_DEFS = {
-    # face: (position_xyz, face_normal_vector)
-    "U": ([-0.385, 0.3275, 0.30], [0.0, 0.0, 1.0]),
-    "D": ([-0.385, 0.3275, 0.30], [0.0, 0.0, -1.0]),
-    "F": ([-0.385, 0.3275, 0.30], [1.0, 0.0, 0.0]),
-    "B": ([-0.385, 0.3275, 0.30], [-1.0, 0.0, 0.0]),
-    "L": ([-0.385, 0.3275, 0.30], [0.0, -1.0, 0.0]),
-    "R": ([-0.385, 0.3275, 0.30], [0.0, 1.0, 0.0]),
+    # face: (position_xyz, face_normal_vector, holding_angle)
+    "U": ([-0.385, 0.3275, 0.25], [1.0, 0.0, 0.0], [90]),
+    "D": ([-0.385, 0.3275, 0.25], [1.0, 0.0, 0.0], [90]),
+    "F": ([-0.385, 0.3275, 0.25], [1.0, 0.0, 0.0], [180]),
+    "B": ([-0.385, 0.3275, 0.25], [-1.0, 0.0, 0.0], [180]),
+    "L": ([-0.385, 0.3275, 0.25], [-1.0, 0.0, 0.0], [90]),
+    "R": ([-0.385, 0.3275, 0.25], [-1.0, 0.0, 0.0], [90]),
 }
 
 HAND_OVER_POSE_DEF = {
-    "position": [-0.385, 0.3275, 0.30],
+    "position": [-0.385, 0.3275, 0.35],
     "orientation_vector": [1.0, 0.0, 0.0]  # approach axis
 }
 
@@ -33,9 +33,9 @@ HAND_OVER_POSE_DEF = {
 GRIPPER_FORWARD_DIRECTION = np.array([0.0, 0.0, 1.0])
 
 # distance (mm) from cube center to gripper contact point
-OFFSET_DIST_HOLD_CUBE = 15    # distance when holding the cube (grasps 2 rows of cube)  
-OFFSET_DIST_SPIN_CUBE = 25    # distance when spinning the cube (grasps 1 row of cube)  
-OFFSET_DIST_PRE_TARGET = 50   # distance when approaching the cube (pre-grasp position)
+OFFSET_DIST_HOLD_CUBE = 15 + 50    # distance when holding the cube (grasps 2 rows of cube)  
+OFFSET_DIST_SPIN_CUBE = 25 + 50    # distance when spinning the cube (grasps 1 row of cube)  
+OFFSET_DIST_PRE_TARGET = 50 + 50   # distance when approaching the cube (pre-grasp position)
 
 
 @dataclass
@@ -45,6 +45,7 @@ class CubePose:
     """
     position: np.ndarray  # [x, y, z]
     orientation_vector: np.ndarray  # face normal [x, y, z]
+    holding_angle: float = 0.0  # degrees, preferred holding angle for this face
 
 @dataclass
 class GripperPose:
@@ -197,59 +198,93 @@ class CubeMotionServer(Node):
         Uses the compact CUBE_POSE_DEFS above (position, face-normal vector).
         """
         poses = {}
-        for face, (pos, normal) in CUBE_POSE_DEFS.items():
+        for face, (pos, normal, holding) in CUBE_POSE_DEFS.items():
+            # holding in CUBE_POSE_DEFS may be a list like [90] or a scalar
+            if isinstance(holding, (list, tuple)):
+                holding_angle = float(holding[0]) if len(holding) > 0 else 0.0
+            else:
+                holding_angle = float(holding)
+
             poses[face] = CubePose(
                 position=np.array(pos),
-                orientation_vector=np.array(normal)
+                orientation_vector=np.array(normal),
+                holding_angle=holding_angle
             )
         return poses
 
-    def get_gripper_pose(self, cube_pose, approach_from_front = False, offset_dist = OFFSET_DIST_HOLD_CUBE, twist_angle = 0.0):
+    def get_gripper_pose(self, cube_pose, approach_direction: float = 0.0, offset_dist = OFFSET_DIST_HOLD_CUBE, twist_angle = 0.0):
         """
         Convert cube pose to gripper pose.
 
         Params:
         cube_pose: CubePose object with position and face-normal orientation vector.
-        approach_from_front: bool, whether the robot should approach the cube face from the front or back.
-            True: robot will grasp the cube face from the front
-            False: robot will grasp the cube face from the back (opposite cube face)
+        approach_direction: approach angle in degrees.
+            0°  -> same as approach_from_front = True
+            180° -> same as approach_from_front = False
+            90° -> approach from the side (any reachable perpendicular direction)
         offset_dist: distance from cube center to gripper contact point (in mm).
         twist_angle: additional twist angle (radians) around the approach axis (face-normal).
 
         Returns:
         GripperPose object with position and quaternion orientation.
         """
-        approach = cube_pose.orientation_vector / np.linalg.norm(cube_pose.orientation_vector)
+        # normalize face normal
+        n = cube_pose.orientation_vector.astype(float)
+        n = n / np.linalg.norm(n)
 
-        # Distance from cube center to gripper contact
-        offset_dist = offset_dist / 1000.0  # convert mm to meters
+        # angle in radians between the approach vector (from cube center to gripper contact)
+        theta = np.deg2rad(float(approach_direction) % 360.0)
 
-        pos = None
-        if approach_from_front:
-            # Gripper 1: approach from +approach direction
-            pos = cube_pose.position + approach * offset_dist
-        else:
-            # Gripper 2: approach from -approach direction (opposite side)
-            pos = cube_pose.position - approach * offset_dist
-
-        # Build an absolute gripper orientation whose local Z (forward) is aligned with the approach axis
-        # and whose rotation around that Z is given by twist_angle.
-        # Determine desired forward (gripper z) direction depending on approach side
-        desired_z = -approach if approach_from_front else approach
-        desired_z = desired_z / np.linalg.norm(desired_z)
-
-        # Pick a stable reference vector not parallel to desired_z
+        # find a stable perpendicular direction p to n
         ref = np.array([1.0, 0.0, 0.0])
-        if abs(np.dot(ref, desired_z)) > 0.9:
+        if abs(np.dot(ref, n)) > 0.9:
             ref = np.array([0.0, 1.0, 0.0])
 
-        # Build orthonormal basis: x orthogonal to z, y = z x x
-        x_axis = np.cross(ref, desired_z)
+        # p is unit vector perpendicular to n
+        p = np.cross(n, ref)
+        p_norm = np.linalg.norm(p)
+        if p_norm < 1e-8:
+            # try another reference if numerical problems
+            ref = np.array([0.0, 1.0, 0.0])
+            p = np.cross(n, ref)
+            p_norm = np.linalg.norm(p)
+            if p_norm < 1e-8:
+                # fallback to any orthogonal vector
+                if abs(n[0]) < 0.9:
+                    p = np.array([1.0, 0.0, 0.0]) - n * n[0]
+                else:
+                    p = np.array([0.0, 1.0, 0.0]) - n * n[1]
+                p_norm = np.linalg.norm(p)
+        p = p / p_norm
+
+        # unit vector u from cube center to gripper contact, forming angle theta with n
+        # u = cos(theta)*n + sin(theta)*p
+        u = np.cos(theta) * n + np.sin(theta) * p
+        u = u / np.linalg.norm(u)
+
+        # offset distance convert mm->m
+        offset_m = offset_dist / 1000.0
+
+        # position of gripper contact point
+        pos = cube_pose.position + u * offset_m
+
+        # desired gripper forward (local z) is opposite to the vector from contact -> cube center
+        # (preserve previous convention where desired_z = -approach when approach_from_front True)
+        desired_z = -u
+        desired_z = desired_z / np.linalg.norm(desired_z)
+
+        # Choose a stable reference not parallel to desired_z for constructing axes
+        ref2 = np.array([1.0, 0.0, 0.0])
+        if abs(np.dot(ref2, desired_z)) > 0.9:
+            ref2 = np.array([0.0, 1.0, 0.0])
+
+        # Build orthonormal basis
+        x_axis = np.cross(ref2, desired_z)
         x_norm = np.linalg.norm(x_axis)
         if x_norm < 1e-8:
             # fallback if numerical issues
-            ref = np.array([0.0, 1.0, 0.0])
-            x_axis = np.cross(ref, desired_z)
+            ref2 = np.array([0.0, 1.0, 0.0])
+            x_axis = np.cross(ref2, desired_z)
             x_norm = np.linalg.norm(x_axis)
         x_axis = x_axis / x_norm
         y_axis = np.cross(desired_z, x_axis)
@@ -295,7 +330,7 @@ class CubeMotionServer(Node):
         q = np.array([qx, qy, qz, qw])
         q = quaternion_normalize(q)
 
-        gripper_pose = GripperPose(position=pos, quaternion=quaternion_normalize(q))
+        gripper_pose = GripperPose(position=pos, quaternion=q)
 
         return gripper_pose
 
@@ -328,19 +363,23 @@ class CubeMotionServer(Node):
         # Define the handover sequence
         old_spinning_robot = self._get_robot_name(self.cube_spinning_robot)
         new_spinning_robot = self._get_robot_name(targeted_cube_spinning_robot)
-        old_spinning_robot_approach_from_front = (self.cube_spinning_robot == 1)
-        new_spinning_robot_approach_from_front = (self.cube_spinning_robot == 2)
+        if self.cube_spinning_robot == 1:
+            old_spinning_robot_approach_direction = 0.0
+            new_spinning_robot_approach_direction = 180.0
+        else:
+            old_spinning_robot_approach_direction = 180.0
+            new_spinning_robot_approach_direction = 0.0
 
         # Old robot moves to handover position with cube
-        old_spinning_robot_target = self.get_gripper_pose(self.handover_pose, approach_from_front=old_spinning_robot_approach_from_front, offset_dist=OFFSET_DIST_HOLD_CUBE)
+        old_spinning_robot_target = self.get_gripper_pose(self.handover_pose, approach_direction=old_spinning_robot_approach_direction, offset_dist=OFFSET_DIST_HOLD_CUBE)
         await self.call_move_j(old_spinning_robot, old_spinning_robot_target)
 
         # New robot approaches handover position
-        new_spinning_robot_pre_target = self.get_gripper_pose(self.handover_pose, approach_from_front=new_spinning_robot_approach_from_front, offset_dist=OFFSET_DIST_PRE_TARGET, twist_angle=np.pi/2)
+        new_spinning_robot_pre_target = self.get_gripper_pose(self.handover_pose, approach_direction=new_spinning_robot_approach_direction, offset_dist=OFFSET_DIST_PRE_TARGET, twist_angle=np.pi/2)
         await self.call_move_j(new_spinning_robot, new_spinning_robot_pre_target)
 
         # New robot moves linearly to grasp cube
-        new_spinning_robot_target = self.get_gripper_pose(self.handover_pose, approach_from_front=new_spinning_robot_approach_from_front, offset_dist=OFFSET_DIST_HOLD_CUBE, twist_angle=np.pi/2)
+        new_spinning_robot_target = self.get_gripper_pose(self.handover_pose, approach_direction=new_spinning_robot_approach_direction, offset_dist=OFFSET_DIST_HOLD_CUBE, twist_angle=np.pi/2)
         await self.call_move_l(new_spinning_robot, new_spinning_robot_target)
 
         # Gripper close: new spinning robot grabs the cube
@@ -350,7 +389,7 @@ class CubeMotionServer(Node):
         await self.gripper_open(old_spinning_robot)
 
         # Old robot retracts
-        old_spinning_robot_post_target = self.get_gripper_pose(self.handover_pose, approach_from_front=old_spinning_robot_approach_from_front, offset_dist=OFFSET_DIST_PRE_TARGET)
+        old_spinning_robot_post_target = self.get_gripper_pose(self.handover_pose, approach_direction=old_spinning_robot_approach_direction, offset_dist=OFFSET_DIST_PRE_TARGET)
         await self.call_move_l(old_spinning_robot, old_spinning_robot_post_target)
 
         self.cube_spinning_robot = targeted_cube_spinning_robot
@@ -395,29 +434,29 @@ class CubeMotionServer(Node):
         holding_robot = self._get_robot_name(3 - self.cube_spinning_robot)  # other robot
 
         # Holding robot moves to hold the cube
-        cube_holding_target = self.get_gripper_pose(cube_pose, approach_from_front=False, offset_dist=OFFSET_DIST_HOLD_CUBE)
+        cube_holding_target = self.get_gripper_pose(cube_pose, approach_direction=cube_pose.holding_angle, offset_dist=OFFSET_DIST_HOLD_CUBE)
         await self.call_move_j(holding_robot, cube_holding_target)
 
         # Spinning robot approaches the face
-        cube_spinning_pre_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_PRE_TARGET)
+        cube_spinning_pre_target = self.get_gripper_pose(cube_pose, approach_direction=0.0, offset_dist=OFFSET_DIST_PRE_TARGET)
         await self.call_move_j(spinning_robot, cube_spinning_pre_target)
 
         # Spinning robot moves linearly to grasp position
-        cube_spinning_start_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_SPIN_CUBE)
+        cube_spinning_start_target = self.get_gripper_pose(cube_pose, approach_direction=0.0, offset_dist=OFFSET_DIST_SPIN_CUBE)
         await self.call_move_l(spinning_robot, cube_spinning_start_target)
 
         # Gripper close: spinning robot grabs the face to rotate
         await self.gripper_close(spinning_robot)
 
         # Spinning robot rotates the face (reorient)
-        cube_spinning_end_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_SPIN_CUBE, twist_angle=np.radians(angle))
+        cube_spinning_end_target = self.get_gripper_pose(cube_pose, approach_direction=0.0, offset_dist=OFFSET_DIST_SPIN_CUBE, twist_angle=np.radians(angle))
         await self.call_move_l(spinning_robot, cube_spinning_end_target)
 
         # Gripper open: spinning robot releases the face after rotation
         await self.gripper_open(spinning_robot)
 
         # Spinning robot retracts
-        cube_spinning_post_target = self.get_gripper_pose(cube_pose, approach_from_front=True, offset_dist=OFFSET_DIST_PRE_TARGET, twist_angle=np.radians(angle))
+        cube_spinning_post_target = self.get_gripper_pose(cube_pose, approach_direction=0.0, offset_dist=OFFSET_DIST_PRE_TARGET, twist_angle=np.radians(angle))
         await self.call_move_l(spinning_robot, cube_spinning_post_target)
 
         result = RotateFace.Result()

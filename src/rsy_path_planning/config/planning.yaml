@@ -1,10 +1,18 @@
 # Path Planning Configuration
-# - MoveJ/MoveJJoints: OMPL planner for joint-space motions
-# - MoveL/MoveLJoints: computeCartesianPath for linear motions with collision checking
+# Hybrid Planning Strategy: Pilz (fast) -> OMPL (obstacle avoidance)
+#
+# Motion Types:
+# - MoveJ/MoveJJoints: PTP (Pilz) -> OMPL fallback
+# - MoveL/MoveLJoints: LIN (Pilz) -> Cartesian path fallback
+#
+# Collision checking handled by MoveIt planning scene
 
 path_planning_action_server:
   ros__parameters:
-    # Robot configuration
+
+    # ==========================================================================
+    # Robot Configuration
+    # ==========================================================================
     robots:
       robot1:
         planning_group: robot1_ur_manipulator
@@ -13,16 +21,14 @@ path_planning_action_server:
         planning_group: robot2_ur_manipulator
         end_effector_link: robot2_tcp
 
-    # OMPL Planning parameters (for MoveJ/MoveJJoints)
+    # ==========================================================================
+    # Planning Parameters (Pilz - Primary Planner)
+    # ==========================================================================
     planning:
-      # Number of planning attempts per retry
-      num_attempts: 30
-      # Maximum time allowed for planning (seconds)
-      allowed_time: 20.0
-      # Default reference frame
+      # Reference frame for all planning
       default_frame: world
-      # OMPL planner algorithm (RRTConnect, RRT*, PRM, BiTRRT, etc.)
-      planner_id: RRTConnect
+      # Maximum planning time for Pilz (seconds) - fast planner
+      allowed_time: 5.0
 
       # Retry configuration for robust planning
       retry:
@@ -31,30 +37,31 @@ path_planning_action_server:
         # Delay between retries (seconds) - allows IK seed randomization
         delay_between_retries: 0.5
 
-    # Cartesian path settings (for MoveL/MoveLJoints)
+    # ==========================================================================
+    # Cartesian Path Parameters (MoveL fallback)
+    # ==========================================================================
     cartesian:
-      # Maximum step size for waypoint interpolation (meters)
-      # Smaller = more waypoints = smoother path but slower planning
+      # Waypoint interpolation step size (meters)
       max_step: 0.01
-      # Jump threshold (0.0 = disabled, recommended for UR robots)
-      # Detects and rejects paths with large joint jumps
-      jump_threshold: 0.0
-      # Check for collisions along the path
-      avoid_collisions: true
-      # Minimum fraction of path that must be achieved (0.0-1.0)
-      # If less than this fraction is collision-free, planning fails
+      # Minimum fraction of path that must be collision-free
       min_fraction: 0.95
 
-    # Velocity and acceleration scaling (0.0 - 1.0)
+    # ==========================================================================
+    # Velocity and Acceleration Scaling (0.0 - 1.0)
+    # ==========================================================================
     velocity_scaling:
-      ptp: 0.5      # Point-to-point (MoveJ) motions
-      linear: 0.3   # Linear Cartesian (MoveL) motions
+      # PTP (Point-to-Point) motions
+      ptp: 0.3
+      # LIN (Linear Cartesian) motions
+      lin: 0.1
 
     acceleration_scaling:
-      ptp: 0.5
-      linear: 0.3
+      ptp: 0.3
+      lin: 0.1
 
-    # Goal tolerances
+    # ==========================================================================
+    # Goal Tolerances
+    # ==========================================================================
     tolerances:
       # Position tolerance (meters)
       position: 0.001

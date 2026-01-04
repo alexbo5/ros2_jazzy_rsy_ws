@@ -129,7 +129,7 @@ class ScanCubeActionServer(Node):
         show_preview = bool(self.get_parameter("show_preview").value)
 
         # Parameter aus Goal lesen
-        camera_index = 0
+        camera_index = 99
         try:
             camera_index = int(goal_handle.request.camera_index)
         except Exception:
@@ -142,7 +142,7 @@ class ScanCubeActionServer(Node):
             self.get_logger().error(msg)
 
             #return sample result for development
-            result.solution = "F"
+            result.solution = "F D' U B R"
             result.success = True
             goal_handle.abort()
             return result

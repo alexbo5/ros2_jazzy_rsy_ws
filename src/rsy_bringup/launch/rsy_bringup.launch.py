@@ -93,7 +93,7 @@ def generate_launch_description():
         package="rviz2",
         executable="rviz2",
         name="rviz2",
-        output="log",
+        output="screen",
         arguments=["-d", os.path.join(bringup_pkg, "config", "moveit.rviz")],
     )
 
