@@ -30,17 +30,12 @@ path_planning_action_server:
       # Maximum planning time for Pilz (seconds) - fast planner
       allowed_time: 5.0
 
-    # ==========================================================================
-    # OMPL Fallback Parameters (for obstacle avoidance)
-    # ==========================================================================
-    # Used when Pilz fails due to collisions in the direct path
-    ompl:
-      # Planner algorithm: RRTConnect is fast and reliable
-      planner_id: RRTConnect
-      # Number of planning attempts
-      num_attempts: 10
-      # Maximum planning time (seconds)
-      allowed_time: 10.0
+      # Retry configuration for robust planning
+      retry:
+        # Maximum number of planning retries when IK/planning fails
+        max_retries: 1
+        # Delay between retries (seconds) - allows IK seed randomization
+        delay_between_retries: 0.5
 
     # ==========================================================================
     # Cartesian Path Parameters (MoveL fallback)

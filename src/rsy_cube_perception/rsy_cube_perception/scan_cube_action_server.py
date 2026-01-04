@@ -92,6 +92,9 @@ class ScanCubeActionServer(Node):
         super().__init__("scan_cube_action_server")
         # declare parameter to enable preview window with grid
         self.declare_parameter("show_preview", True)
+        self.declare_parameter("use_mock_hardware", False)
+        self.declare_parameter("mock_cube_solution", "R U R' U'")
+        self.declare_parameter("mock_cube_description", "Mock cube solution for testing")
         self.preview_window = "Cube Preview"
 
         self._action_server = ActionServer(
@@ -100,7 +103,13 @@ class ScanCubeActionServer(Node):
             'scan_cube',
             execute_callback=self.execute_callback
         )
-        self.get_logger().info("ScanCube Action Server gestartet.")
+
+        # Log mock hardware status
+        use_mock = self.get_parameter("use_mock_hardware").value
+        if use_mock:
+            self.get_logger().info("ScanCube Action Server gestartet (MOCK HARDWARE MODE).")
+        else:
+            self.get_logger().info("ScanCube Action Server gestartet.")
         # Optionaler ActionClient-Name/Typ für Fahren (Platzhalter)
         # self.drive_client = ActionClient(self, DriveFace, 'drive_to_face')
         # Wir verwenden keine Typen, nur optionales Warten auf Server.
@@ -110,6 +119,11 @@ class ScanCubeActionServer(Node):
         self.get_logger().info("Goal erhalten: Starte Erfassung aller Seiten...")
         feedback_msg = ScanCube.Feedback()
         result = ScanCube.Result()
+
+        # Check for mock hardware mode
+        use_mock_hardware = bool(self.get_parameter("use_mock_hardware").value)
+        if use_mock_hardware:
+            return self._execute_mock_scan(goal_handle, feedback_msg, result)
 
         # read parameter for preview display (can change between goals)
         show_preview = bool(self.get_parameter("show_preview").value)
@@ -381,6 +395,48 @@ class ScanCubeActionServer(Node):
             best = max(votes.items(), key=lambda kv: kv[1])[0]
             final.append(best)
         return final
+
+    def _execute_mock_scan(self, goal_handle, feedback_msg, result):
+        """Execute mock cube scan without camera connection."""
+        self.get_logger().info("[MOCK] Simulating cube scan...")
+
+        # Get mock solution from parameters
+        mock_solution = str(self.get_parameter("mock_cube_solution").value)
+        mock_description = str(self.get_parameter("mock_cube_description").value)
+
+        # Simulate scanning each face with feedback
+        total_faces = len(FACE_ORDER)
+        for i, face in enumerate(CAPTURE_ORDER):
+            feedback_msg.current_face = face
+            feedback_msg.faces_captured = i
+            feedback_msg.total_faces = total_faces
+            feedback_msg.status = f"[MOCK] Simulating scan of face {face}..."
+            goal_handle.publish_feedback(feedback_msg)
+            self.get_logger().info(f"[MOCK] Simulating face {face} ({i+1}/{total_faces})")
+
+            # Check for cancellation
+            if goal_handle.is_cancel_requested:
+                result.success = False
+                result.message = "Goal cancelled by client."
+                goal_handle.canceled()
+                return result
+
+            # Simulate processing time
+            time.sleep(0.5)
+
+        # Return mock result
+        result.solution = mock_solution
+        result.description = describe_solution(mock_solution) if not mock_description else mock_description
+        result.success = True
+        result.message = "[MOCK] Cube scan simulation completed successfully."
+
+        feedback_msg.faces_captured = total_faces
+        feedback_msg.status = "[MOCK] Fertig."
+        goal_handle.publish_feedback(feedback_msg)
+
+        self.get_logger().info(f"[MOCK] Returning solution: {mock_solution}")
+        goal_handle.succeed()
+        return result
 
 
 def main(args=None):
