@@ -28,6 +28,9 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/HandOver.action"
   "action/RotateFace.action"
+  "action/TakeUpCube.action"
+  "action/PutDownCube.action"
+  "action/PresentCubeFace.action"
 )
 
 install(PROGRAMS

@@ -1,0 +1,9 @@
+# Service to run the solver on previously scanned colors
+# The colors for all 6 faces must have been scanned via ScanCubeFace action before calling this service
+---
+# Result
+bool success
+string message
+string solution  # the solver result (e.g., "R U R'")
+string description  # human-readable description of solution
+string[] missing_faces  # faces that were not scanned or incomplete (subset of [U, D, F, B, L, R])

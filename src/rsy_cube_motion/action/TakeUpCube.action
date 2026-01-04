@@ -1,0 +1,7 @@
+# Goal: Take up the cube from the rest position
+# Robot 2 always takes up the cube
+---
+# Result
+bool success
+---
+# Feedback

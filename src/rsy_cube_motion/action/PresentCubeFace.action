@@ -1,0 +1,7 @@
+# Goal: Present a cube face at a specific pose for scanning
+string face     # The face to present (U, D, F, B, L, R)
+---
+# Result
+bool success
+---
+# Feedback

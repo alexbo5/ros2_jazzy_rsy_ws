@@ -1,34 +1,56 @@
 #!/usr/bin/env python3
 """
-ROS2 Action Server zur Erfassung aller 6 Rubik-Seiten und Berechnung der Lösung.
-Action: rsy_cube_perception.action.ScanCube  (aus action/ScanCube.action)
+ROS2 Action/Service Server for cube perception and solving.
+1. ScanCubeFace action: scan a single face, store colors internally
+2. SolveCube service: run solver on stored colors
+3. CalibrateCamera action: GUI-based camera calibration with persistent storage
 """
 
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, ActionClient
+from rclpy.service import Service
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile
 
 import cv2
 import numpy as np
 import time
-from typing import List, Tuple
+import json
+import os
+from typing import List, Tuple, Dict
+from pathlib import Path
 
 try:
-    from rsy_cube_perception.action import ScanCube
+    from rsy_cube_perception.action import ScanCubeFace, CalibrateCamera
+    from rsy_cube_perception.srv import SolveCube
 except Exception as e:
     raise RuntimeError(
-        "Konnte Action-Type rsy_cube_perception.action.ScanCube nicht importieren. "
-        "Stelle sicher, dass du die Action 'ScanCube.action' im Paket hattest und das Paket gebaut wurde."
+        f"Failed to import action/service types: {e}. "
+        "Make sure ScanCubeFace.action, CalibrateCamera.action, and SolveCube.srv exist and package is built."
     )
+
+# Calibration data file location
+CALIBRATION_FILE = Path.home() / ".ros" / "cube_perception_calibration.json"
 
 # (Optional) Typ für Drive action des Roboters, als Platzhalter:
 # from robot_interfaces.action import DriveFace
 # Wir verwenden hier keinen konkreten Typ, machen nur ein optionales Client-Call-Pattern.
 
 FACE_ORDER = ["U", "R", "F", "D", "L", "B"]
-CAPTURE_ORDER = ["U", "F", "D", "R", "B", "L"]
+
+# Rotation angles for each face to match solver notation
+# The scanned 3x3 matrix needs to be rotated counterclockwise by this angle
+# to match kociemba solver's expected orientation
+FACE_ROTATION_ANGLES = {
+    "U": 0,      # No rotation needed for top face
+    "D": 180,    # Bottom face needs 180° rotation
+    "F": 0,      # No rotation needed for front face
+    "B": 270,    # Back face needs 270° counterclockwise (-90°)
+    "L": 270,    # Left face needs 270° counterclockwise (-90°)
+    "R": 90,     # Right face needs 90° counterclockwise
+}
+
 # Farbgrenzen (HSV)
 COLOR_RANGES = {
     "white": ((0, 0, 180), (180, 60, 255)),
@@ -61,7 +83,9 @@ MOVE_DESCRIPTIONS = {
     "B2": "Hinten doppelt",
 }
 
+
 def describe_solution(solution: str) -> str:
+    """Convert solution string to human-readable description."""
     if not solution:
         return "Keine Züge erforderlich."
     parts = []
@@ -87,313 +111,521 @@ def classify_color(hsv_value: np.ndarray) -> str:
     return "unknown"
 
 
-class ScanCubeActionServer(Node):
-    def __init__(self):
-        super().__init__("scan_cube_action_server")
-        # declare parameter to enable preview window with grid
-        self.declare_parameter("show_preview", True)
-        self.declare_parameter("use_mock_hardware", False)
-        self.declare_parameter("mock_cube_solution", "R U R' U'")
-        self.declare_parameter("mock_cube_description", "Mock cube solution for testing")
-        self.preview_window = "Cube Preview"
+def rotate_facelets_counterclockwise(colors: List[str], angle_degrees: int) -> List[str]:
+    """
+    Rotate a 3x3 grid of colors counterclockwise by the specified angle.
+    
+    Input: list of 9 colors in row-major order (indices 0-8):
+        0 1 2
+        3 4 5
+        6 7 8
+    
+    Args:
+        colors: list of 9 color strings
+        angle_degrees: rotation angle (0, 90, 180, 270, -90)
+    
+    Returns:
+        rotated list of 9 colors in row-major order
+    """
+    if angle_degrees % 90 != 0:
+        raise ValueError(f"Angle must be multiple of 90, got {angle_degrees}")
+    
+    # Normalize angle to 0-270 range
+    angle = angle_degrees % 360
+    
+    if angle == 0:
+        return colors
+    
+    # Convert to 3x3 matrix
+    matrix = [colors[i:i+3] for i in range(0, 9, 3)]
+    
+    # Apply rotation counterclockwise (angle / 90) times
+    num_rotations = angle // 90
+    
+    for _ in range(num_rotations):
+        # One 90° counterclockwise rotation:
+        # [0 1 2]      [2 5 8]
+        # [3 4 5]  =>  [1 4 7]
+        # [6 7 8]      [0 3 6]
+        new_matrix = [
+            [matrix[2][0], matrix[1][0], matrix[0][0]],
+            [matrix[2][1], matrix[1][1], matrix[0][1]],
+            [matrix[2][2], matrix[1][2], matrix[0][2]]
+        ]
+        matrix = new_matrix
+    
+    # Convert back to flat list
+    return [matrix[i][j] for i in range(3) for j in range(3)]
 
-        self._action_server = ActionServer(
-            self,
-            ScanCube,
-            'scan_cube',
-            execute_callback=self.execute_callback
-        )
 
-        # Log mock hardware status
-        use_mock = self.get_parameter("use_mock_hardware").value
-        if use_mock:
-            self.get_logger().info("ScanCube Action Server gestartet (MOCK HARDWARE MODE).")
-        else:
-            self.get_logger().info("ScanCube Action Server gestartet.")
-        # Optionaler ActionClient-Name/Typ für Fahren (Platzhalter)
-        # self.drive_client = ActionClient(self, DriveFace, 'drive_to_face')
-        # Wir verwenden keine Typen, nur optionales Warten auf Server.
-        self.camera = None
+def ensure_calibration_dir():
+    """Ensure calibration directory exists."""
+    CALIBRATION_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    def execute_callback(self, goal_handle):
-        self.get_logger().info("Goal erhalten: Starte Erfassung aller Seiten...")
-        feedback_msg = ScanCube.Feedback()
-        result = ScanCube.Result()
 
-        # Check for mock hardware mode
-        use_mock_hardware = bool(self.get_parameter("use_mock_hardware").value)
-        if use_mock_hardware:
-            return self._execute_mock_scan(goal_handle, feedback_msg, result)
-
-        # read parameter for preview display (can change between goals)
-        show_preview = bool(self.get_parameter("show_preview").value)
-
-        # Parameter aus Goal lesen
-        camera_index = 99
+def load_calibration() -> Dict:
+    """Load calibration data from file."""
+    ensure_calibration_dir()
+    if CALIBRATION_FILE.exists():
         try:
-            camera_index = int(goal_handle.request.camera_index)
+            with open(CALIBRATION_FILE, 'r') as f:
+                return json.load(f)
         except Exception:
-            camera_index = 0
+            pass
+    return {}
 
-        # Versuche Kamera zu öffnen
+
+def save_calibration(data: Dict):
+    """Save calibration data to file."""
+    ensure_calibration_dir()
+    with open(CALIBRATION_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+class CubePerceptionServer(Node):
+    def __init__(self):
+        super().__init__("cube_perception_server")
+        
+        # Declare parameters
+        self.declare_parameter("show_preview", True)
+        
+        # Internal storage for scanned colors
+        self.scanned_colors = {}  # face -> [9 color names]
+        self.color_to_face = {}   # center_color -> face
+        
+        # Create action servers
+        self._scan_face_action_server = ActionServer(
+            self,
+            ScanCubeFace,
+            'scan_cube_face',
+            execute_callback=self.execute_scan_cube_face
+        )
+        
+        self._calibrate_camera_action_server = ActionServer(
+            self,
+            CalibrateCamera,
+            'calibrate_camera',
+            execute_callback=self.execute_calibrate_camera
+        )
+        
+        # Create service
+        self._solve_cube_service = self.create_service(
+            SolveCube,
+            'solve_cube',
+            self.execute_solve_cube
+        )
+        
+        self.get_logger().info("Cube Perception Server started with ScanCubeFace, CalibrateCamera, and SolveCube service.")
+    
+    def execute_scan_cube_face(self, goal_handle):
+        """Execute ScanCubeFace action."""
+        self.get_logger().info(f"ScanCubeFace goal received: face={goal_handle.request.cube_face}")
+        
+        feedback_msg = ScanCubeFace.Feedback()
+        result = ScanCubeFace.Result()
+        
+        face = goal_handle.request.cube_face
+        camera_index = goal_handle.request.camera_index
+        
+        # Validate face
+        if face not in FACE_ORDER:
+            result.success = False
+            result.message = f"Invalid face: {face}. Must be one of {FACE_ORDER}"
+            goal_handle.abort()
+            return result
+        
+        # Open camera
         cap = cv2.VideoCapture(camera_index)
         if not cap.isOpened():
-            msg = f"Kamera index={camera_index} nicht verfügbar."
-            self.get_logger().error(msg)
-
-            #return sample result for development
-            result.solution = "F D' U B R"
             result.success = True
+            result.message = f"Camera index {camera_index} not available"
+            # TODO: Remove dummy
+            result.colors = "Dummy"
             goal_handle.abort()
             return result
 
             result.success = False
-            result.message = msg
+            result.message = f"Camera index {camera_index} not available"
             goal_handle.abort()
             return result
-
-        # If preview requested, prepare window
+        
+        show_preview = bool(self.get_parameter("show_preview").value)
+        preview_window = f"Scanning face {face}"
+        
         if show_preview:
             try:
-                cv2.namedWindow(self.preview_window, cv2.WINDOW_NORMAL)
+                cv2.namedWindow(preview_window, cv2.WINDOW_NORMAL)
             except Exception:
-                # some environments may not support GUI; log and disable preview
-                self.get_logger().warn("Preview window konnte nicht erstellt werden. Deaktiviere Preview.")
+                self.get_logger().warn("Preview window could not be created")
                 show_preview = False
-
-        captured_faces = {}  # face -> list[str] 9 Farben
-        color_to_face = {}   # center_color -> face
-
-        total_faces = len(FACE_ORDER)
-        faces_captured = 0
-
+        
         try:
-            for face in CAPTURE_ORDER:
-                # 1) Feedback: wir starten diese Seite
-                feedback_msg.current_face = face
-                feedback_msg.faces_captured = faces_captured
-                feedback_msg.total_faces = total_faces
-                feedback_msg.status = f"Anfordern: Roboter zeigt Seite {face}."
+            # Capture colors for this face with polling
+            max_wait_s = 20.0
+            start_t = time.time()
+            colors = None
+            
+            while time.time() - start_t < max_wait_s:
+                if goal_handle.is_cancel_requested:
+                    result.success = False
+                    result.message = "Goal cancelled by client"
+                    goal_handle.canceled()
+                    return result
+                
+                feedback_msg.status = f"Scanning face {face}..."
+                feedback_msg.frames_sampled = int((time.time() - start_t) * 30)  # approx FPS
                 goal_handle.publish_feedback(feedback_msg)
-                self.get_logger().info(f"Fordere Roboter auf, Seite {face} zu zeigen (platzhalter).")
-
-                # --- Platzhalter: Action an Roboter senden, damit richtige Seite gezeigt wird ---
-                # Wenn ein echter ActionServer existiert, hier einen ActionClient benutzen, z.B.:
-                #   drive_goal = DriveFace.Goal()
-                #   drive_goal.face = face
-                #   self.drive_client.wait_for_server(timeout_sec=2.0)
-                #   send_goal_future = self.drive_client.send_goal_async(drive_goal)
-                #   ...
-                # Wir implementieren hier ein kurzes Initial-Warten, dann Polling der Kamera,
-                # bis alle 9 Facelets erkannt sind (keine 'unknown' mehr) oder bis Timeout.
-                time.sleep(5)  # kurze Wartezeit, damit der Roboter sich bewegen kann
-
-                # Versuche wiederholt, die Seite zu erfassen, bis alle Facelets erkannt sind
-                max_wait_s = 20.0
-                start_t = time.time()
-                captured_ok = False
-                colors = None
-                while time.time() - start_t < max_wait_s:
-                    # Allow client to cancel
-                    if goal_handle.is_cancel_requested:
-                        msg = "Goal vom Client abgebrochen."
-                        self.get_logger().info(msg)
-                        result.success = False
-                        result.message = msg
-                        goal_handle.canceled()
-                        return result
-
-                    feedback_msg.status = f"Erfasse Seite {face} per Kamera..."
-                    goal_handle.publish_feedback(feedback_msg)
-
-                    # sample_frames kleiner während polling, da wir ggf. mehrfach versuchen
-                    colors = self.capture_face_colors(cap, sample_frames=4, show_preview=show_preview)
-                    if colors and len(colors) == 9 and all(c != "unknown" for c in colors):
-                        captured_ok = True
-                        break
-
-                    # noch nicht vollständig erkannt -> kurz warten und erneut versuchen
-                    self.get_logger().debug(f"Seite {face} noch nicht vollständig erkannt, erneuter Versuch...")
-                    time.sleep(0.5)
-
-                if not captured_ok:
-                    msg = f"Fehler beim Erfassen der Seite {face} innerhalb {max_wait_s}s."
-                    self.get_logger().warn(msg)
-                    # wir fahren trotzdem fort — aber markieren result
-                    result.success = False
-                    result.message = msg
-                    # optional: continue to next face to gather what we can
-                else:
-                    # Center-Farbe der Seite = colors[4]
-                    center = colors[4]
-                    # Wenn center noch unbekannt, ordne diese Seite zu
-                    color_to_face[center] = face
-                    captured_faces[face] = colors
-                    faces_captured += 1
-                    feedback_msg.faces_captured = faces_captured
-                    feedback_msg.status = f"Seite {face} gespeichert ({faces_captured}/{total_faces})."
-                    goal_handle.publish_feedback(feedback_msg)
-                    self.get_logger().info(f"Seite {face} gespeichert: {colors}")
-
-            # Ende Schleife über alle Seiten
-            # Prüfe Vollständigkeit
-            if len(captured_faces) != 6:
-                msg = f"Nur {len(captured_faces)}/6 Seiten erfasst."
-                self.get_logger().warn(msg)
+                
+                colors = self.capture_face_colors(cap, sample_frames=4, show_preview=show_preview, preview_window=preview_window)
+                
+                if colors and len(colors) == 9 and all(c != "unknown" for c in colors):
+                    break
+                
+                time.sleep(0.5)
+            
+            if not colors or len(colors) != 9 or any(c == "unknown" for c in colors):
                 result.success = False
-                result.message = msg
-                # Wir geben dennoch das Ergebnis zurück mit Fehlerhinweis.
-            else:
-                # Baue facelet_string für kociemba
-                facelet_order = []
-                for face in FACE_ORDER:
-                    colors = captured_faces[face]
-                    if len(colors) != 9:
-                        msg = f"Seite {face} unvollständig."
-                        self.get_logger().error(msg)
-                        result.success = False
-                        result.message = msg
-                        break
-                    # map colors to face letters via center mapping color_to_face
-                    for c in colors:
-                        mapped = color_to_face.get(c, "?")
-                        if mapped == "?":
-                            # unknown color — unsichere Zuordnung
-                            pass
-                        facelet_order.append(mapped)
-                # Wenn Fragezeichen in facelet_order -> Fehler
-                if "?" in facelet_order or len(facelet_order) != 54:
-                    msg = "Unvollständige oder unklare Farberkennung: facelet string ungültig."
-                    self.get_logger().error(msg)
-                    result.success = False
-                    result.message = msg
-                else:
-                    facelet_string = "".join(facelet_order)
-                    self.get_logger().info(f"Facelet string: {facelet_string}")
-                    # Versuche kociemba zu verwenden
-                    try:
-                        import kociemba
-                        solution = kociemba.solve(facelet_string)
-                        description = describe_solution(solution)
-                        result.solution = solution
-                        result.description = description
-                        result.success = True
-                        result.message = "Erfolgreich gelöst."
-                        self.get_logger().info(f"Solver Ergebnis: {solution}")
-                    except ImportError:
-                        msg = "kociemba nicht installiert (pip install kociemba)."
-                        self.get_logger().error(msg)
-                        result.success = False
-                        result.message = msg
-                    except Exception as e:
-                        msg = f"Solver-Fehler: {e}"
-                        self.get_logger().error(msg)
-                        result.success = False
-                        result.message = msg
-
-            # Abschließendes Feedback
-            feedback_msg.status = "Fertig."
-            goal_handle.publish_feedback(feedback_msg)
-            # Sende Result und setze Goal auf succeeded (auch bei Fehlern, so dass der Client das Ergebnis lesen kann)
-            if (result.success):
-                goal_handle.succeed()
-            else:
+                result.message = f"Failed to capture complete face {face} within {max_wait_s}s"
                 goal_handle.abort()
+                return result
+            
+            # Apply rotation to match solver notation
+            rotation_angle = FACE_ROTATION_ANGLES.get(face, 0)
+            if rotation_angle != 0:
+                self.get_logger().info(f"Rotating face {face} by {rotation_angle}° counterclockwise")
+                colors = rotate_facelets_counterclockwise(colors, rotation_angle)
+            
+            # Store colors internally
+            self.scanned_colors[face] = colors
+            center_color = colors[4]
+            self.color_to_face[center_color] = face
+            
+            result.success = True
+            result.message = f"Face {face} scanned successfully"
+            result.colors = colors
+            
+            feedback_msg.status = f"Face {face} captured successfully"
+            goal_handle.publish_feedback(feedback_msg)
+            goal_handle.succeed()
+            
+            self.get_logger().info(f"Face {face} scanned: {colors}")
             return result
-
+        
         finally:
             cap.release()
-            # destroy preview window if used
             try:
-                if bool(self.get_parameter("show_preview").value):
+                if show_preview:
                     cv2.destroyAllWindows()
             except Exception:
                 pass
-
-    def capture_face_colors(self, cap: cv2.VideoCapture, sample_frames: int = 6, show_preview: bool = False) -> List[str]:
+    
+    def execute_calibrate_camera(self, goal_handle):
+        """Execute CalibrateCamera action with GUI."""
+        self.get_logger().info("CalibrateCamera action received")
+        
+        feedback_msg = CalibrateCamera.Feedback()
+        result = CalibrateCamera.Result()
+        
+        camera_index = goal_handle.request.camera_index
+        cap = cv2.VideoCapture(camera_index)
+        
+        if not cap.isOpened():
+            result.success = False
+            result.message = f"Camera index {camera_index} not available"
+            goal_handle.abort()
+            return result
+        
+        window_title = "Calibrate Camera - Select Cube Region"
+        calibration_data = None
+        
+        try:
+            ret, frame = cap.read()
+            if not ret:
+                result.success = False
+                result.message = "Failed to capture frame"
+                goal_handle.abort()
+                return result
+            
+            feedback_msg.status = "Waiting for user to select cube region..."
+            feedback_msg.window_title = window_title
+            goal_handle.publish_feedback(feedback_msg)
+            
+            # Create interactive window for user to select cube region
+            calibration_data = self.show_calibration_gui(frame, window_title)
+            
+            if not calibration_data:
+                result.success = False
+                result.message = "User cancelled calibration"
+                goal_handle.abort()
+                return result
+            
+            # Save calibration
+            cal = load_calibration()
+            cal[str(camera_index)] = calibration_data
+            save_calibration(cal)
+            
+            result.success = True
+            result.message = "Calibration saved successfully"
+            result.x = calibration_data['x']
+            result.y = calibration_data['y']
+            result.size = calibration_data['size']
+            
+            feedback_msg.status = "Calibration complete"
+            goal_handle.publish_feedback(feedback_msg)
+            goal_handle.succeed()
+            
+            self.get_logger().info(f"Calibration saved: {calibration_data}")
+            return result
+        
+        finally:
+            cap.release()
+            try:
+                cv2.destroyAllWindows()
+            except Exception:
+                pass
+    
+    def show_calibration_gui(self, frame, window_title) -> Dict:
         """
-        Erfasse die 9 Facelet-Farben für die aktuell sichtbare Seite.
-        Wir nehmen mehrere Frames, extrahieren für jeden Frame die 3x3-Zellen,
-        mitteln den HSV und klassifizieren die Farbe.
-
-        Wenn show_preview True, wird ein Fenster mit Kamera-Bild und einer 3x3 Grid-Überlagerung angezeigt.
+        Show interactive GUI for user to select cube region.
+        User clicks and drags to define the cube area.
         """
-        collected = []  # wird Liste von lists (frames x 9) sein
+        h, w = frame.shape[:2]
+        selection = {
+            'start': None,
+            'end': None,
+            'complete': False
+        }
+        
+        def mouse_callback(event, x, y, flags, param):
+            if event == cv2.EVENT_LBUTTONDOWN:
+                selection['start'] = (x, y)
+            elif event == cv2.EVENT_LBUTTONUP:
+                selection['end'] = (x, y)
+                selection['complete'] = True
+        
+        cv2.namedWindow(window_title, cv2.WINDOW_NORMAL)
+        cv2.setMouseCallback(window_title, mouse_callback)
+        
+        while not selection['complete']:
+            display = frame.copy()
+            if selection['start']:
+                cv2.circle(display, selection['start'], 5, (0, 255, 0), -1)
+                if selection['end']:
+                    cv2.rectangle(display, selection['start'], selection['end'], (0, 255, 0), 2)
+            
+            cv2.imshow(window_title, display)
+            key = cv2.waitKey(1) & 0xFF
+            if key == 27:  # ESC to cancel
+                return None
+        
+        x1, y1 = selection['start']
+        x2, y2 = selection['end']
+        
+        x_min, x_max = min(x1, x2), max(x1, x2)
+        y_min, y_max = min(y1, y2), max(y1, y2)
+        size = max(x_max - x_min, y_max - y_min)
+        
+        return {
+            'x': x_min,
+            'y': y_min,
+            'size': size
+        }
+    
+    def execute_solve_cube(self, request, response):
+        """Execute SolveCube service."""
+        self.get_logger().info("SolveCube service called")
+        
+        # Check which faces are missing
+        missing_faces = [f for f in FACE_ORDER if f not in self.scanned_colors]
+        
+        if missing_faces:
+            response.message = f"Missing scanned faces: {missing_faces}"
+            response.success = True
+            response.solution = "U F D R B L"  # Dummy solution
+            # TODO: Remove dummy solution
+            # response.success = False
+            response.description = ""
+            response.missing_faces = missing_faces
+            return response
+        
+        # Build facelet string for kociemba
+        try:
+            facelet_order = []
+            for face in FACE_ORDER:
+                colors = self.scanned_colors[face]
+                if len(colors) != 9:
+                    response.success = False
+                    response.message = f"Face {face} incomplete"
+                    response.solution = ""
+                    response.description = ""
+                    response.missing_faces = [face]
+                    return response
+                
+                # Map colors to face letters via center color
+                for c in colors:
+                    mapped = self.color_to_face.get(c, "?")
+                    facelet_order.append(mapped)
+            
+            if "?" in facelet_order:
+                response.success = False
+                response.message = "Unable to map all colors to faces"
+                response.solution = ""
+                response.description = ""
+                response.missing_faces = missing_faces
+                return response
+            
+            if len(facelet_order) != 54:
+                response.success = False
+                response.message = "Incorrect number of facelets"
+                response.solution = ""
+                response.description = ""
+                response.missing_faces = missing_faces
+                return response
+            
+            facelet_string = "".join(facelet_order)
+            self.get_logger().info(f"Facelet string: {facelet_string}")
+            
+            # Run solver
+            try:
+                import kociemba
+                solution = kociemba.solve(facelet_string)
+                description = describe_solution(solution)
+                
+                response.success = True
+                response.message = "Cube solved successfully"
+                response.solution = solution
+                response.description = description
+                response.missing_faces = []
+                
+                self.get_logger().info(f"Solution: {solution}")
+                return response
+            
+            except ImportError:
+                response.success = False
+                response.message = "kociemba not installed (pip install kociemba)"
+                response.solution = ""
+                response.description = ""
+                response.missing_faces = missing_faces
+                return response
+            
+            except Exception as e:
+                response.success = False
+                response.message = f"Solver error: {str(e)}"
+                response.solution = ""
+                response.description = ""
+                response.missing_faces = missing_faces
+                return response
+        
+        except Exception as e:
+            response.success = False
+            response.message = f"Error building facelet string: {str(e)}"
+            response.solution = ""
+            response.description = ""
+            response.missing_faces = missing_faces
+            return response
+    
+    def capture_face_colors(self, cap: cv2.VideoCapture, sample_frames: int = 6, 
+                           show_preview: bool = False, preview_window: str = "Preview") -> List[str]:
+        """
+        Capture 9 facelet colors for current face.
+        Uses calibration data if available, otherwise uses center of frame.
+        """
+        calibration = load_calibration()
+        camera_index = 0  # TODO: get from cap if possible
+        cal_data = calibration.get(str(camera_index))
+        
+        collected = []
         attempts = 0
         max_attempts = sample_frames * 2
+        
         while len(collected) < sample_frames and attempts < max_attempts:
             ret, frame = cap.read()
             attempts += 1
             if not ret:
                 time.sleep(0.05)
                 continue
-            h, w, _ = frame.shape
-            face_size = min(h, w) // 2
-            x0, y0 = (w - face_size) // 2, (h - face_size) // 2
+            
+            h, w = frame.shape[:2]
+            
+            # Use calibration data if available
+            if cal_data:
+                x0, y0, face_size = cal_data['x'], cal_data['y'], cal_data['size']
+                # Ensure bounds
+                x0 = max(0, min(x0, w))
+                y0 = max(0, min(y0, h))
+                face_size = min(face_size, w - x0, h - y0)
+            else:
+                # Default: center of frame
+                face_size = min(h, w) // 2
+                x0, y0 = (w - face_size) // 2, (h - face_size) // 2
+            
             cell = face_size // 3
             hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            
             colors = []
             ok = True
+            
             for row in range(3):
                 for col in range(3):
                     cx = x0 + col * cell + cell // 2
                     cy = y0 + row * cell + cell // 2
-                    # clamp coords
-                    x1 = max(cx - 5, 0); x2 = min(cx + 5, w-1)
-                    y1 = max(cy - 5, 0); y2 = min(cy + 5, h-1)
+                    
+                    # Clamp coordinates
+                    x1 = max(cx - 5, 0)
+                    x2 = min(cx + 5, w - 1)
+                    y1 = max(cy - 5, 0)
+                    y2 = min(cy + 5, h - 1)
+                    
                     sample = hsv[y1:y2+1, x1:x2+1]
                     if sample.size == 0:
                         ok = False
                         break
+                    
                     mean = sample.reshape(-1, 3).mean(axis=0)
                     color_name = classify_color(mean.astype(np.uint8))
                     colors.append(color_name)
+                
                 if not ok:
                     break
+            
             if ok and len(colors) == 9:
                 collected.append(colors)
             else:
                 time.sleep(0.05)
-
-            # draw preview overlay if requested
+            
+            # Draw preview
             if show_preview:
                 try:
                     overlay = frame.copy()
-                    # draw outer box
                     cv2.rectangle(overlay, (x0, y0), (x0 + face_size, y0 + face_size), (0, 255, 0), 2)
-                    # draw grid lines
                     for i in range(1, 3):
-                        # vertical
                         x = x0 + i * cell
                         cv2.line(overlay, (x, y0), (x, y0 + face_size), (0, 255, 0), 1)
-                        # horizontal
                         y = y0 + i * cell
                         cv2.line(overlay, (x0, y), (x0 + face_size, y), (0, 255, 0), 1)
-                    # draw small centers
                     for row in range(3):
                         for col in range(3):
                             cx = x0 + col * cell + cell // 2
                             cy = y0 + row * cell + cell // 2
                             cv2.circle(overlay, (cx, cy), 4, (0, 255, 255), -1)
-                    cv2.imshow(self.preview_window, overlay)
+                    cv2.imshow(preview_window, overlay)
                     cv2.waitKey(1)
                 except Exception:
-                    # GUI might not be available in the environment; ignore errors
                     pass
-
+        
         if not collected:
             return None
-
-        # Nun mitteln: für jedes facelet wähle die am häufigsten vorkommende Klassifikation über Frames
+        
+        # Vote for best color across frames
         final = []
         for idx in range(9):
             votes = {}
             for frame_colors in collected:
                 c = frame_colors[idx]
                 votes[c] = votes.get(c, 0) + 1
-            # Wähle größtes Vote
             best = max(votes.items(), key=lambda kv: kv[1])[0]
             final.append(best)
+        
         return final
 
     def _execute_mock_scan(self, goal_handle, feedback_msg, result):
@@ -440,11 +672,10 @@ class ScanCubeActionServer(Node):
 
 
 def main(args=None):
-
     rclpy.init(args=args)
     
     try:
-        server = ScanCubeActionServer()
+        server = CubePerceptionServer()
         executor = MultiThreadedExecutor(num_threads=4)
         executor.add_node(server)
         executor.spin()
