@@ -22,7 +22,6 @@
   <depend>moveit_planners_ompl</depend>
   <depend>moveit_planners_pilz_industrial_motion_planner</depend>
   <depend>moveit_simple_controller_manager</depend>
-  <depend>moveit_servo</depend>
 
   <!-- Visualization -->
   <depend>rviz2</depend>

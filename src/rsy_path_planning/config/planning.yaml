@@ -27,7 +27,7 @@ path_planning_action_server:
       # Retry configuration for robust planning
       retry:
         # Maximum number of planning retries when IK/planning fails
-        max_retries: 5
+        max_retries: 1
         # Delay between retries (seconds) - allows IK seed randomization
         delay_between_retries: 0.5
 

@@ -3,7 +3,7 @@
 
 # Hardware simulation mode
 # When true, skips connections to real hardware (grippers, cameras)
-use_mock_hardware: false
+use_mock_hardware: true
 
 # Robot network configuration
 robot1:
