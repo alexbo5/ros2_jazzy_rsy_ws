@@ -13,6 +13,7 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.descriptions import ParameterValue
 from launch.substitutions import Command
+from launch.conditions import IfCondition, UnlessCondition
 
 
 def generate_launch_description():
@@ -20,10 +21,16 @@ def generate_launch_description():
     pkg_share = get_package_share_directory("rsy_robot_startup")
 
     # Declare launch arguments
-    use_mock_hardware_arg = DeclareLaunchArgument(
-        'use_mock_hardware',
-        default_value='true',
-        description='Use mock hardware for simulation'
+    robot1_use_mock_hardware_arg = DeclareLaunchArgument(
+        'robot1_use_mock_hardware',
+        default_value='false',
+        description='Use mock hardware for robot1'
+    )
+
+    robot2_use_mock_hardware_arg = DeclareLaunchArgument(
+        'robot2_use_mock_hardware',
+        default_value='true',  # Changed from 'false' to 'true' for safe default
+        description='Use mock hardware for robot2'
     )
 
     robot1_robot_ip_arg = DeclareLaunchArgument(
@@ -65,7 +72,8 @@ def generate_launch_description():
     robot_description = ParameterValue(
         Command([
             "xacro ", urdf_xacro_path,
-            " use_mock_hardware:=", LaunchConfiguration('use_mock_hardware'),
+            " robot1_use_mock_hardware:=", LaunchConfiguration('robot1_use_mock_hardware'),
+            " robot2_use_mock_hardware:=", LaunchConfiguration('robot2_use_mock_hardware'),
             " robot1_robot_ip:=", LaunchConfiguration('robot1_robot_ip'),
             " robot2_robot_ip:=", LaunchConfiguration('robot2_robot_ip'),
             " robot2_x:=", LaunchConfiguration('robot2_x'),
@@ -100,6 +108,22 @@ def generate_launch_description():
             ("/controller_manager/robot_description", "/robot_description"),
         ],
         output="screen",
+    )
+
+    robot_1_urscript_interface = Node(
+        package="ur_robot_driver",
+        executable="urscript_interface",
+        parameters=[{"robot_ip": LaunchConfiguration('robot1_robot_ip')}],
+        output="screen",
+        condition=UnlessCondition(LaunchConfiguration('robot1_use_mock_hardware')),
+    )
+
+    robot_2_urscript_interface = Node(
+        package="ur_robot_driver",
+        executable="urscript_interface",
+        parameters=[{"robot_ip": LaunchConfiguration('robot2_robot_ip')}],
+        output="screen",
+        condition=UnlessCondition(LaunchConfiguration('robot2_use_mock_hardware')),
     )
 
     # Controller spawners (will be started after ros2_control_node)
@@ -148,10 +172,35 @@ def generate_launch_description():
         )
     )
 
+    start_robot1_urscript_interface = RegisterEventHandler(
+        OnProcessStart(
+            target_action=ros2_control_node,
+            on_start=[
+                TimerAction(
+                    period=4.0,
+                    actions=[robot_1_urscript_interface],
+                )
+            ],
+        )
+    )
+
+    start_robot2_urscript_interface = RegisterEventHandler(
+        OnProcessStart(
+            target_action=ros2_control_node,
+            on_start=[
+                TimerAction(
+                    period=4.0,
+                    actions=[robot_2_urscript_interface],
+                )
+            ],
+        )
+    )
+
     return LaunchDescription(
         [
             # Launch arguments
-            use_mock_hardware_arg,
+            robot1_use_mock_hardware_arg,
+            robot2_use_mock_hardware_arg,
             robot1_robot_ip_arg,
             robot2_robot_ip_arg,
             robot2_x_arg,
@@ -164,5 +213,7 @@ def generate_launch_description():
             robot_state_publisher,
             start_ros2_control,
             start_controllers,
+            start_robot1_urscript_interface,
+            start_robot2_urscript_interface,
         ]
     )

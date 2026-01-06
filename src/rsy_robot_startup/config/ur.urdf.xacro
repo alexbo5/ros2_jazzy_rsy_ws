@@ -13,7 +13,7 @@
   <!-- Robot 1: UR3 configuration -->
   <xacro:arg name="robot1_ur_type" default="ur3"/>
   <xacro:arg name="robot1_joint_limit_params" default="$(find rsy_robot_startup)/config/urdf_joint_limits.yaml"/>
-  <xacro:arg name="robot1_kinematics_params" default="$(find ur_description)/config/ur3/default_kinematics.yaml"/>
+  <xacro:arg name="robot1_kinematics_params" default="$(find rsy_robot_startup)/config/ur3_calibration.yaml"/>
   <xacro:arg name="robot1_physical_params" default="$(find ur_description)/config/ur3/physical_parameters.yaml"/>
   <xacro:arg name="robot1_visual_params" default="$(find ur_description)/config/ur3/visual_parameters.yaml"/>
   <xacro:arg name="robot1_transmission_hw_interface" default=""/>
@@ -24,7 +24,7 @@
   <!-- Robot 2: UR3e configuration -->
   <xacro:arg name="robot2_ur_type" default="ur3e"/>
   <xacro:arg name="robot2_joint_limit_params" default="$(find rsy_robot_startup)/config/urdf_joint_limits.yaml"/>
-  <xacro:arg name="robot2_kinematics_params" default="$(find ur_description)/config/ur3e/default_kinematics.yaml"/>
+  <xacro:arg name="robot2_kinematics_params" default="$(find rsy_robot_startup)/config/ur3e_calibration.yaml"/>
   <xacro:arg name="robot2_physical_params" default="$(find ur_description)/config/ur3e/physical_parameters.yaml"/>
   <xacro:arg name="robot2_visual_params" default="$(find ur_description)/config/ur3e/visual_parameters.yaml"/>
   <xacro:arg name="robot2_transmission_hw_interface" default=""/>
@@ -35,10 +35,10 @@
 <!-- ros2_control related parameters for robot1 -->
 <xacro:arg name="robot1_headless_mode" default="false" />
 <xacro:arg name="robot1_robot_ip" default="192.168.0.51" />
-<xacro:arg name="robot1_script_filename" default=""/>
-<xacro:arg name="robot1_output_recipe_filename" default=""/>
-<xacro:arg name="robot1_input_recipe_filename" default=""/>
-<xacro:arg name="robot1_reverse_ip" default="192.168.0.2"/>
+<xacro:arg name="robot1_script_filename" default="$(find ur_client_library)/resources/external_control.urscript"/>
+<xacro:arg name="robot1_output_recipe_filename" default="$(find rsy_robot_startup)/resources/robot1_rtde_output_recipe.txt"/>
+<xacro:arg name="robot1_input_recipe_filename" default="$(find rsy_robot_startup)/resources/robot1_rtde_input_recipe.txt"/>
+<xacro:arg name="robot1_reverse_ip" default="192.168.0.100"/>
 <xacro:arg name="robot1_script_command_port" default="50004"/>
 <xacro:arg name="robot1_reverse_port" default="50001"/>
 <xacro:arg name="robot1_script_sender_port" default="50002"/>
@@ -57,10 +57,10 @@
 <!-- ros2_control related parameters for robot2 -->
 <xacro:arg name="robot2_headless_mode" default="false" />
 <xacro:arg name="robot2_robot_ip" default="192.168.0.11" />
-<xacro:arg name="robot2_script_filename" default=""/>
-<xacro:arg name="robot2_output_recipe_filename" default=""/>
-<xacro:arg name="robot2_input_recipe_filename" default=""/>
-<xacro:arg name="robot2_reverse_ip" default="192.168.0.2"/>
+<xacro:arg name="robot2_script_filename" default="$(find ur_client_library)/resources/external_control.urscript"/>
+<xacro:arg name="robot2_output_recipe_filename" default="$(find rsy_robot_startup)/resources/robot2_rtde_output_recipe.txt"/>
+<xacro:arg name="robot2_input_recipe_filename" default="$(find rsy_robot_startup)/resources/robot2_rtde_input_recipe.txt"/>
+<xacro:arg name="robot2_reverse_ip" default="192.168.0.100"/>
 <xacro:arg name="robot2_script_command_port" default="50014"/>
 <xacro:arg name="robot2_reverse_port" default="50011"/>
 <xacro:arg name="robot2_script_sender_port" default="50012"/>
@@ -85,7 +85,8 @@
 <xacro:arg name="robot2_yaw" default="3.141592" />
 
     <!-- Simulation parameters -->
-  <xacro:arg name="use_mock_hardware" default="true" />
+  <xacro:arg name="robot1_use_mock_hardware" default="true" />
+  <xacro:arg name="robot2_use_mock_hardware" default="true" />
   <xacro:arg name="mock_sensor_commands" default="false" />
 
   <!-- initial position for simulations (Mock Hardware, Gazebo, Ignition) -->
@@ -223,7 +224,7 @@
 
 <!-- Static Robotiq grippers attached to robot tool0 links -->
 <xacro:robotiq_gripper_static prefix="robot1_" parent="robot1_tool0">
-    <origin xyz="0 0 0" rpy="0 0 0" />
+    <origin xyz="0 0 0" rpy="0 0 1.570796" />
 </xacro:robotiq_gripper_static>
 
 <xacro:robotiq_gripper_static prefix="robot2_" parent="robot2_tool0">
@@ -250,8 +251,7 @@
     name="robot1"
     tf_prefix="robot1_"
     kinematics_parameters_file="$(arg robot1_kinematics_params)"
-    transmission_hw_interface="$(arg robot1_transmission_hw_interface)"
-    use_mock_hardware="$(arg use_mock_hardware)"
+    use_mock_hardware="$(arg robot1_use_mock_hardware)"
     mock_sensor_commands="$(arg mock_sensor_commands)"
     headless_mode="$(arg robot1_headless_mode)"
     initial_positions="${xacro.load_yaml(initial_positions_file)}"
@@ -279,8 +279,7 @@
     name="robot2"
     tf_prefix="robot2_"
     kinematics_parameters_file="$(arg robot2_kinematics_params)"
-    transmission_hw_interface="$(arg robot2_transmission_hw_interface)"
-    use_mock_hardware="$(arg use_mock_hardware)"
+    use_mock_hardware="$(arg robot2_use_mock_hardware)"
     mock_sensor_commands="$(arg mock_sensor_commands)"
     headless_mode="$(arg robot2_headless_mode)"
     initial_positions="${xacro.load_yaml(initial_positions_file)}"

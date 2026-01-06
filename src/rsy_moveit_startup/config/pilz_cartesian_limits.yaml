@@ -7,7 +7,7 @@
 cartesian_limits:
   # Maximum translational velocity (m/s)
   # UR3/UR3e can handle higher, but keep conservative for precision work
-  max_trans_vel: 0.5
+  max_trans_vel: 0.01
 
   # Maximum translational acceleration (m/s^2)
   max_trans_acc: 1.5

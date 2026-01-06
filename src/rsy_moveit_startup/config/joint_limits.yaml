@@ -7,7 +7,7 @@ robot1_shoulder_pan_joint:
   min_position: -6.28319  # -360 deg
   max_position: 6.28319   # +360 deg
   has_velocity_limits: true
-  max_velocity: 3.14159   # 180 deg/s
+  max_velocity: 15.70795   # 180 deg/s * 5
   has_acceleration_limits: true
   max_acceleration: 40.0
 robot1_shoulder_lift_joint:
@@ -15,7 +15,7 @@ robot1_shoulder_lift_joint:
   min_position: -6.28319
   max_position: 6.28319
   has_velocity_limits: true
-  max_velocity: 3.14159
+  max_velocity: 15.70795
   has_acceleration_limits: true
   max_acceleration: 40.0
 robot1_elbow_joint:
@@ -23,7 +23,7 @@ robot1_elbow_joint:
   min_position: -3.14159  # -180 deg
   max_position: 3.14159   # +180 deg
   has_velocity_limits: true
-  max_velocity: 3.14159
+  max_velocity: 15.70795
   has_acceleration_limits: true
   max_acceleration: 40.0
 robot1_wrist_1_joint:
@@ -31,7 +31,7 @@ robot1_wrist_1_joint:
   min_position: -6.28319
   max_position: 6.28319
   has_velocity_limits: true
-  max_velocity: 6.28319   # 360 deg/s
+  max_velocity: 31.41595   # 360 deg/s * 5
   has_acceleration_limits: true
   max_acceleration: 40.0
 robot1_wrist_2_joint:
@@ -39,7 +39,7 @@ robot1_wrist_2_joint:
   min_position: -6.28319
   max_position: 6.28319
   has_velocity_limits: true
-  max_velocity: 6.28319
+  max_velocity: 31.41595
   has_acceleration_limits: true
   max_acceleration: 40.0
 robot1_wrist_3_joint:
@@ -47,7 +47,7 @@ robot1_wrist_3_joint:
   min_position: -6.28319  # -360 deg
   max_position: 6.28319   # +360 deg
   has_velocity_limits: true
-  max_velocity: 6.28319
+  max_velocity: 31.41595
   has_acceleration_limits: true
   max_acceleration: 40.0
 
@@ -57,7 +57,7 @@ robot2_shoulder_pan_joint:
   min_position: -6.28319
   max_position: 6.28319
   has_velocity_limits: true
-  max_velocity: 3.14159
+  max_velocity: 15.70795
   has_acceleration_limits: true
   max_acceleration: 40.0
 robot2_shoulder_lift_joint:
@@ -65,7 +65,7 @@ robot2_shoulder_lift_joint:
   min_position: -6.28319
   max_position: 6.28319
   has_velocity_limits: true
-  max_velocity: 3.14159
+  max_velocity: 15.70795
   has_acceleration_limits: true
   max_acceleration: 40.0
 robot2_elbow_joint:
@@ -73,7 +73,7 @@ robot2_elbow_joint:
   min_position: -3.14159
   max_position: 3.14159
   has_velocity_limits: true
-  max_velocity: 3.14159
+  max_velocity: 15.70795
   has_acceleration_limits: true
   max_acceleration: 40.0
 robot2_wrist_1_joint:
@@ -81,7 +81,7 @@ robot2_wrist_1_joint:
   min_position: -6.28319
   max_position: 6.28319
   has_velocity_limits: true
-  max_velocity: 6.28319
+  max_velocity: 31.41595
   has_acceleration_limits: true
   max_acceleration: 40.0
 robot2_wrist_2_joint:
@@ -89,7 +89,7 @@ robot2_wrist_2_joint:
   min_position: -6.28319
   max_position: 6.28319
   has_velocity_limits: true
-  max_velocity: 6.28319
+  max_velocity: 31.41595
   has_acceleration_limits: true
   max_acceleration: 40.0
 robot2_wrist_3_joint:
@@ -97,6 +97,6 @@ robot2_wrist_3_joint:
   min_position: -6.28319  # -360 deg
   max_position: 6.28319   # +360 deg
   has_velocity_limits: true
-  max_velocity: 6.28319
+  max_velocity: 31.41595
   has_acceleration_limits: true
   max_acceleration: 40.0

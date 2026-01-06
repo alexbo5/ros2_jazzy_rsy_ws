@@ -23,7 +23,7 @@ def generate_launch_description():
     # Declare launch arguments for robot1
     robot1_ip_arg = DeclareLaunchArgument(
         'robot1_gripper_ip',
-        default_value='192.168.1.10',
+        default_value='192.168.0.51',
         description='IP address of robot1 gripper'
     )
 
@@ -36,7 +36,7 @@ def generate_launch_description():
     # Declare launch arguments for robot2
     robot2_ip_arg = DeclareLaunchArgument(
         'robot2_gripper_ip',
-        default_value='192.168.1.11',
+        default_value='192.168.0.11',
         description='IP address of robot2 gripper'
     )
 

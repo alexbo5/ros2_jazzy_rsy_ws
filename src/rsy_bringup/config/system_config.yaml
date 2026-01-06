@@ -3,17 +3,17 @@
 
 # Hardware simulation mode
 # When true, skips connections to real hardware (grippers, cameras)
-use_mock_hardware: true
+use_mock_hardware: false
 
 # Robot network configuration
 robot1:
   robot_ip: "192.168.0.51"
-  gripper_ip: "192.168.1.10"
+  gripper_ip: "192.168.0.51"
   gripper_port: 63352
 
 robot2:
   robot_ip: "192.168.0.11"
-  gripper_ip: "192.168.1.11"
+  gripper_ip: "192.168.0.11"
   gripper_port: 63352
   # Position relative to world frame (meters and radians)
   position:
