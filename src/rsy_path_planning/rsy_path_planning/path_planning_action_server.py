@@ -266,7 +266,18 @@ class PathPlanningActionServer(Node):
             self.get_logger().info('Cartesian path succeeded')
             return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
 
-        return self._abort(goal_handle, result, 'LIN planning failed')
+        self.get_logger().warn('Cartesian path failed, trying PTP fallback...')
+        feedback.status = 'Planning PTP fallback...'
+        goal_handle.publish_feedback(feedback)
+
+        # PTP fallback for LIN - use OMPL when linear path is not possible
+        ompl_req = self._build_request(req.robot_name, robot, 'ompl', None, pose=pose)
+        trajectory = await self._try_plan(ompl_req)
+        if trajectory:
+            self.get_logger().info('OMPL PTP fallback succeeded for LIN')
+            return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
+
+        return self._abort(goal_handle, result, 'LIN planning failed (all methods)')
 
     async def _try_plan(self, plan_req):
         """Try planning, return trajectory or None."""
@@ -277,7 +288,77 @@ class PathPlanningActionServer(Node):
         return None
 
     async def _plan_cartesian(self, robot_name, robot, target_pose, frame):
-        """Plan Cartesian path."""
+        """Plan Cartesian path with interpolated waypoints for longer distances."""
+        # First get current end-effector pose to compute distance
+        current_joints = self._get_joint_values(robot_name)
+        current_pose = await self._compute_fk(robot, self.joint_names[robot_name], current_joints)
+        
+        if current_pose is None:
+            self.get_logger().warn('Could not compute current FK for cartesian planning')
+            return await self._plan_cartesian_direct(robot_name, robot, target_pose, frame)
+        
+        # Compute distance
+        dx = target_pose.position.x - current_pose.position.x
+        dy = target_pose.position.y - current_pose.position.y
+        dz = target_pose.position.z - current_pose.position.z
+        distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+        
+        self.get_logger().info(f'Cartesian distance: {distance:.4f}m')
+        
+        # For short distances, use direct planning
+        if distance < 0.05:  # Less than 5cm
+            return await self._plan_cartesian_direct(robot_name, robot, target_pose, frame)
+        
+        # For longer distances, interpolate waypoints
+        num_waypoints = max(2, int(distance / 0.02))  # One waypoint every 2cm
+        waypoints = []
+        
+        for i in range(1, num_waypoints + 1):
+            t = i / num_waypoints
+            wp = Pose()
+            wp.position.x = current_pose.position.x + t * dx
+            wp.position.y = current_pose.position.y + t * dy
+            wp.position.z = current_pose.position.z + t * dz
+            # SLERP for orientation would be better, but linear interpolation for now
+            wp.orientation.x = current_pose.orientation.x + t * (target_pose.orientation.x - current_pose.orientation.x)
+            wp.orientation.y = current_pose.orientation.y + t * (target_pose.orientation.y - current_pose.orientation.y)
+            wp.orientation.z = current_pose.orientation.z + t * (target_pose.orientation.z - current_pose.orientation.z)
+            wp.orientation.w = current_pose.orientation.w + t * (target_pose.orientation.w - current_pose.orientation.w)
+            # Normalize quaternion
+            qnorm = math.sqrt(wp.orientation.x**2 + wp.orientation.y**2 + wp.orientation.z**2 + wp.orientation.w**2)
+            if qnorm > 0:
+                wp.orientation.x /= qnorm
+                wp.orientation.y /= qnorm
+                wp.orientation.z /= qnorm
+                wp.orientation.w /= qnorm
+            waypoints.append(wp)
+        
+        self.get_logger().info(f'Planning cartesian path with {len(waypoints)} waypoints')
+        
+        req = GetCartesianPath.Request()
+        req.header.frame_id = frame
+        req.header.stamp = self.get_clock().now().to_msg()
+        req.group_name = robot['group']
+        req.link_name = robot['ee_link']
+        req.waypoints = waypoints
+        req.max_step = self.cfg['cart_step']
+        req.jump_threshold = 0.0
+        req.avoid_collisions = True
+        req.start_state = self._get_robot_state(robot_name)
+        req.max_velocity_scaling_factor = self.cfg['vel_lin']
+        req.max_acceleration_scaling_factor = self.cfg['acc_lin']
+
+        resp = await self._cart_client.call_async(req)
+
+        self.get_logger().info(f'Cartesian path result: {resp.fraction:.1%} achieved, error: {resp.error_code.val}')
+
+        if (resp.error_code.val == MoveItErrorCodes.SUCCESS and
+                resp.fraction >= self.cfg['cart_min_frac']):
+            return resp.solution
+        return None
+
+    async def _plan_cartesian_direct(self, robot_name, robot, target_pose, frame):
+        """Plan direct Cartesian path (single waypoint)."""
         req = GetCartesianPath.Request()
         req.header.frame_id = frame
         req.header.stamp = self.get_clock().now().to_msg()
@@ -288,13 +369,16 @@ class PathPlanningActionServer(Node):
         req.jump_threshold = 0.0
         req.avoid_collisions = True
         req.start_state = self._get_robot_state(robot_name)
+        req.max_velocity_scaling_factor = self.cfg['vel_lin']
+        req.max_acceleration_scaling_factor = self.cfg['acc_lin']
 
         resp = await self._cart_client.call_async(req)
 
+        self.get_logger().info(f'Direct cartesian path: {resp.fraction:.1%} achieved')
+
         if (resp.error_code.val == MoveItErrorCodes.SUCCESS and
                 resp.fraction >= self.cfg['cart_min_frac']):
-            self.get_logger().info(f'Cartesian path: {resp.fraction:.0%}')
-            return self._scale_trajectory(resp.solution, 'lin')
+            return resp.solution
         return None
 
     async def _compute_fk(self, robot, joint_names, joint_values):
@@ -446,18 +530,26 @@ class PathPlanningActionServer(Node):
         return joints
 
     def _normalize_joints(self, robot_name, target):
-        """Normalize continuous joints to shortest path."""
-        current = self._get_joint_values(robot_name)
+        """Normalize continuous joints to shortest path from current position.
+
+        Uses the raw current state (what the robot reports) as the reference
+        for computing the shortest path to the target.
+        """
+        current = self._get_joint_values(robot_name)  # Use raw values, not normalized
         normalized = list(target)
 
         for idx in CONTINUOUS_JOINTS:
             if idx < len(normalized):
-                diff = target[idx] - current[idx]
-                while diff > math.pi:
-                    diff -= 2 * math.pi
-                while diff < -math.pi:
-                    diff += 2 * math.pi
-                normalized[idx] = current[idx] + diff
+                # Find equivalent target angle closest to current position
+                tgt = target[idx]
+                curr = current[idx]
+                
+                # Bring target to within 2π of current
+                while tgt - curr > math.pi:
+                    tgt -= 2 * math.pi
+                while tgt - curr < -math.pi:
+                    tgt += 2 * math.pi
+                normalized[idx] = tgt
 
         return normalized
 
@@ -466,23 +558,36 @@ class PathPlanningActionServer(Node):
         return [self._joint_states.get(name, 0.0) for name in self.joint_names[robot_name]]
 
     def _get_robot_state(self, robot_name):
-        """Get robot state for planning."""
+        """Get robot state for planning - use actual joint values."""
         state = RobotState()
         state.joint_state.name = self.joint_names[robot_name]
-        state.joint_state.position = self._get_joint_values(robot_name)
+        state.joint_state.position = self._get_joint_values(robot_name)  # Raw values, no normalization
         return state
 
+    # Remove _normalize_start_state method entirely - it's no longer needed
+
     def _scale_trajectory(self, trajectory, motion_type):
-        """Scale trajectory velocities."""
-        scale = self.cfg[f'vel_{motion_type}']
+        """Scale trajectory velocities and accelerations.
+        
+        Note: This is only used when the planner doesn't support scaling factors directly.
+        For most cases, use the scaling factors in the planning request instead.
+        """
+        vel_scale = self.cfg[f'vel_{motion_type}']
+        acc_scale = self.cfg[f'acc_{motion_type}']
+        
         for pt in trajectory.joint_trajectory.points:
+            # Scale time (slower = longer time)
             t = pt.time_from_start.sec + pt.time_from_start.nanosec * 1e-9
-            t_scaled = t / scale
+            t_scaled = t / vel_scale
             pt.time_from_start.sec = int(t_scaled)
             pt.time_from_start.nanosec = int((t_scaled % 1) * 1e9)
-            pt.velocities = [v * scale for v in pt.velocities]
+            
+            # Scale velocities
+            pt.velocities = [v * vel_scale for v in pt.velocities]
+            
+            # Scale accelerations using acceleration scaling factor
             if pt.accelerations:
-                pt.accelerations = [a * scale * scale for a in pt.accelerations]
+                pt.accelerations = [a * acc_scale for a in pt.accelerations]
         return trajectory
 
     def _abort(self, goal_handle, result, message):

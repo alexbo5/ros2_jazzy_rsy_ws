@@ -25,17 +25,17 @@ path_planning_action_server:
 
     # Cartesian Path Fallback (for MoveL)
     cartesian:
-      max_step: 0.01
-      min_fraction: 0.95
+      max_step: 0.005          # Reduced from 0.01 for finer resolution
+      min_fraction: 0.80       # Reduced from 0.95 to accept partial paths
 
     # Velocity/Acceleration Scaling (0.0 - 1.0)
     velocity_scaling:
       ptp: 0.3
-      lin: 0.3
+      lin: 0.15                # Increased from 0.05 for faster cube spinning
 
     acceleration_scaling:
       ptp: 0.3
-      lin: 0.3
+      lin: 0.15                # Increased from 0.05 for faster cube spinning
 
     # Goal Tolerances
     tolerances:
