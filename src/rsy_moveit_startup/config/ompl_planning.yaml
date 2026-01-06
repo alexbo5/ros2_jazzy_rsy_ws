@@ -1,6 +1,4 @@
-# OMPL Planning Configuration (Optional Fallback)
-# Not used by path planning action server (uses Pilz instead)
-# Kept for other MoveIt applications that may need sampling-based planning
+# OMPL planning configuration (fallback planner)
 
 planning_plugins:
   - ompl_interface/OMPLPlanner
@@ -17,7 +15,6 @@ robot2_ur_manipulator:
     - RRTConnect
   longest_valid_segment_fraction: 0.005
 
-# RRTConnect - bidirectional rapidly-exploring random tree
 RRTConnect:
   type: geometric::RRTConnect
   range: 0.0

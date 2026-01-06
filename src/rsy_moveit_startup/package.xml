@@ -4,7 +4,7 @@
   <name>rsy_moveit_startup</name>
   <version>0.0.1</version>
   <description>MoveIt2 configuration for dual UR robot setup</description>
-  <maintainer email="alexander@todo.todo">Alexander</maintainer>
+  <maintainer email="todo@todo.todo">todo</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
@@ -12,18 +12,12 @@
   <depend>rclpy</depend>
   <depend>launch</depend>
   <depend>launch_ros</depend>
-
-  <!-- Robot startup package dependency -->
   <depend>rsy_robot_startup</depend>
-
-  <!-- MoveIt2 -->
   <depend>moveit_ros_move_group</depend>
   <depend>moveit_configs_utils</depend>
   <depend>moveit_planners_ompl</depend>
   <depend>moveit_planners_pilz_industrial_motion_planner</depend>
   <depend>moveit_simple_controller_manager</depend>
-
-  <!-- Visualization -->
   <depend>rviz2</depend>
   <depend>rviz_default_plugins</depend>
   <depend>moveit_ros_visualization</depend>

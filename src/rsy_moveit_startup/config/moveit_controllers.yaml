@@ -1,4 +1,5 @@
-# MoveIt uses this configuration for controller management
+# MoveIt controller configuration
+
 trajectory_execution:
   allowed_execution_duration_scaling: 1.2
   allowed_goal_duration_margin: 1.0
@@ -8,7 +9,7 @@ trajectory_execution:
 moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
 
 moveit_simple_controller_manager:
-  controller_names: 
+  controller_names:
     - robot1_scaled_joint_trajectory_controller
     - robot2_scaled_joint_trajectory_controller
 
