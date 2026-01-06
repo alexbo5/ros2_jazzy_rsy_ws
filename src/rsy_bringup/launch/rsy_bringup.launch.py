@@ -1,16 +1,21 @@
 """
 RSY Bringup Launch File
 Launches all components: robot, MoveIt, and application nodes.
-Reads configuration from config/system_config.yaml.
 """
 
 import os
 import yaml
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription, TimerAction, DeclareLaunchArgument
+from launch.actions import (
+    IncludeLaunchDescription,
+    DeclareLaunchArgument,
+    GroupAction,
+    RegisterEventHandler,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch.event_handlers import OnProcessStart
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -30,65 +35,55 @@ def generate_launch_description():
     cube_perception_pkg = get_package_share_directory("rsy_cube_perception")
     gripper_pkg = get_package_share_directory("rsy_gripper_controller")
 
-    # Load system configuration
+    # Load system configuration (mock hardware flags)
     config_path = os.path.join(bringup_pkg, "config", "system_config.yaml")
     config = load_config(config_path)
 
-    # Extract configuration values
-    use_mock_hardware = config.get('use_mock_hardware', False)
-    robot1_config = config.get('robot1', {})
-    robot2_config = config.get('robot2', {})
-    camera_config = config.get('camera', {})
-    mock_config = config.get('mock', {})
+    robot1_use_mock = config.get('robot1', {}).get('use_mock_hardware', False)
+    robot2_use_mock = config.get('robot2', {}).get('use_mock_hardware', False)
+    camera_use_mock = config.get('camera', {}).get('use_mock_hardware', False)
 
-    # Declare launch argument to override mock hardware from command line
-    use_mock_hardware_arg = DeclareLaunchArgument(
-        'use_mock_hardware',
-        default_value=str(use_mock_hardware).lower(),
-        description='Use mock hardware mode (overrides config file)'
+    # Launch arguments for command line override
+    robot1_mock_arg = DeclareLaunchArgument(
+        'robot1_use_mock_hardware',
+        default_value=str(robot1_use_mock).lower(),
+        description='Use mock hardware for robot1'
     )
-
-    # Extract robot2 position from config
-    robot2_position = robot2_config.get('position', {})
-    robot2_orientation = robot2_config.get('orientation', {})
+    robot2_mock_arg = DeclareLaunchArgument(
+        'robot2_use_mock_hardware',
+        default_value=str(robot2_use_mock).lower(),
+        description='Use mock hardware for robot2'
+    )
+    camera_mock_arg = DeclareLaunchArgument(
+        'camera_use_mock_hardware',
+        default_value=str(camera_use_mock).lower(),
+        description='Use mock hardware for camera'
+    )
 
     # 1. Robot startup (robot_state_publisher + controllers)
     robot_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(robot_pkg, "launch", "robot.launch.py")),
         launch_arguments={
-            'use_mock_hardware': LaunchConfiguration('use_mock_hardware'),
-            'robot1_robot_ip': robot1_config.get('robot_ip', '192.168.0.51'),
-            'robot2_robot_ip': robot2_config.get('robot_ip', '192.168.0.11'),
-            'robot2_x': str(robot2_position.get('x', -0.77)),
-            'robot2_y': str(robot2_position.get('y', 0.655)),
-            'robot2_z': str(robot2_position.get('z', 0.0)),
-            'robot2_roll': str(robot2_orientation.get('roll', 0.0)),
-            'robot2_pitch': str(robot2_orientation.get('pitch', 0.0)),
-            'robot2_yaw': str(robot2_orientation.get('yaw', 3.141592)),
+            'robot1_use_mock_hardware': LaunchConfiguration('robot1_use_mock_hardware'),
+            'robot2_use_mock_hardware': LaunchConfiguration('robot2_use_mock_hardware'),
         }.items()
     )
 
     # 2. MoveIt startup (move_group)
     moveit_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(moveit_pkg, "launch", "moveit.launch.py")),
-        launch_arguments={
-            'use_mock_hardware': LaunchConfiguration('use_mock_hardware'),
-        }.items()
     )
 
     # 3. Gripper servers for both robots
     gripper_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(gripper_pkg, "launch", "gripper.launch.py")),
         launch_arguments={
-            'use_mock_hardware': LaunchConfiguration('use_mock_hardware'),
-            'robot1_gripper_ip': robot1_config.get('gripper_ip', '192.168.1.10'),
-            'robot1_gripper_port': str(robot1_config.get('gripper_port', 63352)),
-            'robot2_gripper_ip': robot2_config.get('gripper_ip', '192.168.1.11'),
-            'robot2_gripper_port': str(robot2_config.get('gripper_port', 63352)),
+            'robot1_use_mock_hardware': LaunchConfiguration('robot1_use_mock_hardware'),
+            'robot2_use_mock_hardware': LaunchConfiguration('robot2_use_mock_hardware'),
         }.items()
     )
 
-    # 4. RViz
+    # 4. RViz visualization
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
@@ -97,44 +92,47 @@ def generate_launch_description():
         arguments=["-d", os.path.join(bringup_pkg, "config", "moveit.rviz")],
     )
 
-    # 5. Application nodes (delayed to ensure MoveIt is ready)
-    app_delay = 5.0
-
-    path_planning_launch = TimerAction(
-        period=app_delay,
-        actions=[IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(path_planning_pkg, "launch", "path_planning.launch.py"))
-        )]
-    )
-
-    cube_motion_launch = TimerAction(
-        period=app_delay,
-        actions=[IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(cube_motion_pkg, "launch", "cube_motion_server.launch.py"))
-        )]
-    )
-
-    cube_perception_launch = TimerAction(
-        period=app_delay,
-        actions=[IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(cube_perception_pkg, "launch", "cube_perception.launch.py")),
+    # 5. Application nodes - grouped together, started after RViz is ready
+    # This ensures MoveIt has had time to initialize
+    application_nodes = GroupAction([
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(path_planning_pkg, "launch", "path_planning.launch.py")
+            )
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(cube_motion_pkg, "launch", "cube_motion_server.launch.py")
+            )
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(cube_perception_pkg, "launch", "cube_perception.launch.py")
+            ),
             launch_arguments={
-                'use_mock_hardware': LaunchConfiguration('use_mock_hardware'),
-                'mock_cube_solution': mock_config.get('cube_solution', "R U R' U'"),
-                'mock_cube_description': mock_config.get('cube_description', 'Mock cube solution for testing'),
-                'camera_index': str(camera_config.get('index', 0)),
-                'show_preview': str(camera_config.get('show_preview', True)).lower(),
+                'use_mock_hardware': LaunchConfiguration('camera_use_mock_hardware'),
             }.items()
-        )]
+        ),
+    ])
+
+    # Start application nodes after RViz process starts (MoveIt should be ready by then)
+    start_applications = RegisterEventHandler(
+        OnProcessStart(
+            target_action=rviz_node,
+            on_start=[application_nodes],
+        )
     )
 
     return LaunchDescription([
-        use_mock_hardware_arg,
+        # Launch arguments
+        robot1_mock_arg,
+        robot2_mock_arg,
+        camera_mock_arg,
+        # Core system
         robot_launch,
         moveit_launch,
         gripper_launch,
         rviz_node,
-        path_planning_launch,
-        cube_motion_launch,
-        cube_perception_launch,
+        # Applications (event-triggered)
+        start_applications,
     ])
