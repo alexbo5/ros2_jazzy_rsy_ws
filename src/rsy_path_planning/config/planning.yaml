@@ -1,18 +1,9 @@
 # Path Planning Configuration
-# Hybrid Planning Strategy: Pilz (fast) -> OMPL (obstacle avoidance)
-#
-# Motion Types:
-# - MoveJ/MoveJJoints: PTP (Pilz) -> OMPL fallback
-# - MoveL/MoveLJoints: LIN (Pilz) -> Cartesian path fallback
-#
-# Collision checking handled by MoveIt planning scene
+# Strategy: Pilz (fast) -> OMPL/Cartesian fallback (obstacle avoidance)
 
 path_planning_action_server:
   ros__parameters:
-
-    # ==========================================================================
     # Robot Configuration
-    # ==========================================================================
     robots:
       robot1:
         planning_group: robot1_ur_manipulator
@@ -21,51 +12,33 @@ path_planning_action_server:
         planning_group: robot2_ur_manipulator
         end_effector_link: robot2_tcp
 
-    # ==========================================================================
-    # Planning Parameters (Pilz - Primary Planner)
-    # ==========================================================================
+    # Pilz Planner (primary)
     planning:
-      # Reference frame for all planning
       default_frame: world
-      # Maximum planning time for Pilz (seconds) - fast planner
       allowed_time: 5.0
 
-      # Retry configuration for robust planning
-      retry:
-        # Maximum number of planning retries when IK/planning fails
-        max_retries: 1
-        # Delay between retries (seconds) - allows IK seed randomization
-        delay_between_retries: 0.5
+    # OMPL Fallback (for MoveJ obstacle avoidance)
+    ompl:
+      planner_id: RRTConnect
+      num_attempts: 10
+      allowed_time: 10.0
 
-    # ==========================================================================
-    # Cartesian Path Parameters (MoveL fallback)
-    # ==========================================================================
+    # Cartesian Path Fallback (for MoveL)
     cartesian:
-      # Waypoint interpolation step size (meters)
       max_step: 0.01
-      # Minimum fraction of path that must be collision-free
       min_fraction: 0.95
 
-    # ==========================================================================
-    # Velocity and Acceleration Scaling (0.0 - 1.0)
-    # ==========================================================================
+    # Velocity/Acceleration Scaling (0.0 - 1.0)
     velocity_scaling:
-      # PTP (Point-to-Point) motions
       ptp: 0.3
-      # LIN (Linear Cartesian) motions
-      lin: 0.1
+      lin: 0.3
 
     acceleration_scaling:
       ptp: 0.3
-      lin: 0.1
+      lin: 0.3
 
-    # ==========================================================================
     # Goal Tolerances
-    # ==========================================================================
     tolerances:
-      # Position tolerance (meters)
-      position: 0.001
-      # Orientation tolerance (radians)
-      orientation: 0.01
-      # Joint tolerance (radians)
-      joint: 0.01
+      position: 0.001   # meters
+      orientation: 0.01 # radians
+      joint: 0.01       # radians
