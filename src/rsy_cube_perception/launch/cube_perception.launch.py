@@ -2,44 +2,38 @@
 Launch file for cube perception action server.
 
 Supports mock hardware mode for testing without a camera.
+Configuration loaded from config/cube_perception_config.yaml.
 """
 
+import os
+import yaml
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+
+
+def load_config(config_path):
+    """Load configuration from YAML file."""
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
 
 def generate_launch_description():
-    # Declare launch arguments
+    # Load configuration
+    pkg_share = get_package_share_directory("rsy_cube_perception")
+    config_path = os.path.join(pkg_share, "config", "cube_perception_config.yaml")
+    config = load_config(config_path)
+
+    camera_config = config.get('camera', {})
+    mock_config = config.get('mock', {})
+
+    # Launch argument for mock hardware (passed from bringup)
     use_mock_hardware_arg = DeclareLaunchArgument(
         'use_mock_hardware',
         default_value='false',
         description='Use mock hardware instead of real camera'
-    )
-
-    mock_cube_solution_arg = DeclareLaunchArgument(
-        'mock_cube_solution',
-        default_value="R U R' U'",
-        description='Mock Kociemba solution to return in mock mode'
-    )
-
-    mock_cube_description_arg = DeclareLaunchArgument(
-        'mock_cube_description',
-        default_value='Mock cube solution for testing',
-        description='Description of mock solution'
-    )
-
-    camera_index_arg = DeclareLaunchArgument(
-        'camera_index',
-        default_value='0',
-        description='Camera device index'
-    )
-
-    show_preview_arg = DeclareLaunchArgument(
-        'show_preview',
-        default_value='true',
-        description='Show camera preview window with grid overlay'
     )
 
     action_server_node = Node(
@@ -49,21 +43,14 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'use_mock_hardware': LaunchConfiguration('use_mock_hardware'),
-            'mock_cube_solution': LaunchConfiguration('mock_cube_solution'),
-            'mock_cube_description': LaunchConfiguration('mock_cube_description'),
-            'show_preview': LaunchConfiguration('show_preview'),
+            'camera_index': camera_config.get('index', 0),
+            'show_preview': camera_config.get('show_preview', True),
+            'mock_cube_solution': mock_config.get('cube_solution', "R U R' U'"),
+            'mock_cube_description': mock_config.get('cube_description', 'Mock cube solution'),
         }],
     )
 
     return LaunchDescription([
         use_mock_hardware_arg,
-        mock_cube_solution_arg,
-        mock_cube_description_arg,
-        camera_index_arg,
-        show_preview_arg,
         action_server_node,
     ])
-
-
-if __name__ == "__main__":
-    generate_launch_description()

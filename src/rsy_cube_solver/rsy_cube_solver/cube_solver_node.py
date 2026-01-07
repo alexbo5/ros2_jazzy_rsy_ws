@@ -47,7 +47,6 @@ class CubeSolver(Node):
         
         # Present each cube face and scan it
         self.get_logger().info("Presenting and scanning all cube faces...")
-        camera_index = 0
         faces_to_scan = ["U", "D", "F", "B", "L", "R"]
         
         for face in faces_to_scan:
@@ -88,7 +87,6 @@ class CubeSolver(Node):
                 return
             
             goal = ScanCubeFace.Goal()
-            goal.camera_index = camera_index
             goal.cube_face = face
             send_goal_future = self.scan_cube_face_client.send_goal_async(goal)
             rclpy.spin_until_future_complete(self, send_goal_future)

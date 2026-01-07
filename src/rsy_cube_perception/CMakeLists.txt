@@ -41,8 +41,8 @@ install(PROGRAMS
   RENAME scan_cube_action_server
 )
 
-# Install launch files
-install(DIRECTORY launch
+# Install launch files and config
+install(DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
 )
 

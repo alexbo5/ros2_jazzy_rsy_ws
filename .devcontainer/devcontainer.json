@@ -28,7 +28,8 @@
     ],
     "runArgs": [
         "--network=host",
-        "--privileged"
+        "--privileged",
+        "--device=/dev/video4:/dev/video4"
     ],
     "containerEnv": {
         "ROS_DOMAIN_ID": "0",

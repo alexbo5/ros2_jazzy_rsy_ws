@@ -22,9 +22,9 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install service definitions and launch files
+# Install service definitions, launch files, and config
 install(
-  DIRECTORY srv launch
+  DIRECTORY srv launch config
   DESTINATION share/${PROJECT_NAME}
 )
 

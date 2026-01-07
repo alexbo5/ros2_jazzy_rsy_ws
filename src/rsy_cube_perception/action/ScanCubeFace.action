@@ -1,5 +1,4 @@
 # Goal: scan a single cube face
-int32 camera_index
 string cube_face  # one of: U, D, F, B, L, R
 ---
 # Result: colors of the 9 facelets in scan order (row-major: top-left to bottom-right)

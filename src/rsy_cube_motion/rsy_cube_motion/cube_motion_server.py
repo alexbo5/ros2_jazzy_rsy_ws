@@ -57,9 +57,9 @@ CUBE_PRESENT_POSES = {
 GRIPPER_FORWARD_DIRECTION = np.array([0.0, 0.0, 1.0])
 
 # distance (mm) from cube center to gripper contact point
-OFFSET_DIST_HOLD_CUBE = 15    # distance when holding the cube (grasps 2 rows of cube)  
-OFFSET_DIST_SPIN_CUBE = 25    # distance when spinning the cube (grasps 1 row of cube)  
-OFFSET_DIST_PRE_TARGET = 50   # distance when approaching the cube (pre-grasp position)
+OFFSET_DIST_HOLD_CUBE = 0     # distance when holding the cube (grasps 2 rows of cube)  
+OFFSET_DIST_SPIN_CUBE = 20    # distance when spinning the cube (grasps 1 row of cube)  
+OFFSET_DIST_PRE_TARGET = 100   # distance when approaching the cube (pre-grasp position)
 OFFSET_DIST_TAKE_CUBE = 40    # distance when taking up the cube from rest position
 
 
@@ -200,7 +200,7 @@ class CubeMotionServer(Node):
         super().__init__('cube_motion_server')
 
         # Roboter, der den Würfel dreht (1 oder 2)
-        self.cube_spinning_robot = 2
+        self.cube_spinning_robot = 1
 
         # Cube poses for each accessible face (U, D, L, R, F, B)
         self.cube_poses = self._init_cube_poses()
@@ -541,10 +541,10 @@ class CubeMotionServer(Node):
         success = success and await self.call_move_l(new_spinning_robot, new_spinning_robot_target)
 
         # Gripper close: new spinning robot grabs the cube
-        await self.gripper_close(new_spinning_robot)
+        await self.gripper_open(new_spinning_robot)
 
         # Gripper open: old spinning robot releases the cube
-        await self.gripper_open(old_spinning_robot)
+        await self.gripper_close(old_spinning_robot)
 
         # Old robot retracts
         old_spinning_robot_post_target = self.get_gripper_pose(self.handover_pose, approach_direction=old_spinning_robot_approach_direction, offset_dist=OFFSET_DIST_PRE_TARGET)
@@ -643,7 +643,7 @@ class CubeMotionServer(Node):
         Sequence:
         1. Robot 2 moves to pre-grasp position (OFFSET_DIST_PRE_TARGET)
         2. Robot 2 moves linearly to grasp position (OFFSET_DIST_HOLD_CUBE)
-        3. Close gripper (TODO)
+        3. Close gripper
         4. Robot 2 retracts to a safe position
         5. Set spinning_robot to 1 (Robot 1 will spin, Robot 2 holds)
         """
@@ -673,8 +673,9 @@ class CubeMotionServer(Node):
             if not success:
                 raise RuntimeError("Failed to move to grasp position")
             
-            # TODO: Close gripper on robot 2
             self.get_logger().info(">>> [TakeUpCube] Gripper schließen (Robot 2)")
+            # Gripper close: spinning robot grabs the face to rotate
+            await self.gripper_close(robot2_name)
 
             above_rest_pose = CubePose(
                 position=self.rest_pose.position + np.array([0.0, 0.0, OFFSET_DIST_TAKE_CUBE/1000.0]),
@@ -726,7 +727,7 @@ class CubeMotionServer(Node):
         2. If not, perform handover so Robot 2 holds
         3. Robot 2 moves to position above rest position (OFFSET_DIST_PRE_TARGET)
         4. Robot 2 moves linearly to put down position (OFFSET_DIST_HOLD_CUBE)
-        5. Open gripper (TODO)
+        5. Open gripper
         6. Robot 2 retracts
         """
         self.get_logger().info(">>> [PutDownCube] Cube ablegen...")
@@ -773,8 +774,9 @@ class CubeMotionServer(Node):
             if not success:
                 raise RuntimeError("Failed to move to put down position")
             
-            # TODO: Open gripper on robot 2
+            # Open gripper on robot 2
             self.get_logger().info(">>> [PutDownCube] Gripper öffnen (Robot 2)")
+            await self.gripper_open(robot2_name)
             
             # Robot 2 retracts
             post_position = self.get_gripper_pose(

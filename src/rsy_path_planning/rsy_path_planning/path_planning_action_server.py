@@ -1,23 +1,7 @@
 #!/usr/bin/env python3
-"""
-Path Planning Action Server with Hybrid Planning Strategy
-
-Actions:
-- MoveJ/MoveJJoints: PTP motion (Pilz) with OMPL fallback for obstacles
-- MoveL/MoveLJoints: LIN motion (Pilz) with Cartesian path fallback
-
-Strategy:
-1. Try Pilz planner first (deterministic, efficient)
-2. Fall back to OMPL if Pilz fails (obstacle avoidance)
-
-Features:
-- Shortest joint path selection to prevent robot spinning
-- Automatic planner fallback for robust obstacle handling
-- Collision-checked paths via MoveIt planning scene
-"""
+"""Path Planning Action Server - Pilz with OMPL/Cartesian fallback."""
 
 import math
-import time
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, ActionClient
@@ -33,238 +17,164 @@ from moveit_msgs.action import ExecuteTrajectory
 from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import PoseStamped, Pose
 from sensor_msgs.msg import JointState
-import tf2_ros
 
 from rsy_path_planning.action import MoveJ, MoveL, MoveJJoints, MoveLJoints
+
+
+UR_JOINTS = [
+    'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
+    'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'
+]
+
+CONTINUOUS_JOINTS = [0, 3, 4, 5]
+
+ERROR_NAMES = {
+    MoveItErrorCodes.SUCCESS: 'SUCCESS',
+    MoveItErrorCodes.FAILURE: 'FAILURE',
+    MoveItErrorCodes.PLANNING_FAILED: 'PLANNING_FAILED',
+    MoveItErrorCodes.INVALID_MOTION_PLAN: 'INVALID_MOTION_PLAN',
+    MoveItErrorCodes.CONTROL_FAILED: 'CONTROL_FAILED',
+    MoveItErrorCodes.TIMED_OUT: 'TIMED_OUT',
+    MoveItErrorCodes.START_STATE_IN_COLLISION: 'START_STATE_IN_COLLISION',
+    MoveItErrorCodes.GOAL_IN_COLLISION: 'GOAL_IN_COLLISION',
+    MoveItErrorCodes.NO_IK_SOLUTION: 'NO_IK_SOLUTION',
+    MoveItErrorCodes.INVALID_GROUP_NAME: 'INVALID_GROUP_NAME',
+}
 
 
 class PathPlanningActionServer(Node):
     """Path planning server with hybrid Pilz/OMPL strategy."""
 
-    # Continuous joints that can rotate ±360° - need shortest path handling
-    CONTINUOUS_JOINT_INDICES = [0, 3, 4, 5]  # shoulder_pan, wrist_1, wrist_2, wrist_3
-
-    # MoveIt error codes worth retrying with different planner
-    # Includes collision errors and IK failures (IK can fail due to collision during solve)
-    RETRYABLE_ERRORS = {
-        MoveItErrorCodes.PLANNING_FAILED,
-        MoveItErrorCodes.INVALID_MOTION_PLAN,
-        MoveItErrorCodes.GOAL_IN_COLLISION,
-        MoveItErrorCodes.START_STATE_IN_COLLISION,
-        MoveItErrorCodes.NO_IK_SOLUTION,  # IK can fail due to collision during solve
-        MoveItErrorCodes.FAILURE,  # Generic failure, worth retrying with OMPL
-    }
-
     def __init__(self):
         super().__init__('path_planning_action_server')
-
         self._declare_parameters()
         self._load_config()
-
-        cb = ReentrantCallbackGroup()
-
-        # Service clients
-        self._plan_client = self.create_client(
-            GetMotionPlan, '/plan_kinematic_path', callback_group=cb
-        )
-        self._fk_client = self.create_client(
-            GetPositionFK, '/compute_fk', callback_group=cb
-        )
-        self._cartesian_client = self.create_client(
-            GetCartesianPath, '/compute_cartesian_path', callback_group=cb
-        )
-
-        # Action client for trajectory execution
-        self._exec_client = ActionClient(
-            self, ExecuteTrajectory, '/execute_trajectory', callback_group=cb
-        )
-
-        # Wait for services
-        self.get_logger().info('Waiting for planning services...')
-        self._plan_client.wait_for_service(timeout_sec=30.0)
-        self._fk_client.wait_for_service(timeout_sec=30.0)
-        self._cartesian_client.wait_for_service(timeout_sec=30.0)
-        self._exec_client.wait_for_server(timeout_sec=30.0)
-
-        # TF buffer
-        self._tf_buffer = tf2_ros.Buffer()
-        self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
-
-        # Joint state subscriber
-        self._current_joint_states = {}
-        self._joint_state_sub = self.create_subscription(
-            JointState, '/joint_states', self._joint_state_callback, 10
-        )
-
-        # Action servers
-        ActionServer(self, MoveJ, 'move_j', execute_callback=self._exec_movej, callback_group=cb)
-        ActionServer(self, MoveL, 'move_l', execute_callback=self._exec_movel, callback_group=cb)
-        ActionServer(self, MoveJJoints, 'move_j_joints', execute_callback=self._exec_movej_joints, callback_group=cb)
-        ActionServer(self, MoveLJoints, 'move_l_joints', execute_callback=self._exec_movel_joints, callback_group=cb)
-
-        self.get_logger().info('Path Planning Server ready (Hybrid Pilz/OMPL)')
-        self.get_logger().info(f'  MoveJ/MoveJJoints: PTP -> OMPL fallback')
-        self.get_logger().info(f'  MoveL/MoveLJoints: LIN -> Cartesian fallback')
+        self._setup_clients()
+        self._setup_action_servers()
+        self.get_logger().info('Path Planning Server ready')
 
     def _declare_parameters(self):
-        """Declare all parameters with defaults."""
-        # Robot configuration
-        self.declare_parameter('robots.robot1.planning_group', 'robot1_ur_manipulator')
-        self.declare_parameter('robots.robot1.end_effector_link', 'robot1_tcp')
-        self.declare_parameter('robots.robot2.planning_group', 'robot2_ur_manipulator')
-        self.declare_parameter('robots.robot2.end_effector_link', 'robot2_tcp')
-
-        # Planning parameters
-        self.declare_parameter('planning.default_frame', 'world')
-        self.declare_parameter('planning.allowed_time', 5.0)
-
-        # OMPL fallback parameters
-        self.declare_parameter('ompl.planner_id', 'RRTConnect')
-        self.declare_parameter('ompl.num_attempts', 10)
-        self.declare_parameter('ompl.allowed_time', 10.0)
-
-        # Cartesian path parameters (for MoveL fallback)
-        self.declare_parameter('cartesian.max_step', 0.01)
-        self.declare_parameter('cartesian.min_fraction', 0.95)
-
-        # Velocity and acceleration scaling (0.0 - 1.0)
-        self.declare_parameter('velocity_scaling.ptp', 0.5)
-        self.declare_parameter('velocity_scaling.lin', 0.3)
-        self.declare_parameter('acceleration_scaling.ptp', 0.5)
-        self.declare_parameter('acceleration_scaling.lin', 0.3)
-
-        # Goal tolerances
-        self.declare_parameter('tolerances.position', 0.001)
-        self.declare_parameter('tolerances.orientation', 0.01)
-        self.declare_parameter('tolerances.joint', 0.01)
+        """Declare ROS parameters."""
+        params = [
+            ('robots.robot1.planning_group', 'robot1_ur_manipulator'),
+            ('robots.robot1.end_effector_link', 'robot1_tcp'),
+            ('robots.robot2.planning_group', 'robot2_ur_manipulator'),
+            ('robots.robot2.end_effector_link', 'robot2_tcp'),
+            ('planning.default_frame', 'world'),
+            ('planning.allowed_time', 5.0),
+            ('ompl.planner_id', 'RRTConnect'),
+            ('ompl.num_attempts', 10),
+            ('ompl.allowed_time', 10.0),
+            ('cartesian.max_step', 0.01),
+            ('cartesian.min_fraction', 0.95),
+            ('velocity_scaling.ptp', 0.5),
+            ('velocity_scaling.lin', 0.3),
+            ('acceleration_scaling.ptp', 0.5),
+            ('acceleration_scaling.lin', 0.3),
+            ('tolerances.position', 0.001),
+            ('tolerances.orientation', 0.01),
+            ('tolerances.joint', 0.01),
+        ]
+        for name, default in params:
+            self.declare_parameter(name, default)
 
     def _load_config(self):
         """Load configuration from parameters."""
+        get = lambda p: self.get_parameter(p).value
+
         self.robots = {
-            'robot1': {
-                'group': self.get_parameter('robots.robot1.planning_group').value,
-                'ee_link': self.get_parameter('robots.robot1.end_effector_link').value,
-            },
-            'robot2': {
-                'group': self.get_parameter('robots.robot2.planning_group').value,
-                'ee_link': self.get_parameter('robots.robot2.end_effector_link').value,
-            },
+            name: {
+                'group': get(f'robots.{name}.planning_group'),
+                'ee_link': get(f'robots.{name}.end_effector_link'),
+            }
+            for name in ['robot1', 'robot2']
         }
 
         self.joint_names = {
-            'robot1': [f'robot1_{j}' for j in [
-                'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
-                'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'
-            ]],
-            'robot2': [f'robot2_{j}' for j in [
-                'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
-                'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'
-            ]],
+            name: [f'{name}_{j}' for j in UR_JOINTS]
+            for name in ['robot1', 'robot2']
         }
 
-        self.planning = {
-            'default_frame': self.get_parameter('planning.default_frame').value,
-            'allowed_time': self.get_parameter('planning.allowed_time').value,
+        self.cfg = {
+            'frame': get('planning.default_frame'),
+            'pilz_time': get('planning.allowed_time'),
+            'ompl_planner': get('ompl.planner_id'),
+            'ompl_attempts': get('ompl.num_attempts'),
+            'ompl_time': get('ompl.allowed_time'),
+            'cart_step': get('cartesian.max_step'),
+            'cart_min_frac': get('cartesian.min_fraction'),
+            'vel_ptp': get('velocity_scaling.ptp'),
+            'vel_lin': get('velocity_scaling.lin'),
+            'acc_ptp': get('acceleration_scaling.ptp'),
+            'acc_lin': get('acceleration_scaling.lin'),
+            'tol_pos': get('tolerances.position'),
+            'tol_ori': get('tolerances.orientation'),
+            'tol_joint': get('tolerances.joint'),
         }
 
-        self.ompl = {
-            'planner_id': self.get_parameter('ompl.planner_id').value,
-            'num_attempts': self.get_parameter('ompl.num_attempts').value,
-            'allowed_time': self.get_parameter('ompl.allowed_time').value,
-        }
+        self._joint_states = {}
 
-        self.cartesian = {
-            'max_step': self.get_parameter('cartesian.max_step').value,
-            'min_fraction': self.get_parameter('cartesian.min_fraction').value,
-        }
+    def _setup_clients(self):
+        """Setup service and action clients."""
+        cb = ReentrantCallbackGroup()
 
-        self.vel_scale = {
-            'ptp': self.get_parameter('velocity_scaling.ptp').value,
-            'lin': self.get_parameter('velocity_scaling.lin').value,
-        }
+        self._plan_client = self.create_client(
+            GetMotionPlan, '/plan_kinematic_path', callback_group=cb)
+        self._fk_client = self.create_client(
+            GetPositionFK, '/compute_fk', callback_group=cb)
+        self._cart_client = self.create_client(
+            GetCartesianPath, '/compute_cartesian_path', callback_group=cb)
+        self._exec_client = ActionClient(
+            self, ExecuteTrajectory, '/execute_trajectory', callback_group=cb)
 
-        self.acc_scale = {
-            'ptp': self.get_parameter('acceleration_scaling.ptp').value,
-            'lin': self.get_parameter('acceleration_scaling.lin').value,
-        }
+        self.get_logger().info('Waiting for MoveIt services...')
+        for client in [self._plan_client, self._fk_client, self._cart_client]:
+            client.wait_for_service(timeout_sec=30.0)
+        self._exec_client.wait_for_server(timeout_sec=30.0)
 
-        self.tolerances = {
-            'position': self.get_parameter('tolerances.position').value,
-            'orientation': self.get_parameter('tolerances.orientation').value,
-            'joint': self.get_parameter('tolerances.joint').value,
-        }
+        self.create_subscription(
+            JointState, '/joint_states', self._on_joint_state, 10)
 
-    def _joint_state_callback(self, msg):
-        """Store current joint states."""
-        for i, name in enumerate(msg.name):
-            self._current_joint_states[name] = msg.position[i]
+    def _setup_action_servers(self):
+        """Setup action servers."""
+        cb = ReentrantCallbackGroup()
+        actions = [
+            (MoveJ, 'move_j', self._exec_movej),
+            (MoveL, 'move_l', self._exec_movel),
+            (MoveJJoints, 'move_j_joints', self._exec_movej_joints),
+            (MoveLJoints, 'move_l_joints', self._exec_movel_joints),
+        ]
+        for action_type, name, callback in actions:
+            ActionServer(self, action_type, name,
+                         execute_callback=callback, callback_group=cb)
 
-    def _get_current_joint_values(self, robot_name):
-        """Get current joint values for a robot."""
-        joint_names = self.joint_names[robot_name]
-        values = []
-        for name in joint_names:
-            if name in self._current_joint_states:
-                values.append(self._current_joint_states[name])
-            else:
-                self.get_logger().warn(f'Joint {name} not found, using 0.0')
-                values.append(0.0)
-        return values
+    def _on_joint_state(self, msg):
+        """Store joint states."""
+        for name, pos in zip(msg.name, msg.position):
+            self._joint_states[name] = pos
 
-    def _get_current_robot_state(self, robot_name):
-        """Get current robot state for planning."""
-        robot_state = RobotState()
-        joint_names = self.joint_names[robot_name]
-        robot_state.joint_state.name = joint_names
-        robot_state.joint_state.position = self._get_current_joint_values(robot_name)
-        return robot_state
-
-    def _normalize_joint_target(self, robot_name, target_values):
-        """
-        Normalize joint targets to shortest path from current position.
-        For continuous joints (±360°), select equivalent angle closest to current.
-        """
-        current_values = self._get_current_joint_values(robot_name)
-        normalized = list(target_values)
-
-        for idx in self.CONTINUOUS_JOINT_INDICES:
-            if idx < len(normalized):
-                current = current_values[idx]
-                target = normalized[idx]
-
-                # Find equivalent angle closest to current
-                diff = target - current
-                while diff > math.pi:
-                    diff -= 2 * math.pi
-                while diff < -math.pi:
-                    diff += 2 * math.pi
-
-                normalized[idx] = current + diff
-
-        return normalized
-
-    # === Action Callbacks ===
+    # Action callbacks
 
     async def _exec_movej(self, goal_handle):
-        """MoveJ: PTP motion to Cartesian target with OMPL fallback."""
-        return await self._execute_ptp_pose(goal_handle, MoveJ)
+        """MoveJ action."""
+        return await self._execute_ptp(goal_handle, MoveJ, target_type='pose')
 
     async def _exec_movel(self, goal_handle):
-        """MoveL: LIN motion with Cartesian path fallback."""
-        return await self._execute_lin_pose(goal_handle, MoveL)
+        """MoveL action."""
+        return await self._execute_lin(goal_handle, MoveL, target_type='pose')
 
     async def _exec_movej_joints(self, goal_handle):
-        """MoveJJoints: PTP motion to joint target with OMPL fallback."""
-        return await self._execute_ptp_joints(goal_handle, MoveJJoints)
+        """MoveJJoints action."""
+        return await self._execute_ptp(goal_handle, MoveJJoints, target_type='joints')
 
     async def _exec_movel_joints(self, goal_handle):
-        """MoveLJoints: LIN motion to joint target with Cartesian fallback."""
-        return await self._execute_lin_joints(goal_handle, MoveLJoints)
+        """MoveLJoints action."""
+        return await self._execute_lin(goal_handle, MoveLJoints, target_type='joints')
 
-    # === PTP Planning (MoveJ) with OMPL Fallback ===
+    # Planning
 
-    async def _execute_ptp_pose(self, goal_handle, action_type):
-        """Execute PTP motion to Cartesian pose with OMPL fallback."""
+    async def _execute_ptp(self, goal_handle, action_type, target_type):
+        """Execute PTP motion with OMPL fallback."""
         req = goal_handle.request
         result = action_type.Result()
         feedback = action_type.Feedback()
@@ -273,131 +183,38 @@ class PathPlanningActionServer(Node):
             return self._abort(goal_handle, result, f'Unknown robot: {req.robot_name}')
 
         robot = self.robots[req.robot_name]
-        frame = req.frame_id or self.planning['default_frame']
 
-        pose = PoseStamped()
-        pose.header.frame_id = frame
-        pose.header.stamp = self.get_clock().now().to_msg()
-        pose.pose.position.x = req.x
-        pose.pose.position.y = req.y
-        pose.pose.position.z = req.z
-        pose.pose.orientation.x = req.qx
-        pose.pose.orientation.y = req.qy
-        pose.pose.orientation.z = req.qz
-        pose.pose.orientation.w = req.qw
+        if target_type == 'pose':
+            pose = self._build_pose(req)
+            self.get_logger().info(
+                f'MoveJ {req.robot_name}: ({req.x:.3f}, {req.y:.3f}, {req.z:.3f})')
+            pilz_req = self._build_request(req.robot_name, robot, 'pilz', 'PTP', pose=pose)
+            ompl_req = self._build_request(req.robot_name, robot, 'ompl', None, pose=pose)
+        else:
+            joints = self._validate_joints(req, result, goal_handle)
+            if joints is None:
+                return result
+            joints = self._normalize_joints(req.robot_name, joints)
+            self.get_logger().info(
+                f'MoveJJoints {req.robot_name}: {[f"{v:.2f}" for v in joints]}')
+            pilz_req = self._build_request(req.robot_name, robot, 'pilz', 'PTP', joints=joints)
+            ompl_req = self._build_request(req.robot_name, robot, 'ompl', None, joints=joints)
 
-        self.get_logger().info(
-            f'MoveJ {req.robot_name}: ({req.x:.3f}, {req.y:.3f}, {req.z:.3f})'
-        )
+        for planner, plan_req in [('Pilz', pilz_req), ('OMPL', ompl_req)]:
+            feedback.status = f'Planning ({planner})...'
+            goal_handle.publish_feedback(feedback)
 
-        # Try Pilz PTP first
-        feedback.status = 'Planning PTP motion (Pilz)...'
-        goal_handle.publish_feedback(feedback)
+            trajectory = await self._try_plan(plan_req)
+            if trajectory:
+                self.get_logger().info(f'{planner} succeeded')
+                return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
 
-        plan_req = self._build_pilz_pose_request(req.robot_name, robot, pose, 'PTP')
-        plan_resp = await self._plan_client.call_async(plan_req)
-        error_code = plan_resp.motion_plan_response.error_code.val
+            self.get_logger().warn(f'{planner} failed: {self._get_error_name(self._last_error)}')
 
-        if error_code == MoveItErrorCodes.SUCCESS:
-            self.get_logger().info('PTP planning succeeded (Pilz)')
-            return await self._execute_trajectory(
-                goal_handle, result, feedback,
-                plan_resp.motion_plan_response.trajectory
-            )
+        return self._abort(goal_handle, result, 'PTP planning failed')
 
-        # Check if we should try OMPL fallback
-        error_name = self._get_error_name(error_code)
-        self.get_logger().warn(f'Pilz PTP failed: {error_name}, trying OMPL...')
-
-        if error_code not in self.RETRYABLE_ERRORS:
-            return self._abort(goal_handle, result, f'PTP planning failed: {error_name}')
-
-        # Fall back to OMPL
-        feedback.status = 'Planning with OMPL (obstacle avoidance)...'
-        goal_handle.publish_feedback(feedback)
-
-        plan_req = self._build_ompl_pose_request(req.robot_name, robot, pose)
-        plan_resp = await self._plan_client.call_async(plan_req)
-        error_code = plan_resp.motion_plan_response.error_code.val
-
-        if error_code != MoveItErrorCodes.SUCCESS:
-            error_name = self._get_error_name(error_code)
-            return self._abort(goal_handle, result, f'OMPL planning failed: {error_name}')
-
-        self.get_logger().info('OMPL planning succeeded')
-        return await self._execute_trajectory(
-            goal_handle, result, feedback,
-            plan_resp.motion_plan_response.trajectory
-        )
-
-    async def _execute_ptp_joints(self, goal_handle, action_type):
-        """Execute PTP motion to joint target with OMPL fallback."""
-        req = goal_handle.request
-        result = action_type.Result()
-        feedback = action_type.Feedback()
-
-        if req.robot_name not in self.robots:
-            return self._abort(goal_handle, result, f'Unknown robot: {req.robot_name}')
-
-        joint_names = self.joint_names[req.robot_name]
-        joint_values = list(req.joint_values)
-
-        if len(joint_values) != len(joint_names):
-            return self._abort(goal_handle, result,
-                f'Expected {len(joint_names)} joints, got {len(joint_values)}')
-
-        # Normalize to shortest path
-        joint_values = self._normalize_joint_target(req.robot_name, joint_values)
-        robot = self.robots[req.robot_name]
-
-        self.get_logger().info(
-            f'MoveJJoints {req.robot_name}: {[f"{v:.2f}" for v in joint_values]}'
-        )
-
-        # Try Pilz PTP first
-        feedback.status = 'Planning PTP motion (Pilz)...'
-        goal_handle.publish_feedback(feedback)
-
-        plan_req = self._build_pilz_joints_request(req.robot_name, robot, joint_names, joint_values, 'PTP')
-        plan_resp = await self._plan_client.call_async(plan_req)
-        error_code = plan_resp.motion_plan_response.error_code.val
-
-        if error_code == MoveItErrorCodes.SUCCESS:
-            self.get_logger().info('PTP planning succeeded (Pilz)')
-            return await self._execute_trajectory(
-                goal_handle, result, feedback,
-                plan_resp.motion_plan_response.trajectory
-            )
-
-        # Check if we should try OMPL fallback
-        error_name = self._get_error_name(error_code)
-        self.get_logger().warn(f'Pilz PTP failed: {error_name}, trying OMPL...')
-
-        if error_code not in self.RETRYABLE_ERRORS:
-            return self._abort(goal_handle, result, f'PTP planning failed: {error_name}')
-
-        # Fall back to OMPL
-        feedback.status = 'Planning with OMPL (obstacle avoidance)...'
-        goal_handle.publish_feedback(feedback)
-
-        plan_req = self._build_ompl_joints_request(req.robot_name, robot, joint_names, joint_values)
-        plan_resp = await self._plan_client.call_async(plan_req)
-        error_code = plan_resp.motion_plan_response.error_code.val
-
-        if error_code != MoveItErrorCodes.SUCCESS:
-            error_name = self._get_error_name(error_code)
-            return self._abort(goal_handle, result, f'OMPL planning failed: {error_name}')
-
-        self.get_logger().info('OMPL planning succeeded')
-        return await self._execute_trajectory(
-            goal_handle, result, feedback,
-            plan_resp.motion_plan_response.trajectory
-        )
-
-    # === LIN Planning (MoveL) with Cartesian Fallback ===
-
-    async def _execute_lin_pose(self, goal_handle, action_type):
-        """Execute LIN motion to pose with Cartesian path fallback."""
+    async def _execute_lin(self, goal_handle, action_type, target_type):
+        """Execute LIN motion with Cartesian fallback."""
         req = goal_handle.request
         result = action_type.Result()
         feedback = action_type.Feedback()
@@ -406,196 +223,194 @@ class PathPlanningActionServer(Node):
             return self._abort(goal_handle, result, f'Unknown robot: {req.robot_name}')
 
         robot = self.robots[req.robot_name]
-        frame = req.frame_id or self.planning['default_frame']
 
-        pose = PoseStamped()
-        pose.header.frame_id = frame
-        pose.header.stamp = self.get_clock().now().to_msg()
-        pose.pose.position.x = req.x
-        pose.pose.position.y = req.y
-        pose.pose.position.z = req.z
-        pose.pose.orientation.x = req.qx
-        pose.pose.orientation.y = req.qy
-        pose.pose.orientation.z = req.qz
-        pose.pose.orientation.w = req.qw
+        if target_type == 'pose':
+            pose = self._build_pose(req)
+            frame = req.frame_id or self.cfg['frame']
+            self.get_logger().info(
+                f'MoveL {req.robot_name}: ({req.x:.3f}, {req.y:.3f}, {req.z:.3f})')
+        else:
+            joints = self._validate_joints(req, result, goal_handle)
+            if joints is None:
+                return result
+            feedback.status = 'Computing FK...'
+            goal_handle.publish_feedback(feedback)
+            target_pose = await self._compute_fk(robot, self.joint_names[req.robot_name], joints)
+            if target_pose is None:
+                return self._abort(goal_handle, result, 'FK computation failed')
+            pose = PoseStamped()
+            pose.header.frame_id = self.cfg['frame']
+            pose.header.stamp = self.get_clock().now().to_msg()
+            pose.pose = target_pose
+            frame = self.cfg['frame']
+            self.get_logger().info(
+                f'MoveLJoints {req.robot_name}: ({target_pose.position.x:.3f}, '
+                f'{target_pose.position.y:.3f}, {target_pose.position.z:.3f})')
 
-        self.get_logger().info(
-            f'MoveL {req.robot_name}: ({req.x:.3f}, {req.y:.3f}, {req.z:.3f})'
-        )
-
-        # Try Pilz LIN first
-        feedback.status = 'Planning LIN motion (Pilz)...'
+        feedback.status = 'Planning LIN (Pilz)...'
         goal_handle.publish_feedback(feedback)
 
-        plan_req = self._build_pilz_pose_request(req.robot_name, robot, pose, 'LIN')
-        plan_resp = await self._plan_client.call_async(plan_req)
-        error_code = plan_resp.motion_plan_response.error_code.val
+        pilz_req = self._build_request(req.robot_name, robot, 'pilz', 'LIN', pose=pose)
+        trajectory = await self._try_plan(pilz_req)
+        if trajectory:
+            self.get_logger().info('Pilz LIN succeeded')
+            return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
 
-        if error_code == MoveItErrorCodes.SUCCESS:
-            self.get_logger().info('LIN planning succeeded (Pilz)')
-            return await self._execute_trajectory(
-                goal_handle, result, feedback,
-                plan_resp.motion_plan_response.trajectory
-            )
-
-        # Fall back to computeCartesianPath
-        error_name = self._get_error_name(error_code)
-        self.get_logger().warn(f'Pilz LIN failed: {error_name}, trying Cartesian path...')
+        self.get_logger().warn(f'Pilz LIN failed: {self._get_error_name(self._last_error)}')
 
         feedback.status = 'Planning Cartesian path...'
         goal_handle.publish_feedback(feedback)
 
-        trajectory = await self._plan_cartesian_path(req.robot_name, robot, pose.pose, frame)
-        if trajectory is None:
-            return self._abort(goal_handle, result, 'Cartesian path planning failed')
+        trajectory = await self._plan_cartesian(req.robot_name, robot, pose.pose, frame)
+        if trajectory:
+            self.get_logger().info('Cartesian path succeeded')
+            return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
 
-        self.get_logger().info('Cartesian path planning succeeded')
-        return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
-
-    async def _execute_lin_joints(self, goal_handle, action_type):
-        """Execute LIN motion to joint target with Cartesian fallback."""
-        req = goal_handle.request
-        result = action_type.Result()
-        feedback = action_type.Feedback()
-
-        if req.robot_name not in self.robots:
-            return self._abort(goal_handle, result, f'Unknown robot: {req.robot_name}')
-
-        joint_names = self.joint_names[req.robot_name]
-        joint_values = list(req.joint_values)
-
-        if len(joint_values) != len(joint_names):
-            return self._abort(goal_handle, result,
-                f'Expected {len(joint_names)} joints, got {len(joint_values)}')
-
-        robot = self.robots[req.robot_name]
-
-        # Compute FK to get target pose
-        feedback.status = 'Computing FK for target...'
+        self.get_logger().warn('Cartesian path failed, trying PTP fallback...')
+        feedback.status = 'Planning PTP fallback...'
         goal_handle.publish_feedback(feedback)
 
-        target_pose = await self._compute_fk(robot, joint_names, joint_values)
-        if target_pose is None:
-            return self._abort(goal_handle, result, 'FK computation failed')
+        # PTP fallback for LIN - use OMPL when linear path is not possible
+        ompl_req = self._build_request(req.robot_name, robot, 'ompl', None, pose=pose)
+        trajectory = await self._try_plan(ompl_req)
+        if trajectory:
+            self.get_logger().info('OMPL PTP fallback succeeded for LIN')
+            return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
 
-        self.get_logger().info(
-            f'MoveLJoints {req.robot_name}: ({target_pose.position.x:.3f}, '
-            f'{target_pose.position.y:.3f}, {target_pose.position.z:.3f})'
-        )
+        return self._abort(goal_handle, result, 'LIN planning failed (all methods)')
 
-        pose = PoseStamped()
-        pose.header.frame_id = self.planning['default_frame']
-        pose.header.stamp = self.get_clock().now().to_msg()
-        pose.pose = target_pose
-
-        # Try Pilz LIN first
-        feedback.status = 'Planning LIN motion (Pilz)...'
-        goal_handle.publish_feedback(feedback)
-
-        plan_req = self._build_pilz_pose_request(req.robot_name, robot, pose, 'LIN')
-        plan_resp = await self._plan_client.call_async(plan_req)
-        error_code = plan_resp.motion_plan_response.error_code.val
-
-        if error_code == MoveItErrorCodes.SUCCESS:
-            self.get_logger().info('LIN planning succeeded (Pilz)')
-            return await self._execute_trajectory(
-                goal_handle, result, feedback,
-                plan_resp.motion_plan_response.trajectory
-            )
-
-        # Fall back to computeCartesianPath
-        error_name = self._get_error_name(error_code)
-        self.get_logger().warn(f'Pilz LIN failed: {error_name}, trying Cartesian path...')
-
-        feedback.status = 'Planning Cartesian path...'
-        goal_handle.publish_feedback(feedback)
-
-        trajectory = await self._plan_cartesian_path(
-            req.robot_name, robot, target_pose, self.planning['default_frame']
-        )
-        if trajectory is None:
-            return self._abort(goal_handle, result, 'Cartesian path planning failed')
-
-        self.get_logger().info('Cartesian path planning succeeded')
-        return await self._execute_trajectory(goal_handle, result, feedback, trajectory)
-
-    # === Helper Planning Methods ===
-
-    async def _plan_cartesian_path(self, robot_name, robot, target_pose, frame):
-        """Plan Cartesian path using computeCartesianPath."""
-        cart_req = GetCartesianPath.Request()
-        cart_req.header.frame_id = frame
-        cart_req.header.stamp = self.get_clock().now().to_msg()
-        cart_req.group_name = robot['group']
-        cart_req.link_name = robot['ee_link']
-        cart_req.waypoints = [target_pose]
-        cart_req.max_step = self.cartesian['max_step']
-        cart_req.jump_threshold = 0.0
-        cart_req.avoid_collisions = True
-        cart_req.start_state = self._get_current_robot_state(robot_name)
-
-        cart_resp = await self._cartesian_client.call_async(cart_req)
-
-        fraction = cart_resp.fraction
-        error_code = cart_resp.error_code.val
-
-        self.get_logger().info(f'Cartesian path: fraction={fraction:.2%}')
-
-        if error_code == MoveItErrorCodes.SUCCESS and fraction >= self.cartesian['min_fraction']:
-            return self._scale_trajectory(cart_resp.solution, 'lin')
-
+    async def _try_plan(self, plan_req):
+        """Try planning, return trajectory or None."""
+        resp = await self._plan_client.call_async(plan_req)
+        self._last_error = resp.motion_plan_response.error_code.val
+        if self._last_error == MoveItErrorCodes.SUCCESS:
+            return resp.motion_plan_response.trajectory
         return None
 
-    def _scale_trajectory(self, trajectory, motion_type):
-        """Scale trajectory velocities."""
-        vel_scale = self.vel_scale.get(motion_type, 0.5)
+    async def _plan_cartesian(self, robot_name, robot, target_pose, frame):
+        """Plan Cartesian path with interpolated waypoints for longer distances."""
+        # First get current end-effector pose to compute distance
+        current_joints = self._get_joint_values(robot_name)
+        current_pose = await self._compute_fk(robot, self.joint_names[robot_name], current_joints)
+        
+        if current_pose is None:
+            self.get_logger().warn('Could not compute current FK for cartesian planning')
+            return await self._plan_cartesian_direct(robot_name, robot, target_pose, frame)
+        
+        # Compute distance
+        dx = target_pose.position.x - current_pose.position.x
+        dy = target_pose.position.y - current_pose.position.y
+        dz = target_pose.position.z - current_pose.position.z
+        distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+        
+        self.get_logger().info(f'Cartesian distance: {distance:.4f}m')
+        
+        # For short distances, use direct planning
+        if distance < 0.05:  # Less than 5cm
+            return await self._plan_cartesian_direct(robot_name, robot, target_pose, frame)
+        
+        # For longer distances, interpolate waypoints
+        num_waypoints = max(2, int(distance / 0.02))  # One waypoint every 2cm
+        waypoints = []
+        
+        for i in range(1, num_waypoints + 1):
+            t = i / num_waypoints
+            wp = Pose()
+            wp.position.x = current_pose.position.x + t * dx
+            wp.position.y = current_pose.position.y + t * dy
+            wp.position.z = current_pose.position.z + t * dz
+            # SLERP for orientation would be better, but linear interpolation for now
+            wp.orientation.x = current_pose.orientation.x + t * (target_pose.orientation.x - current_pose.orientation.x)
+            wp.orientation.y = current_pose.orientation.y + t * (target_pose.orientation.y - current_pose.orientation.y)
+            wp.orientation.z = current_pose.orientation.z + t * (target_pose.orientation.z - current_pose.orientation.z)
+            wp.orientation.w = current_pose.orientation.w + t * (target_pose.orientation.w - current_pose.orientation.w)
+            # Normalize quaternion
+            qnorm = math.sqrt(wp.orientation.x**2 + wp.orientation.y**2 + wp.orientation.z**2 + wp.orientation.w**2)
+            if qnorm > 0:
+                wp.orientation.x /= qnorm
+                wp.orientation.y /= qnorm
+                wp.orientation.z /= qnorm
+                wp.orientation.w /= qnorm
+            waypoints.append(wp)
+        
+        self.get_logger().info(f'Planning cartesian path with {len(waypoints)} waypoints')
+        
+        req = GetCartesianPath.Request()
+        req.header.frame_id = frame
+        req.header.stamp = self.get_clock().now().to_msg()
+        req.group_name = robot['group']
+        req.link_name = robot['ee_link']
+        req.waypoints = waypoints
+        req.max_step = self.cfg['cart_step']
+        req.jump_threshold = 0.0
+        req.avoid_collisions = True
+        req.start_state = self._get_robot_state(robot_name)
+        req.max_velocity_scaling_factor = self.cfg['vel_lin']
+        req.max_acceleration_scaling_factor = self.cfg['acc_lin']
 
-        for point in trajectory.joint_trajectory.points:
-            original_time = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9
-            scaled_time = original_time / vel_scale
-            point.time_from_start.sec = int(scaled_time)
-            point.time_from_start.nanosec = int((scaled_time % 1) * 1e9)
-            point.velocities = [v * vel_scale for v in point.velocities]
-            if point.accelerations:
-                point.accelerations = [a * vel_scale * vel_scale for a in point.accelerations]
+        resp = await self._cart_client.call_async(req)
 
-        return trajectory
+        self.get_logger().info(f'Cartesian path result: {resp.fraction:.1%} achieved, error: {resp.error_code.val}')
+
+        if (resp.error_code.val == MoveItErrorCodes.SUCCESS and
+                resp.fraction >= self.cfg['cart_min_frac']):
+            return resp.solution
+        return None
+
+    async def _plan_cartesian_direct(self, robot_name, robot, target_pose, frame):
+        """Plan direct Cartesian path (single waypoint)."""
+        req = GetCartesianPath.Request()
+        req.header.frame_id = frame
+        req.header.stamp = self.get_clock().now().to_msg()
+        req.group_name = robot['group']
+        req.link_name = robot['ee_link']
+        req.waypoints = [target_pose]
+        req.max_step = self.cfg['cart_step']
+        req.jump_threshold = 0.0
+        req.avoid_collisions = True
+        req.start_state = self._get_robot_state(robot_name)
+        req.max_velocity_scaling_factor = self.cfg['vel_lin']
+        req.max_acceleration_scaling_factor = self.cfg['acc_lin']
+
+        resp = await self._cart_client.call_async(req)
+
+        self.get_logger().info(f'Direct cartesian path: {resp.fraction:.1%} achieved')
+
+        if (resp.error_code.val == MoveItErrorCodes.SUCCESS and
+                resp.fraction >= self.cfg['cart_min_frac']):
+            return resp.solution
+        return None
 
     async def _compute_fk(self, robot, joint_names, joint_values):
         """Compute forward kinematics."""
-        fk_request = GetPositionFK.Request()
-        fk_request.header.frame_id = self.planning['default_frame']
-        fk_request.header.stamp = self.get_clock().now().to_msg()
-        fk_request.fk_link_names = [robot['ee_link']]
-        fk_request.robot_state.joint_state.name = joint_names
-        fk_request.robot_state.joint_state.position = joint_values
+        req = GetPositionFK.Request()
+        req.header.frame_id = self.cfg['frame']
+        req.header.stamp = self.get_clock().now().to_msg()
+        req.fk_link_names = [robot['ee_link']]
+        req.robot_state.joint_state.name = joint_names
+        req.robot_state.joint_state.position = joint_values
 
         try:
-            fk_response = await self._fk_client.call_async(fk_request)
-            if fk_response.error_code.val == MoveItErrorCodes.SUCCESS:
-                return fk_response.pose_stamped[0].pose
-            else:
-                self.get_logger().error(f'FK failed: {fk_response.error_code.val}')
-                return None
+            resp = await self._fk_client.call_async(req)
+            if resp.error_code.val == MoveItErrorCodes.SUCCESS:
+                return resp.pose_stamped[0].pose
         except Exception as e:
-            self.get_logger().error(f'FK service call failed: {e}')
-            return None
-
-    # === Trajectory Execution ===
+            self.get_logger().error(f'FK failed: {e}')
+        return None
 
     async def _execute_trajectory(self, goal_handle, result, feedback, trajectory):
-        """Execute a planned trajectory."""
-        feedback.status = 'Executing trajectory...'
+        """Execute trajectory."""
+        feedback.status = 'Executing...'
         goal_handle.publish_feedback(feedback)
 
-        exec_goal = ExecuteTrajectory.Goal()
-        exec_goal.trajectory = trajectory
+        goal = ExecuteTrajectory.Goal()
+        goal.trajectory = trajectory
 
-        exec_handle = await self._exec_client.send_goal_async(exec_goal)
-        if not exec_handle.accepted:
+        handle = await self._exec_client.send_goal_async(goal)
+        if not handle.accepted:
             return self._abort(goal_handle, result, 'Execution rejected')
 
-        exec_result = await exec_handle.get_result_async()
+        exec_result = await handle.get_result_async()
 
         if exec_result.result.error_code.val == MoveItErrorCodes.SUCCESS:
             result.success = True
@@ -603,199 +418,189 @@ class PathPlanningActionServer(Node):
             goal_handle.succeed()
         else:
             result.success = False
-            error_name = self._get_error_name(exec_result.result.error_code.val)
-            result.message = f'Execution failed: {error_name}'
+            result.message = f'Execution failed: {self._get_error_name(exec_result.result.error_code.val)}'
             goal_handle.abort()
 
         return result
 
-    # === Request Building ===
+    # Request building
 
-    def _build_pilz_pose_request(self, robot_name, robot, pose, planner_id):
-        """Build Pilz request (PTP or LIN) for pose target."""
+    def _build_request(self, robot_name, robot, pipeline, planner_id, pose=None, joints=None):
+        """Build motion plan request."""
         req = GetMotionPlan.Request()
         mp = req.motion_plan_request
-
         mp.group_name = robot['group']
-        mp.pipeline_id = 'pilz_industrial_motion_planner'
-        mp.planner_id = planner_id
-        mp.num_planning_attempts = 1
-        mp.allowed_planning_time = self.planning['allowed_time']
+        mp.start_state = self._get_robot_state(robot_name)
 
-        vel_type = 'ptp' if planner_id == 'PTP' else 'lin'
-        mp.max_velocity_scaling_factor = self.vel_scale[vel_type]
-        mp.max_acceleration_scaling_factor = self.acc_scale[vel_type]
+        if pipeline == 'pilz':
+            mp.pipeline_id = 'pilz_industrial_motion_planner'
+            mp.planner_id = planner_id
+            mp.num_planning_attempts = 1
+            mp.allowed_planning_time = self.cfg['pilz_time']
+            vel_type = 'ptp' if planner_id == 'PTP' else 'lin'
+        else:
+            mp.pipeline_id = 'ompl'
+            mp.planner_id = self.cfg['ompl_planner']
+            mp.num_planning_attempts = self.cfg['ompl_attempts']
+            mp.allowed_planning_time = self.cfg['ompl_time']
+            vel_type = 'ptp'
 
-        mp.start_state = self._get_current_robot_state(robot_name)
+        mp.max_velocity_scaling_factor = self.cfg[f'vel_{vel_type}']
+        mp.max_acceleration_scaling_factor = self.cfg[f'acc_{vel_type}']
 
-        # Position constraint
-        pos_constraint = PositionConstraint()
-        pos_constraint.header = pose.header
-        pos_constraint.link_name = robot['ee_link']
-        pos_constraint.weight = 1.0
+        if pose:
+            mp.goal_constraints.append(self._build_pose_constraints(robot, pose))
+        elif joints:
+            mp.goal_constraints.append(
+                self._build_joint_constraints(self.joint_names[robot_name], joints))
+
+        return req
+
+    def _build_pose_constraints(self, robot, pose):
+        """Build pose constraints."""
+        constraints = Constraints()
+
+        pos = PositionConstraint()
+        pos.header = pose.header
+        pos.link_name = robot['ee_link']
+        pos.weight = 1.0
 
         bv = BoundingVolume()
         sphere = SolidPrimitive()
         sphere.type = SolidPrimitive.SPHERE
-        sphere.dimensions = [self.tolerances['position']]
+        sphere.dimensions = [self.cfg['tol_pos']]
         bv.primitives.append(sphere)
 
         sphere_pose = Pose()
         sphere_pose.position = pose.pose.position
         sphere_pose.orientation.w = 1.0
         bv.primitive_poses.append(sphere_pose)
-        pos_constraint.constraint_region = bv
+        pos.constraint_region = bv
+        constraints.position_constraints.append(pos)
 
-        # Orientation constraint
-        ori_constraint = OrientationConstraint()
-        ori_constraint.header = pose.header
-        ori_constraint.link_name = robot['ee_link']
-        ori_constraint.orientation = pose.pose.orientation
-        ori_constraint.absolute_x_axis_tolerance = self.tolerances['orientation']
-        ori_constraint.absolute_y_axis_tolerance = self.tolerances['orientation']
-        ori_constraint.absolute_z_axis_tolerance = self.tolerances['orientation']
-        ori_constraint.weight = 1.0
+        ori = OrientationConstraint()
+        ori.header = pose.header
+        ori.link_name = robot['ee_link']
+        ori.orientation = pose.pose.orientation
+        ori.absolute_x_axis_tolerance = self.cfg['tol_ori']
+        ori.absolute_y_axis_tolerance = self.cfg['tol_ori']
+        ori.absolute_z_axis_tolerance = self.cfg['tol_ori']
+        ori.weight = 1.0
+        constraints.orientation_constraints.append(ori)
 
-        constraints = Constraints()
-        constraints.position_constraints.append(pos_constraint)
-        constraints.orientation_constraints.append(ori_constraint)
-        mp.goal_constraints.append(constraints)
+        return constraints
 
-        return req
-
-    def _build_pilz_joints_request(self, robot_name, robot, joint_names, joint_values, planner_id):
-        """Build Pilz request (PTP or LIN) for joint target."""
-        req = GetMotionPlan.Request()
-        mp = req.motion_plan_request
-
-        mp.group_name = robot['group']
-        mp.pipeline_id = 'pilz_industrial_motion_planner'
-        mp.planner_id = planner_id
-        mp.num_planning_attempts = 1
-        mp.allowed_planning_time = self.planning['allowed_time']
-
-        vel_type = 'ptp' if planner_id == 'PTP' else 'lin'
-        mp.max_velocity_scaling_factor = self.vel_scale[vel_type]
-        mp.max_acceleration_scaling_factor = self.acc_scale[vel_type]
-
-        mp.start_state = self._get_current_robot_state(robot_name)
-
+    def _build_joint_constraints(self, joint_names, joint_values):
+        """Build joint constraints."""
         constraints = Constraints()
         for name, value in zip(joint_names, joint_values):
             jc = JointConstraint()
             jc.joint_name = name
             jc.position = value
-            jc.tolerance_above = self.tolerances['joint']
-            jc.tolerance_below = self.tolerances['joint']
+            jc.tolerance_above = self.cfg['tol_joint']
+            jc.tolerance_below = self.cfg['tol_joint']
             jc.weight = 1.0
             constraints.joint_constraints.append(jc)
+        return constraints
 
-        mp.goal_constraints.append(constraints)
-        return req
+    # Utilities
 
-    def _build_ompl_pose_request(self, robot_name, robot, pose):
-        """Build OMPL request for pose target (obstacle avoidance)."""
-        req = GetMotionPlan.Request()
-        mp = req.motion_plan_request
+    def _build_pose(self, req):
+        """Build PoseStamped from request."""
+        pose = PoseStamped()
+        pose.header.frame_id = req.frame_id or self.cfg['frame']
+        pose.header.stamp = self.get_clock().now().to_msg()
+        pose.pose.position.x = req.x
+        pose.pose.position.y = req.y
+        pose.pose.position.z = req.z
+        pose.pose.orientation.x = req.qx
+        pose.pose.orientation.y = req.qy
+        pose.pose.orientation.z = req.qz
+        pose.pose.orientation.w = req.qw
+        return pose
 
-        mp.group_name = robot['group']
-        mp.pipeline_id = 'ompl'
-        mp.planner_id = self.ompl['planner_id']
-        mp.num_planning_attempts = self.ompl['num_attempts']
-        mp.allowed_planning_time = self.ompl['allowed_time']
-        mp.max_velocity_scaling_factor = self.vel_scale['ptp']
-        mp.max_acceleration_scaling_factor = self.acc_scale['ptp']
+    def _validate_joints(self, req, result, goal_handle):
+        """Validate joint values count."""
+        joint_names = self.joint_names[req.robot_name]
+        joints = list(req.joint_values)
+        if len(joints) != len(joint_names):
+            self._abort(goal_handle, result,
+                        f'Expected {len(joint_names)} joints, got {len(joints)}')
+            return None
+        return joints
 
-        mp.start_state = self._get_current_robot_state(robot_name)
+    def _normalize_joints(self, robot_name, target):
+        """Normalize continuous joints to shortest path from current position.
 
-        # Position constraint
-        pos_constraint = PositionConstraint()
-        pos_constraint.header = pose.header
-        pos_constraint.link_name = robot['ee_link']
-        pos_constraint.weight = 1.0
+        Uses the raw current state (what the robot reports) as the reference
+        for computing the shortest path to the target.
+        """
+        current = self._get_joint_values(robot_name)  # Use raw values, not normalized
+        normalized = list(target)
 
-        bv = BoundingVolume()
-        sphere = SolidPrimitive()
-        sphere.type = SolidPrimitive.SPHERE
-        sphere.dimensions = [self.tolerances['position']]
-        bv.primitives.append(sphere)
+        for idx in CONTINUOUS_JOINTS:
+            if idx < len(normalized):
+                # Find equivalent target angle closest to current position
+                tgt = target[idx]
+                curr = current[idx]
+                
+                # Bring target to within 2π of current
+                while tgt - curr > math.pi:
+                    tgt -= 2 * math.pi
+                while tgt - curr < -math.pi:
+                    tgt += 2 * math.pi
+                normalized[idx] = tgt
 
-        sphere_pose = Pose()
-        sphere_pose.position = pose.pose.position
-        sphere_pose.orientation.w = 1.0
-        bv.primitive_poses.append(sphere_pose)
-        pos_constraint.constraint_region = bv
+        return normalized
 
-        # Orientation constraint
-        ori_constraint = OrientationConstraint()
-        ori_constraint.header = pose.header
-        ori_constraint.link_name = robot['ee_link']
-        ori_constraint.orientation = pose.pose.orientation
-        ori_constraint.absolute_x_axis_tolerance = self.tolerances['orientation']
-        ori_constraint.absolute_y_axis_tolerance = self.tolerances['orientation']
-        ori_constraint.absolute_z_axis_tolerance = self.tolerances['orientation']
-        ori_constraint.weight = 1.0
+    def _get_joint_values(self, robot_name):
+        """Get current joint values."""
+        return [self._joint_states.get(name, 0.0) for name in self.joint_names[robot_name]]
 
-        constraints = Constraints()
-        constraints.position_constraints.append(pos_constraint)
-        constraints.orientation_constraints.append(ori_constraint)
-        mp.goal_constraints.append(constraints)
+    def _get_robot_state(self, robot_name):
+        """Get robot state for planning - use actual joint values."""
+        state = RobotState()
+        state.joint_state.name = self.joint_names[robot_name]
+        state.joint_state.position = self._get_joint_values(robot_name)  # Raw values, no normalization
+        return state
 
-        return req
+    # Remove _normalize_start_state method entirely - it's no longer needed
 
-    def _build_ompl_joints_request(self, robot_name, robot, joint_names, joint_values):
-        """Build OMPL request for joint target (obstacle avoidance)."""
-        req = GetMotionPlan.Request()
-        mp = req.motion_plan_request
-
-        mp.group_name = robot['group']
-        mp.pipeline_id = 'ompl'
-        mp.planner_id = self.ompl['planner_id']
-        mp.num_planning_attempts = self.ompl['num_attempts']
-        mp.allowed_planning_time = self.ompl['allowed_time']
-        mp.max_velocity_scaling_factor = self.vel_scale['ptp']
-        mp.max_acceleration_scaling_factor = self.acc_scale['ptp']
-
-        mp.start_state = self._get_current_robot_state(robot_name)
-
-        constraints = Constraints()
-        for name, value in zip(joint_names, joint_values):
-            jc = JointConstraint()
-            jc.joint_name = name
-            jc.position = value
-            jc.tolerance_above = self.tolerances['joint']
-            jc.tolerance_below = self.tolerances['joint']
-            jc.weight = 1.0
-            constraints.joint_constraints.append(jc)
-
-        mp.goal_constraints.append(constraints)
-        return req
-
-    # === Helpers ===
+    def _scale_trajectory(self, trajectory, motion_type):
+        """Scale trajectory velocities and accelerations.
+        
+        Note: This is only used when the planner doesn't support scaling factors directly.
+        For most cases, use the scaling factors in the planning request instead.
+        """
+        vel_scale = self.cfg[f'vel_{motion_type}']
+        acc_scale = self.cfg[f'acc_{motion_type}']
+        
+        for pt in trajectory.joint_trajectory.points:
+            # Scale time (slower = longer time)
+            t = pt.time_from_start.sec + pt.time_from_start.nanosec * 1e-9
+            t_scaled = t / vel_scale
+            pt.time_from_start.sec = int(t_scaled)
+            pt.time_from_start.nanosec = int((t_scaled % 1) * 1e9)
+            
+            # Scale velocities
+            pt.velocities = [v * vel_scale for v in pt.velocities]
+            
+            # Scale accelerations using acceleration scaling factor
+            if pt.accelerations:
+                pt.accelerations = [a * acc_scale for a in pt.accelerations]
+        return trajectory
 
     def _abort(self, goal_handle, result, message):
-        """Abort action with error message."""
+        """Abort action with error."""
         self.get_logger().error(message)
         result.success = False
         result.message = message
         goal_handle.abort()
         return result
 
-    def _get_error_name(self, error_code):
-        """Convert MoveIt error code to name."""
-        error_names = {
-            MoveItErrorCodes.SUCCESS: 'SUCCESS',
-            MoveItErrorCodes.FAILURE: 'FAILURE',
-            MoveItErrorCodes.PLANNING_FAILED: 'PLANNING_FAILED',
-            MoveItErrorCodes.INVALID_MOTION_PLAN: 'INVALID_MOTION_PLAN',
-            MoveItErrorCodes.CONTROL_FAILED: 'CONTROL_FAILED',
-            MoveItErrorCodes.TIMED_OUT: 'TIMED_OUT',
-            MoveItErrorCodes.START_STATE_IN_COLLISION: 'START_STATE_IN_COLLISION',
-            MoveItErrorCodes.GOAL_IN_COLLISION: 'GOAL_IN_COLLISION',
-            MoveItErrorCodes.NO_IK_SOLUTION: 'NO_IK_SOLUTION',
-            MoveItErrorCodes.INVALID_GROUP_NAME: 'INVALID_GROUP_NAME',
-        }
-        return error_names.get(error_code, f'UNKNOWN_{error_code}')
+    def _get_error_name(self, code):
+        """Get error name from code."""
+        return ERROR_NAMES.get(code, f'UNKNOWN_{code}')
 
 
 def main(args=None):

@@ -1,0 +1,17 @@
+# Robot Hardware Configuration
+
+robot1:
+  robot_ip: "192.168.0.51"
+
+robot2:
+  robot_ip: "192.168.0.11"
+  # Position relative to world frame
+  position:
+    x: -0.77
+    y: 0.655
+    z: 0.0
+  # Orientation in radians
+  orientation:
+    roll: 0.0
+    pitch: 0.0
+    yaw: 3.141592  # 180 degrees - facing opposite direction

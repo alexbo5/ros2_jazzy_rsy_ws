@@ -136,36 +136,72 @@ class GripperActionServer(Node):
         return response
 
     def _execute_gripper_command(self, sock, position, action_name, response):
-        """Execute a gripper position command."""
+        """Execute a gripper position command and wait for completion."""
         try:
             # Send position command
             command = f'SET POS {position}\n'.encode()
             sock.sendall(command)
             sock.recv(2**10)  # Acknowledge
 
-            # Wait for gripper to move
-            time.sleep(1.0)
+            # Poll gripper position until it stops moving or timeout
+            max_wait_time = 5.0  # Maximum time to wait for gripper movement
+            poll_interval = 0.1  # Time between position checks
+            elapsed_time = 0.0
+            last_position = -1
+            stable_count = 0
+            stable_threshold = 5  # Number of consecutive stable readings to confirm completion
 
-            # Query current position
+            while elapsed_time < max_wait_time:
+                time.sleep(poll_interval)
+                elapsed_time += poll_interval
+
+                # Query current position
+                sock.sendall(b'GET POS\n')
+                data = sock.recv(2**10)
+
+                # Parse position from response
+                match = re.search(r'\d+', data.decode())
+                if not match:
+                    continue
+
+                gripper_pos = int(match.group())
+
+                # Check if gripper has stopped moving
+                if gripper_pos == last_position:
+                    stable_count += 1
+                    if stable_count >= stable_threshold:
+                        # Gripper stopped moving - movement completed
+                        percentage = round((float(gripper_pos) / 255.0) * 100.0, 2)
+                        response.success = True
+                        response.value = gripper_pos
+                        response.average = percentage
+                        response.message = (
+                            f'{action_name} command completed. '
+                            f'Gripper is {percentage}% closed (raw: {gripper_pos}/255)'
+                        )
+                        self.get_logger().info(response.message)
+                        return response
+                else:
+                    stable_count = 0
+                    last_position = gripper_pos
+
+            # Timeout reached - report final position
             sock.sendall(b'GET POS\n')
             data = sock.recv(2**10)
-
-            # Parse position from response
             match = re.search(r'\d+', data.decode())
             if match:
                 gripper_pos = int(match.group())
                 percentage = round((float(gripper_pos) / 255.0) * 100.0, 2)
-
-                response.success = True
+                response.success = True  # Still consider success if we got a valid position
                 response.value = gripper_pos
                 response.average = percentage
                 response.message = (
-                    f'{action_name} command executed successfully. '
+                    f'{action_name} command timed out but gripper responded. '
                     f'Gripper is {percentage}% closed (raw: {gripper_pos}/255)'
                 )
-                self.get_logger().info(response.message)
+                self.get_logger().warn(response.message)
             else:
-                response.message = f'ERROR: Could not parse gripper position from response: {data}'
+                response.message = f'ERROR: Timeout waiting for gripper to stop moving'
                 self.get_logger().error(response.message)
 
         except socket.timeout:
