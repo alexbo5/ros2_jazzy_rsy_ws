@@ -29,8 +29,25 @@ except Exception as e:
         "Make sure ScanCubeFace.action, CalibrateCamera.action, and SolveCube.srv exist and package is built."
     )
 
-# Calibration data file location
-CALIBRATION_FILE = Path.home() / ".ros" / "cube_perception_calibration.json"
+# Calibration data file location - prefer package config directory
+def get_calibration_file_path() -> Path:
+    """Get calibration file path, preferring package config directory."""
+    # Try package config directory first
+    package_config = Path("/root/ros2_ws/src/rsy_cube_perception/config/cube_perception_calibration.json")
+    if package_config.parent.exists() or _try_create_dir(package_config.parent):
+        return package_config
+    # Fallback to home .ros directory
+    return Path.home() / ".ros" / "cube_perception_calibration.json"
+
+
+def _try_create_dir(path: Path) -> bool:
+    """Try to create directory, return True if successful."""
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        return True
+    except Exception:
+        return False
+
 
 FACE_ORDER = ["U", "R", "F", "D", "L", "B"]
 
@@ -63,6 +80,17 @@ COLOR_RANGES = {
     "orange": ((10, 120, 100), (20, 255, 255)),
     "green": ((40, 70, 70), (85, 255, 255)),
     "blue": ((90, 70, 70), (130, 255, 255)),
+}
+
+# Color to BGR mapping for visualization
+COLOR_BGR = {
+    "white": (255, 255, 255),
+    "yellow": (0, 255, 255),
+    "red": (0, 0, 255),
+    "orange": (0, 165, 255),
+    "green": (0, 255, 0),
+    "blue": (255, 0, 0),
+    "unknown": (128, 128, 128),
 }
 
 MOVE_DESCRIPTIONS = {
@@ -135,15 +163,17 @@ def rotate_facelets_counterclockwise(colors: List[str], angle_degrees: int) -> L
 
 def ensure_calibration_dir():
     """Ensure calibration directory exists."""
-    CALIBRATION_FILE.parent.mkdir(parents=True, exist_ok=True)
+    cal_file = get_calibration_file_path()
+    cal_file.parent.mkdir(parents=True, exist_ok=True)
 
 
 def load_calibration() -> Dict:
     """Load calibration data from file."""
     ensure_calibration_dir()
-    if CALIBRATION_FILE.exists():
+    cal_file = get_calibration_file_path()
+    if cal_file.exists():
         try:
-            with open(CALIBRATION_FILE, 'r') as f:
+            with open(cal_file, 'r') as f:
                 return json.load(f)
         except Exception:
             pass
@@ -153,7 +183,8 @@ def load_calibration() -> Dict:
 def save_calibration(data: Dict):
     """Save calibration data to file."""
     ensure_calibration_dir()
-    with open(CALIBRATION_FILE, 'w') as f:
+    cal_file = get_calibration_file_path()
+    with open(cal_file, 'w') as f:
         json.dump(data, f, indent=2)
 
 
@@ -211,7 +242,6 @@ class CubePerceptionServer(Node):
     def execute_scan_cube_face(self, goal_handle):
         """Execute ScanCubeFace action."""
         face = goal_handle.request.cube_face
-        camera_index = goal_handle.request.camera_index if goal_handle.request.camera_index >= 0 else self.camera_index
 
         self.get_logger().info(f"ScanCubeFace goal received: face={face}")
 
@@ -230,7 +260,7 @@ class CubePerceptionServer(Node):
             return self._execute_mock_scan_face(goal_handle, face, feedback_msg, result)
 
         # Real hardware - use camera
-        return self._execute_real_scan_face(goal_handle, face, camera_index, feedback_msg, result)
+        return self._execute_real_scan_face(goal_handle, face, self.camera_index, feedback_msg, result)
 
     def _execute_mock_scan_face(self, goal_handle, face, feedback_msg, result):
         """Execute mock face scan without camera."""
@@ -288,7 +318,7 @@ class CubePerceptionServer(Node):
                 show_preview = False
 
         try:
-            max_wait_s = 20.0
+            max_wait_s = 200.0
             start_t = time.time()
             colors = None
 
@@ -362,12 +392,11 @@ class CubePerceptionServer(Node):
             goal_handle.succeed()
             return result
 
-        camera_index = goal_handle.request.camera_index if goal_handle.request.camera_index >= 0 else self.camera_index
-        cap = cv2.VideoCapture(camera_index)
+        cap = cv2.VideoCapture(self.camera_index)
 
         if not cap.isOpened():
             result.success = False
-            result.message = f"Camera index {camera_index} not available"
+            result.message = f"Camera index {self.camera_index} not available"
             goal_handle.abort()
             return result
 
@@ -394,7 +423,7 @@ class CubePerceptionServer(Node):
                 return result
 
             cal = load_calibration()
-            cal[str(camera_index)] = calibration_data
+            cal[str(self.camera_index)] = calibration_data
             save_calibration(cal)
 
             result.success = True
@@ -422,30 +451,90 @@ class CubePerceptionServer(Node):
         selection = {
             'start': None,
             'end': None,
-            'complete': False
+            'drawing': False,
+            'complete': False,
+            'confirmed': False
         }
 
         def mouse_callback(event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN:
                 selection['start'] = (x, y)
+                selection['end'] = None
+                selection['drawing'] = True
+                selection['complete'] = False
+            elif event == cv2.EVENT_MOUSEMOVE and selection['drawing']:
+                selection['end'] = (x, y)
             elif event == cv2.EVENT_LBUTTONUP:
                 selection['end'] = (x, y)
+                selection['drawing'] = False
                 selection['complete'] = True
 
         cv2.namedWindow(window_title, cv2.WINDOW_NORMAL)
         cv2.setMouseCallback(window_title, mouse_callback)
 
-        while not selection['complete']:
+        instructions_select = "Draw rectangle around cube. ESC=Cancel"
+        instructions_confirm = "Press ENTER/C=Confirm, R=Redraw, ESC=Cancel"
+
+        while not selection['confirmed']:
             display = frame.copy()
-            if selection['start']:
+            
+            # Draw selection rectangle if exists
+            if selection['start'] and selection['end']:
+                cv2.rectangle(display, selection['start'], selection['end'], (0, 255, 0), 2)
+            elif selection['start']:
                 cv2.circle(display, selection['start'], 5, (0, 255, 0), -1)
-                if selection['end']:
-                    cv2.rectangle(display, selection['start'], selection['end'], (0, 255, 0), 2)
+
+            # Show appropriate instructions
+            if selection['complete']:
+                instructions = instructions_confirm
+                # Draw 3x3 grid preview on selected region
+                x1, y1 = selection['start']
+                x2, y2 = selection['end']
+                x_min, x_max = min(x1, x2), max(x1, x2)
+                y_min, y_max = min(y1, y2), max(y1, y2)
+                size = max(x_max - x_min, y_max - y_min)
+                cell = size // 3
+                
+                # Draw grid lines
+                for i in range(1, 3):
+                    x = x_min + i * cell
+                    cv2.line(display, (x, y_min), (x, y_min + size), (0, 255, 0), 1)
+                    y = y_min + i * cell
+                    cv2.line(display, (x_min, y), (x_min + size, y), (0, 255, 0), 1)
+                
+                # Draw sample points
+                for row in range(3):
+                    for col in range(3):
+                        cx = x_min + col * cell + cell // 2
+                        cy = y_min + row * cell + cell // 2
+                        cv2.circle(display, (cx, cy), 4, (0, 255, 255), -1)
+            else:
+                instructions = instructions_select
+
+            # Draw instruction text with background
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.6
+            thickness = 1
+            text_size = cv2.getTextSize(instructions, font, font_scale, thickness)[0]
+            text_x, text_y = 10, 25
+            cv2.rectangle(display, (text_x - 5, text_y - text_size[1] - 5),
+                         (text_x + text_size[0] + 5, text_y + 5), (0, 0, 0), -1)
+            cv2.putText(display, instructions, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
 
             cv2.imshow(window_title, display)
-            key = cv2.waitKey(1) & 0xFF
+            key = cv2.waitKey(30) & 0xFF
+            
             if key == 27:  # ESC to cancel
+                cv2.destroyWindow(window_title)
                 return None
+            elif selection['complete'] and key in [13, ord('c'), ord('C')]:  # Enter or C to confirm
+                selection['confirmed'] = True
+            elif selection['complete'] and key in [ord('r'), ord('R')]:  # R to redraw
+                selection['start'] = None
+                selection['end'] = None
+                selection['complete'] = False
+
+        cv2.destroyWindow(window_title)
 
         x1, y1 = selection['start']
         x2, y2 = selection['end']
@@ -592,6 +681,7 @@ class CubePerceptionServer(Node):
             hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
             colors = []
+            color_positions = []  # Store positions for preview
             ok = True
 
             for row in range(3):
@@ -612,6 +702,7 @@ class CubePerceptionServer(Node):
                     mean = sample.reshape(-1, 3).mean(axis=0)
                     color_name = classify_color(mean.astype(np.uint8))
                     colors.append(color_name)
+                    color_positions.append((cx, cy, color_name))
 
                 if not ok:
                     break
@@ -630,11 +721,35 @@ class CubePerceptionServer(Node):
                         cv2.line(overlay, (x, y0), (x, y0 + face_size), (0, 255, 0), 1)
                         y = y0 + i * cell
                         cv2.line(overlay, (x0, y), (x0 + face_size, y), (0, 255, 0), 1)
-                    for row in range(3):
-                        for col in range(3):
-                            cx = x0 + col * cell + cell // 2
-                            cy = y0 + row * cell + cell // 2
-                            cv2.circle(overlay, (cx, cy), 4, (0, 255, 255), -1)
+                    
+                    # Draw sample points with detected colors
+                    for cx, cy, color_name in color_positions:
+                        # Draw colored circle for the detected color
+                        bgr_color = COLOR_BGR.get(color_name, (128, 128, 128))
+                        cv2.circle(overlay, (cx, cy), 12, bgr_color, -1)
+                        cv2.circle(overlay, (cx, cy), 12, (0, 0, 0), 2)  # Black border
+                        
+                        # Draw color name label
+                        label = color_name[:3].upper()  # Shortened: WHI, YEL, RED, etc.
+                        font = cv2.FONT_HERSHEY_SIMPLEX
+                        font_scale = 0.4
+                        thickness = 1
+                        text_size = cv2.getTextSize(label, font, font_scale, thickness)[0]
+                        text_x = cx - text_size[0] // 2
+                        text_y = cy + cell // 2 - 5
+                        
+                        # Background for text
+                        cv2.rectangle(overlay, 
+                                     (text_x - 2, text_y - text_size[1] - 2),
+                                     (text_x + text_size[0] + 2, text_y + 2),
+                                     (0, 0, 0), -1)
+                        cv2.putText(overlay, label, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
+                    
+                    # Show progress info
+                    progress_text = f"Frames: {len(collected)}/{sample_frames}"
+                    cv2.rectangle(overlay, (5, 5), (150, 30), (0, 0, 0), -1)
+                    cv2.putText(overlay, progress_text, (10, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    
                     cv2.imshow(preview_window, overlay)
                     cv2.waitKey(1)
                 except Exception:
