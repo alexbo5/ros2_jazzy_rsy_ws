@@ -1,5 +1,4 @@
 # Goal: keine zusätzlichen Parameter (optional: camera_index, retries, timeout_ms)
-int32 camera_index
 ---
 # Result
 string solution   # den vom Solver zurückgegebenen Zugfolgen-String (z.B. "R U R'")

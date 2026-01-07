@@ -1,8 +1,8 @@
 # Cube Perception Configuration
 
 camera:
-  index: 0
-  show_preview: true
+  index: 4
+  show_preview: false
 
 mock:
   # Kociemba solution to return when use_mock_hardware is true
