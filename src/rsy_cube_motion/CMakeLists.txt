@@ -31,12 +31,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/PresentCubeFace.action"
 )
 
-# Install Python modules to the same location as rosidl-generated Python files
-install(FILES
-  rsy_cube_motion/logging_utils.py
-  DESTINATION "lib/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages/${PROJECT_NAME}"
-)
-
 install(PROGRAMS
   rsy_cube_motion/cube_motion_server.py
   DESTINATION lib/${PROJECT_NAME}

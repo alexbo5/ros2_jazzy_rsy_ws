@@ -6,9 +6,6 @@ namespace rsy_mtc_planning
 MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   : Node("motion_sequence_server", options)
 {
-  // Initialize planning logger
-  logger_ = std::make_unique<PlanningLogger>(get_logger());
-
   // Create action server
   action_server_ = rclcpp_action::create_server<ExecuteMotionSequence>(
     this,
@@ -21,7 +18,7 @@ MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   robot1_gripper_client_ = this->create_client<RobotiqGripper>("robot1_robotiq_gripper");
   robot2_gripper_client_ = this->create_client<RobotiqGripper>("robot2_robotiq_gripper");
 
-  RCLCPP_INFO(get_logger(), "Motion Sequence Server ready (logs: %s)", logger_->getLogFilePath().c_str());
+  RCLCPP_INFO(get_logger(), "Motion Sequence Server ready");
 }
 
 MotionSequenceServer::~MotionSequenceServer()
@@ -39,7 +36,7 @@ rclcpp_action::GoalResponse MotionSequenceServer::handle_goal(
   std::shared_ptr<const ExecuteMotionSequence::Goal> goal)
 {
   (void)uuid;
-  logger_->debug("Received motion sequence with " + std::to_string(goal->motion_steps.size()) + " steps");
+  RCLCPP_DEBUG(get_logger(), "Received motion sequence with %zu steps", goal->motion_steps.size());
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
@@ -47,7 +44,7 @@ rclcpp_action::CancelResponse MotionSequenceServer::handle_cancel(
   const std::shared_ptr<GoalHandleExecuteMotionSequence> goal_handle)
 {
   (void)goal_handle;
-  logger_->warn("Cancel request received");
+  RCLCPP_WARN(get_logger(), "Cancel request received");
   return rclcpp_action::CancelResponse::ACCEPT;
 }
 
@@ -82,7 +79,7 @@ void MotionSequenceServer::process_motion_sequence(
     }
     catch (const std::exception& e)
     {
-      logger_->error("Failed to initialize task builder: " + std::string(e.what()));
+      RCLCPP_ERROR(get_logger(), "Failed to initialize task builder: %s", e.what());
       result->success = false;
       result->message = "Failed to initialize task builder";
       goal_handle->abort(result);
@@ -115,7 +112,7 @@ void MotionSequenceServer::process_motion_sequence(
   if (all_motion_steps.empty())
   {
     // Only gripper operations, execute them directly
-    logger_->debug("No motion steps, executing " + std::to_string(gripper_operations.size()) + " gripper ops only");
+    RCLCPP_DEBUG(get_logger(), "No motion steps, executing %zu gripper ops only", gripper_operations.size());
     for (const auto& [idx, gripper_step] : gripper_operations)
     {
       if (!execute_gripper_action(gripper_step.robot_name,
@@ -136,7 +133,7 @@ void MotionSequenceServer::process_motion_sequence(
   }
 
   // Start planning session logging
-  logger_->startPlanningSession(all_motion_steps.size(), gripper_operations.size());
+  RCLCPP_INFO(get_logger(), "Planning %zu motion steps...", all_motion_steps.size());
 
   // Update feedback
   feedback->current_step = 0;
@@ -166,7 +163,7 @@ void MotionSequenceServer::process_motion_sequence(
 
       if (ik_data.ik_solutions.empty())
       {
-        logger_->warn("No IK for step " + std::to_string(i) + " (" + step.robot_name + "), using pose goal");
+        RCLCPP_WARN(get_logger(), "No IK for step %zu (%s), using pose goal", i, step.robot_name.c_str());
       }
 
       movej_ik_data.push_back(ik_data);
@@ -184,7 +181,7 @@ void MotionSequenceServer::process_motion_sequence(
   }
 
   // Log IK computation summary
-  logger_->logIKComputation(movej_ik_data.size(), total_combinations, ik_counts);
+  RCLCPP_INFO(get_logger(), "IK: %zu MoveJ steps, %zu combinations", movej_ik_data.size(), total_combinations);
 
   // Update feedback
   feedback->status = "Exploring IK combinations with backtracking";
@@ -209,7 +206,7 @@ void MotionSequenceServer::process_motion_sequence(
       std::min(total_combinations, static_cast<size_t>(1000)) :
       std::min(total_combinations, static_cast<size_t>(500));
 
-    logger_->logPhaseStart(phase, planner_name, phase_max);
+    RCLCPP_INFO(get_logger(), "Phase %d: %s (max %zu)", phase, planner_name.c_str(), phase_max);
 
     // Reset IK indices for this phase
     std::vector<size_t> current_ik_indices(movej_ik_data.size(), 0);
@@ -219,7 +216,7 @@ void MotionSequenceServer::process_motion_sequence(
     {
       if (goal_handle->is_canceling())
       {
-        logger_->warn("Planning canceled by user");
+        RCLCPP_WARN(get_logger(), "Planning canceled by user");
         result->success = false;
         result->message = "Canceled";
         goal_handle->canceled(result);
@@ -238,9 +235,11 @@ void MotionSequenceServer::process_motion_sequence(
         }
       }
 
-      // Log progress (to file every attempt, to terminal every 100)
-      bool log_terminal = (combinations_tried == 1 || combinations_tried % 100 == 0);
-      logger_->logAttempt(combinations_tried, current_ik_indices, log_terminal);
+      // Log progress every 100 attempts
+      if (combinations_tried == 1 || combinations_tried % 100 == 0)
+      {
+        RCLCPP_INFO(get_logger(), "[%s] %zu/%zu", planner_name.c_str(), combinations_tried, total_combinations);
+      }
 
       try
       {
@@ -254,12 +253,12 @@ void MotionSequenceServer::process_motion_sequence(
           planning_succeeded = true;
           successful_task = std::move(task);
           success_ik_indices = current_ik_indices;
-          logger_->logSuccess(planner_name, combinations_tried, current_ik_indices);
+          RCLCPP_INFO(get_logger(), "SUCCESS: %s @ #%zu", planner_name.c_str(), combinations_tried);
         }
       }
       catch (const std::exception& e)
       {
-        logger_->logAttemptFailed(combinations_tried, e.what());
+        RCLCPP_DEBUG(get_logger(), "Attempt %zu failed: %s", combinations_tried, e.what());
       }
 
       if (!planning_succeeded)
@@ -285,7 +284,7 @@ void MotionSequenceServer::process_motion_sequence(
         // If we've wrapped around completely, we're done with this phase
         if (carry)
         {
-          logger_->logPhaseExhausted(phase, combinations_tried);
+          RCLCPP_INFO(get_logger(), "Phase %d exhausted after %zu attempts", phase, combinations_tried);
           break;
         }
       }
@@ -294,7 +293,7 @@ void MotionSequenceServer::process_motion_sequence(
 
   if (!planning_succeeded)
   {
-    logger_->logFailure();
+    RCLCPP_ERROR(get_logger(), "Planning failed after exhausting all combinations");
     result->success = false;
     result->message = "Planning failed: no IK combination allows feasible paths";
     result->failed_step_index = 0;
@@ -306,13 +305,13 @@ void MotionSequenceServer::process_motion_sequence(
   size_t num_trajectories = task_builder_->getNumSubTrajectories(successful_task);
   size_t gripper_op_idx = 0;
 
-  logger_->logExecutionStart(num_trajectories, gripper_operations.size());
+  RCLCPP_INFO(get_logger(), "Executing: %zu trajectories, %zu gripper ops", num_trajectories, gripper_operations.size());
 
   for (size_t traj_idx = 0; traj_idx < num_trajectories; ++traj_idx)
   {
     if (goal_handle->is_canceling())
     {
-      logger_->warn("Execution canceled by user");
+      RCLCPP_WARN(get_logger(), "Execution canceled by user");
       result->success = false;
       result->message = "Canceled";
       goal_handle->canceled(result);
@@ -326,11 +325,12 @@ void MotionSequenceServer::process_motion_sequence(
       const auto& gripper_step = gripper_operations[gripper_op_idx].second;
       bool is_open = gripper_step.motion_type == MotionStep::GRIPPER_OPEN;
       bool success = execute_gripper_action(gripper_step.robot_name, is_open);
-      logger_->logGripperOp(gripper_step.robot_name, is_open ? "open" : "close", success);
+      RCLCPP_DEBUG(get_logger(), "Gripper %s %s: %s", gripper_step.robot_name.c_str(),
+                   is_open ? "open" : "close", success ? "OK" : "FAILED");
 
       if (!success)
       {
-        logger_->error("Gripper failed before trajectory " + std::to_string(traj_idx));
+        RCLCPP_ERROR(get_logger(), "Gripper failed before trajectory %zu", traj_idx);
         result->success = false;
         result->message = "Gripper operation failed before trajectory " + std::to_string(traj_idx);
         result->failed_step_index = static_cast<int32_t>(traj_idx);
@@ -342,11 +342,11 @@ void MotionSequenceServer::process_motion_sequence(
 
     // Execute this sub-trajectory
     bool traj_success = task_builder_->executeSubTrajectory(successful_task, traj_idx);
-    logger_->logTrajectoryExecution(traj_idx, num_trajectories, traj_success);
+    RCLCPP_DEBUG(get_logger(), "Trajectory %zu/%zu: %s", traj_idx + 1, num_trajectories, traj_success ? "OK" : "FAILED");
 
     if (!traj_success)
     {
-      logger_->error("Trajectory " + std::to_string(traj_idx) + " execution failed");
+      RCLCPP_ERROR(get_logger(), "Trajectory %zu execution failed", traj_idx);
       result->success = false;
       result->message = "Trajectory execution failed at index " + std::to_string(traj_idx);
       result->failed_step_index = static_cast<int32_t>(traj_idx);
@@ -361,11 +361,12 @@ void MotionSequenceServer::process_motion_sequence(
     const auto& gripper_step = gripper_operations[gripper_op_idx].second;
     bool is_open = gripper_step.motion_type == MotionStep::GRIPPER_OPEN;
     bool success = execute_gripper_action(gripper_step.robot_name, is_open);
-    logger_->logGripperOp(gripper_step.robot_name, is_open ? "open" : "close", success);
+    RCLCPP_DEBUG(get_logger(), "Gripper %s %s: %s", gripper_step.robot_name.c_str(),
+                 is_open ? "open" : "close", success ? "OK" : "FAILED");
 
     if (!success)
     {
-      logger_->error("Gripper failed after all trajectories");
+      RCLCPP_ERROR(get_logger(), "Gripper failed after all trajectories");
       result->success = false;
       result->message = "Gripper operation failed after trajectories";
       result->failed_step_index = static_cast<int32_t>(goal->motion_steps.size() - 1);
@@ -383,7 +384,7 @@ void MotionSequenceServer::process_motion_sequence(
 
 bool MotionSequenceServer::execute_motion_step(const MotionStep& step)
 {
-  logger_->debug("Executing step: type=" + std::to_string(step.motion_type) + ", robot=" + step.robot_name);
+  RCLCPP_DEBUG(get_logger(), "Executing step: type=%d, robot=%s", step.motion_type, step.robot_name.c_str());
 
   // Handle gripper operations directly
   if (step.motion_type == MotionStep::GRIPPER_OPEN)
@@ -404,14 +405,14 @@ bool MotionSequenceServer::execute_motion_step(const MotionStep& step)
 
     if (!task_builder_->planTask(task, 1))
     {
-      logger_->error("Planning failed for single motion step");
+      RCLCPP_ERROR(get_logger(), "Planning failed for single motion step");
       return false;
     }
 
     // Use direct execution to bypass buggy MTC execute_task_solution action
     if (!task_builder_->executeTaskDirect(task))
     {
-      logger_->error("Execution failed for single motion step");
+      RCLCPP_ERROR(get_logger(), "Execution failed for single motion step");
       return false;
     }
 
@@ -419,7 +420,7 @@ bool MotionSequenceServer::execute_motion_step(const MotionStep& step)
   }
   catch (const std::exception& e)
   {
-    logger_->error("Exception during motion step: " + std::string(e.what()));
+    RCLCPP_ERROR(get_logger(), "Exception during motion step: %s", e.what());
     return false;
   }
 }
@@ -431,27 +432,27 @@ bool MotionSequenceServer::execute_gripper_action(const std::string& robot_name,
 
   if (!client->wait_for_service(std::chrono::seconds(5)))
   {
-    logger_->error("Gripper service not available: " + robot_name);
+    RCLCPP_ERROR(get_logger(), "Gripper service not available: %s", robot_name.c_str());
     return false;
   }
 
   auto request = std::make_shared<RobotiqGripper::Request>();
   request->action = action;
 
-  logger_->debug("Gripper " + robot_name + " " + action);
+  RCLCPP_DEBUG(get_logger(), "Gripper %s %s", robot_name.c_str(), action.c_str());
 
   auto future = client->async_send_request(request);
 
   if (future.wait_for(std::chrono::seconds(30)) != std::future_status::ready)
   {
-    logger_->error("Gripper timeout: " + robot_name);
+    RCLCPP_ERROR(get_logger(), "Gripper timeout: %s", robot_name.c_str());
     return false;
   }
 
   auto result = future.get();
   if (!result->success)
   {
-    logger_->error("Gripper failed " + robot_name + ": " + result->message);
+    RCLCPP_ERROR(get_logger(), "Gripper failed %s: %s", robot_name.c_str(), result->message.c_str());
     return false;
   }
 

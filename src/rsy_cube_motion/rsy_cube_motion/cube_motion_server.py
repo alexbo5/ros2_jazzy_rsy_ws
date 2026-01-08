@@ -9,7 +9,6 @@ from rsy_cube_motion.action import RotateFace, HandOver, TakeUpCube, PutDownCube
 from rsy_mtc_planning.action import ExecuteMotionSequence
 from rsy_mtc_planning.msg import MotionStep
 from geometry_msgs.msg import PoseStamped
-from rsy_cube_motion.logging_utils import CubeMotionLogger
 
 # Roboter 1 dreht U, F, D; Roboter 2 dreht L, B, R
 ROBOT_FACES = ["U", "F", "D"], ["L", "B", "R"]
@@ -277,9 +276,7 @@ class CubeMotionServer(Node):
         # MTC motion sequence action client
         self.mtc_client = ActionClient(self, ExecuteMotionSequence, 'execute_motion_sequence')
 
-        # Initialize logger
-        self.logger = CubeMotionLogger(self.get_logger())
-        self.get_logger().info(f"Cube Motion Server ready (logs: {self.logger.get_log_file_path()})")
+        self.get_logger().info("Cube Motion Server ready")
 
     def _init_cube_poses(self):
         """Initialize cube poses for each accessible face.
@@ -549,7 +546,7 @@ class CubeMotionServer(Node):
             True if execution succeeded, False otherwise
         """
         if not self.mtc_client.wait_for_server(timeout_sec=10.0):
-            self.logger.error("MTC action server not available")
+            self.get_logger().error("MTC action server not available")
             return False
 
         goal = ExecuteMotionSequence.Goal()
@@ -557,23 +554,23 @@ class CubeMotionServer(Node):
         goal.max_planning_attempts = max_attempts
         goal.validate_only = False
 
-        self.logger.mtc_start(len(steps))
+        self.get_logger().debug(f"MTC sequence: {len(steps)} steps")
 
         goal_handle = await self.mtc_client.send_goal_async(goal)
         if not goal_handle.accepted:
-            self.logger.error("MTC goal rejected")
+            self.get_logger().error("MTC goal rejected")
             return False
 
         result = await goal_handle.get_result_async()
 
         if result.result.success:
-            self.logger.mtc_result(True, result.result.message)
+            self.get_logger().debug(f"MTC result: OK - {result.result.message}")
             return True
         else:
             msg = result.result.message
             if result.result.failed_step_index >= 0:
                 msg += f" (step {result.result.failed_step_index})"
-            self.logger.mtc_result(False, msg)
+            self.get_logger().error(f"MTC failed: {msg}")
             return False
 
     # -------------------------------
@@ -587,14 +584,14 @@ class CubeMotionServer(Node):
             targeted_cube_spinning_robot = (self.cube_spinning_robot) % 2 + 1  # Wechsel zum anderen Roboter
 
         if (targeted_cube_spinning_robot == self.cube_spinning_robot):
-            self.logger.debug("HandOver: no change needed")
+            self.get_logger().debug("HandOver: no change needed")
             result = HandOver.Result()
             result.success = True
             result.cube_spinning_robot = self.cube_spinning_robot
             goal_handle.abort()
             return result
 
-        self.logger.action_start("HandOver", f"robot{self.cube_spinning_robot} -> robot{targeted_cube_spinning_robot}")
+        self.get_logger().info(f"[HandOver] Started: robot{self.cube_spinning_robot} -> robot{targeted_cube_spinning_robot}")
 
         # Define the handover sequence
         old_spinning_robot = self._get_robot_name(self.cube_spinning_robot)
@@ -647,7 +644,7 @@ class CubeMotionServer(Node):
         result.success = success
         result.cube_spinning_robot = self.cube_spinning_robot
 
-        self.logger.action_complete("HandOver", success)
+        self.get_logger().info(f"[HandOver] {'OK' if success else 'FAILED'}")
         if result.success:
             goal_handle.succeed()
         else:
@@ -661,16 +658,16 @@ class CubeMotionServer(Node):
         move = goal_handle.request.move
         face, angle = decode_kociemba_move(move)
 
-        self.logger.action_start("RotateFace", f"{move} ({face} {angle})")
+        self.get_logger().info(f"[RotateFace] Started: {move} ({face} {angle})")
 
         # Beispiel: Vor dem Drehen muss evtl. umgegriffen werden
         if face not in ROBOT_FACES[self.cube_spinning_robot-1]:
-            self.logger.action_progress("RotateFace", "HandOver required")
+            self.get_logger().debug("[RotateFace] HandOver required")
             await self.call_hand_over()
 
         # Get cube pose for this face
         cube_pose = self.get_cube_pose_for_face(face)
-        self.logger.action_progress("RotateFace", f"face {face} pos {cube_pose.position}")
+        self.get_logger().debug(f"[RotateFace] face {face} pos {cube_pose.position}")
 
         # Determine which robot holds and which spins
         spinning_robot = self._get_robot_name(self.cube_spinning_robot)
@@ -710,7 +707,7 @@ class CubeMotionServer(Node):
 
         result = RotateFace.Result()
         result.success = success
-        self.logger.action_complete("RotateFace", success, move)
+        self.get_logger().info(f"[RotateFace] {'OK' if success else 'FAILED'}: {move}")
         if result.success:
             goal_handle.succeed()
         else:
@@ -726,7 +723,7 @@ class CubeMotionServer(Node):
         Robot 2 always takes up the cube.
         After taking up, Robot 1 becomes the spinning robot.
         """
-        self.logger.action_start("TakeUpCube")
+        self.get_logger().info("[TakeUpCube] Started")
 
         robot2_name = self._get_robot_name(2)
 
@@ -775,7 +772,7 @@ class CubeMotionServer(Node):
         result = TakeUpCube.Result()
         result.success = success
 
-        self.logger.action_complete("TakeUpCube", success)
+        self.get_logger().info(f"[TakeUpCube] {'OK' if success else 'FAILED'}")
         if result.success:
             goal_handle.succeed()
         else:
@@ -791,17 +788,17 @@ class CubeMotionServer(Node):
         Put down the cube to the rest position.
         Robot 2 must be holding the cube (cube_spinning_robot = 1).
         """
-        self.logger.action_start("PutDownCube")
+        self.get_logger().info("[PutDownCube] Started")
 
         robot2_name = self._get_robot_name(2)
 
         # Check if Robot 2 is holding the cube
         if self.cube_spinning_robot != 1:
-            self.logger.action_progress("PutDownCube", "HandOver required")
+            self.get_logger().debug("[PutDownCube] HandOver required")
             await self.call_hand_over()
 
             if self.cube_spinning_robot != 1:
-                self.logger.action_complete("PutDownCube", False, "HandOver failed")
+                self.get_logger().info("[PutDownCube] FAILED: HandOver failed")
                 result = PutDownCube.Result()
                 result.success = False
                 goal_handle.abort()
@@ -848,7 +845,7 @@ class CubeMotionServer(Node):
         result = PutDownCube.Result()
         result.success = success
 
-        self.logger.action_complete("PutDownCube", success)
+        self.get_logger().info(f"[PutDownCube] {'OK' if success else 'FAILED'}")
         if result.success:
             goal_handle.succeed()
         else:
@@ -864,7 +861,7 @@ class CubeMotionServer(Node):
         Present a specific cube face to the camera for scanning.
         """
         face = goal_handle.request.face
-        self.logger.action_start("PresentCubeFace", f"face {face}")
+        self.get_logger().info(f"[PresentCubeFace] Started: face {face}")
 
         success = True
 
@@ -892,18 +889,18 @@ class CubeMotionServer(Node):
                 raise ValueError(f"Face {face} not found in ROBOT_FACES")
             holding_robot_name = self._get_robot_name(holding_robot_id)
 
-            self.logger.action_progress("PresentCubeFace", f"held by {holding_robot_name}")
+            self.get_logger().debug(f"[PresentCubeFace] held by {holding_robot_name}")
 
             # Perform handover if necessary
             if holding_robot_id == 1:
                 if self.cube_spinning_robot != 2:
-                    self.logger.action_progress("PresentCubeFace", "HandOver required")
+                    self.get_logger().debug("[PresentCubeFace] HandOver required")
                     await self.call_hand_over()
                     if self.cube_spinning_robot != 2:
                         raise RuntimeError("Handover failed")
             else:  # holding_robot_id == 2
                 if self.cube_spinning_robot != 1:
-                    self.logger.action_progress("PresentCubeFace", "HandOver required")
+                    self.get_logger().debug("[PresentCubeFace] HandOver required")
                     await self.call_hand_over()
                     if self.cube_spinning_robot != 1:
                         raise RuntimeError("Handover failed")
@@ -921,13 +918,13 @@ class CubeMotionServer(Node):
             success = await self._execute_mtc_sequence(steps)
 
         except Exception as e:
-            self.logger.error(f"PresentCubeFace error: {str(e)}")
+            self.get_logger().error(f"PresentCubeFace error: {str(e)}")
             success = False
 
         result = PresentCubeFace.Result()
         result.success = success
 
-        self.logger.action_complete("PresentCubeFace", success, face)
+        self.get_logger().info(f"[PresentCubeFace] {'OK' if success else 'FAILED'}: {face}")
         if result.success:
             goal_handle.succeed()
         else:
@@ -947,7 +944,7 @@ class CubeMotionServer(Node):
 
         server_ready = self.hand_over_client.wait_for_server(timeout_sec=5.0)
         if not server_ready:
-            self.logger.error("HandOver action server not available")
+            self.get_logger().error("HandOver action server not available")
             return
 
         goal = HandOver.Goal()
@@ -959,7 +956,7 @@ class CubeMotionServer(Node):
         result = await result_future
 
         if not result.result.success:
-            self.logger.error("HandOver internal call failed")
+            self.get_logger().error("HandOver internal call failed")
             raise Exception("HandOver failed")
 
 
