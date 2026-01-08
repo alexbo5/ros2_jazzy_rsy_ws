@@ -47,6 +47,8 @@ def generate_launch_description():
                 "joint_limits": joint_limits,
                 "cartesian_limits": pilz_config.get("cartesian_limits", {}),
             }},
+            # Enable MTC execution capability for execute_task_solution action
+            {"capabilities": "move_group/ExecuteTaskSolutionCapability"},
         ],
     )
 

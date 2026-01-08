@@ -9,7 +9,10 @@
       "Bash(git config:*)",
       "Bash(find:*)",
       "Bash(mv:*)",
-      "Bash(apt-cache search:*)"
+      "Bash(apt-cache search:*)",
+      "Bash(done)",
+      "WebFetch(domain:automaticaddison.com)",
+      "WebFetch(domain:moveit.picknik.ai)"
     ]
   }
 }

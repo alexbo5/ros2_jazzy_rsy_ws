@@ -12,6 +12,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     GroupAction,
     RegisterEventHandler,
+    TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -31,6 +32,7 @@ def generate_launch_description():
     robot_pkg = get_package_share_directory("rsy_robot_startup")
     moveit_pkg = get_package_share_directory("rsy_moveit_startup")
     path_planning_pkg = get_package_share_directory("rsy_path_planning")
+    mtc_planning_pkg = get_package_share_directory("rsy_mtc_planning")
     cube_motion_pkg = get_package_share_directory("rsy_cube_motion")
     cube_perception_pkg = get_package_share_directory("rsy_cube_perception")
     gripper_pkg = get_package_share_directory("rsy_gripper_controller")
@@ -92,9 +94,16 @@ def generate_launch_description():
         arguments=["-d", os.path.join(bringup_pkg, "config", "moveit.rviz")],
     )
 
-    # 5. Application nodes - grouped together, started after RViz is ready
-    # This ensures MoveIt has had time to initialize
+    # 5. Application nodes - grouped together, started after MoveIt is ready
+    # This ensures MoveIt has had time to initialize and publish robot_description_semantic
     application_nodes = GroupAction([
+        # MTC Planning (must start before cube_motion_server)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(mtc_planning_pkg, "launch", "mtc_planning.launch.py")
+            )
+        ),
+        # Legacy path planning (kept for compatibility)
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(path_planning_pkg, "launch", "path_planning.launch.py")
@@ -103,7 +112,10 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(cube_motion_pkg, "launch", "cube_motion_server.launch.py")
-            )
+            ),
+            launch_arguments={
+                'use_mock_hardware': LaunchConfiguration('robot1_use_mock_hardware'),
+            }.items()
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
@@ -115,11 +127,18 @@ def generate_launch_description():
         ),
     ])
 
-    # Start application nodes after RViz process starts (MoveIt should be ready by then)
+    # Start application nodes after a delay to ensure MoveIt is fully initialized
+    # and publishing robot_description_semantic topic
+    delayed_applications = TimerAction(
+        period=5.0,  # Wait 5 seconds after RViz starts
+        actions=[application_nodes],
+    )
+
+    # Start delayed applications after RViz process starts
     start_applications = RegisterEventHandler(
         OnProcessStart(
             target_action=rviz_node,
-            on_start=[application_nodes],
+            on_start=[delayed_applications],
         )
     )
 
@@ -133,6 +152,6 @@ def generate_launch_description():
         moveit_launch,
         gripper_launch,
         rviz_node,
-        # Applications (event-triggered)
+        # Applications (event-triggered with delay)
         start_applications,
     ])

@@ -1,0 +1,482 @@
+// Copyright (c) 2023, ROS2 Contributors
+// All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/**
+ * @file mtc_task_builder.cpp
+ * @brief Implementation of MTCTaskBuilder for building MoveIt Task Constructor tasks
+ */
+
+#include "rsy_mtc_planning/mtc_task_builder.hpp"
+
+#include <moveit/task_constructor/stages/current_state.h>
+#include <moveit/task_constructor/stages/move_to.h>
+#include <moveit/task_constructor/stages/move_relative.h>
+#include <moveit_task_constructor_msgs/msg/solution.hpp>
+
+namespace rsy_mtc_planning
+{
+
+namespace mtc = moveit::task_constructor;
+
+MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node)
+  : node_(node)
+{
+  // Load robot model
+  robot_model_loader_ = std::make_shared<robot_model_loader::RobotModelLoader>(node_, "robot_description");
+  robot_model_ = robot_model_loader_->getModel();
+
+  if (!robot_model_)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Failed to load robot model");
+    throw std::runtime_error("Failed to load robot model");
+  }
+
+  // Create planning scene monitor for execution
+  planning_scene_monitor_ = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(
+    node_, robot_model_loader_, "planning_scene_monitor");
+  planning_scene_monitor_->startSceneMonitor();
+  planning_scene_monitor_->startStateMonitor();
+  planning_scene_monitor_->startWorldGeometryMonitor();
+
+  // Create planning scene
+  planning_scene_ = std::make_shared<planning_scene::PlanningScene>(robot_model_);
+
+  // Create planners
+  sampling_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_);
+  sampling_planner_->setTimeout(10.0);  // Increase from default 1.0s to 10s for RRTConnect
+
+  cartesian_planner_ = std::make_shared<mtc::solvers::CartesianPath>();
+  joint_interpolation_planner_ = std::make_shared<mtc::solvers::JointInterpolationPlanner>();
+
+  // Configure cartesian planner
+  cartesian_planner_->setMaxVelocityScalingFactor(velocity_scaling_lin_);
+  cartesian_planner_->setMaxAccelerationScalingFactor(acceleration_scaling_lin_);
+  cartesian_planner_->setStepSize(0.01);
+  cartesian_planner_->setMinFraction(0.95);   // Allow 95% completion (was defaulting to 1.0)
+
+  // Setup robot configurations
+  planning_groups_["robot1"] = "robot1_ur_manipulator";
+  planning_groups_["robot2"] = "robot2_ur_manipulator";
+  ee_links_["robot1"] = "robot1_tcp";
+  ee_links_["robot2"] = "robot2_tcp";
+  gripper_groups_["robot1"] = "robot1_gripper";
+  gripper_groups_["robot2"] = "robot2_gripper";
+
+  RCLCPP_INFO(node_->get_logger(), "MTCTaskBuilder initialized");
+}
+
+mtc::Task MTCTaskBuilder::buildTask(
+  const std::vector<rsy_mtc_planning::msg::MotionStep>& steps,
+  const std::string& task_name)
+{
+  mtc::Task task;
+  task.setName(task_name);  // Set the task name on the task object
+  task.stages()->setName(task_name);
+  task.setRobotModel(robot_model_);  // Reuse already-loaded robot model to avoid duplicate publishers
+
+  // Enable introspection for better debugging
+  task.enableIntrospection();
+
+  // Add current state as the starting point
+  auto current_state = std::make_unique<mtc::stages::CurrentState>("current_state");
+  task.add(std::move(current_state));
+
+  // Add stages for each motion step
+  for (size_t i = 0; i < steps.size(); ++i)
+  {
+    const auto& step = steps[i];
+
+    switch (step.motion_type)
+    {
+      case rsy_mtc_planning::msg::MotionStep::MOVE_J:
+        addMoveJStage(task, step, static_cast<int>(i));
+        break;
+
+      case rsy_mtc_planning::msg::MotionStep::MOVE_L:
+        addMoveLStage(task, step, static_cast<int>(i));
+        break;
+
+      case rsy_mtc_planning::msg::MotionStep::GRIPPER_OPEN:
+      case rsy_mtc_planning::msg::MotionStep::GRIPPER_CLOSE:
+        addGripperStage(task, step, static_cast<int>(i));
+        break;
+
+      default:
+        RCLCPP_WARN(node_->get_logger(), "Unknown motion type %d at step %zu", step.motion_type, i);
+        break;
+    }
+  }
+
+  return task;
+}
+
+bool MTCTaskBuilder::planTask(mtc::Task& task, int max_solutions)
+{
+  try
+  {
+    // Initialize the task
+    task.init();
+
+    // Plan the task
+    if (!task.plan(max_solutions))
+    {
+      RCLCPP_ERROR(node_->get_logger(), "Task planning failed");
+      return false;
+    }
+
+    RCLCPP_INFO(node_->get_logger(), "Task planning succeeded with %zu solutions",
+                task.numSolutions());
+    return true;
+  }
+  catch (const std::exception& e)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Task planning exception: %s", e.what());
+    return false;
+  }
+}
+
+bool MTCTaskBuilder::executeTask(mtc::Task& task)
+{
+  if (task.numSolutions() == 0)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "No solutions to execute");
+    return false;
+  }
+
+  try
+  {
+    // Get the first solution
+    const auto& solution = task.solutions().front();
+    
+    RCLCPP_INFO(node_->get_logger(), "Executing task '%s'", task.name().c_str());
+
+    // Execute the solution using MTC's execute
+    auto result = task.execute(*solution);
+    if (result.val != moveit_msgs::msg::MoveItErrorCodes::SUCCESS)
+    {
+      RCLCPP_ERROR(node_->get_logger(), "Task execution failed with error code: %d", result.val);
+      return false;
+    }
+
+    RCLCPP_INFO(node_->get_logger(), "Task execution succeeded");
+    return true;
+  }
+  catch (const std::exception& e)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Task execution exception: %s", e.what());
+    return false;
+  }
+}
+
+bool MTCTaskBuilder::executeTaskDirect(mtc::Task& task)
+{
+  if (task.numSolutions() == 0)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "No solutions to execute");
+    return false;
+  }
+
+  try
+  {
+    // Get the first solution
+    const auto& solution = task.solutions().front();
+    
+    RCLCPP_INFO(node_->get_logger(), "Executing task '%s' (direct execution via MoveGroupInterface)", task.name().c_str());
+
+    // Get the trajectory from the solution - use toMsg() to get the full trajectory
+    moveit_task_constructor_msgs::msg::Solution solution_msg;
+    solution->toMsg(solution_msg, nullptr);
+
+    // Execute each sub-trajectory using MoveGroupInterface
+    for (const auto& sub_traj : solution_msg.sub_trajectory)
+    {
+      if (sub_traj.trajectory.joint_trajectory.points.empty() &&
+          sub_traj.trajectory.multi_dof_joint_trajectory.points.empty())
+      {
+        RCLCPP_DEBUG(node_->get_logger(), "Skipping empty sub-trajectory");
+        continue;
+      }
+
+      // Determine which planning group this trajectory is for
+      std::string group_name;
+      if (!sub_traj.trajectory.joint_trajectory.joint_names.empty())
+      {
+        const auto& first_joint = sub_traj.trajectory.joint_trajectory.joint_names[0];
+        if (first_joint.find("robot1") != std::string::npos)
+        {
+          group_name = "robot1_ur_manipulator";
+        }
+        else if (first_joint.find("robot2") != std::string::npos)
+        {
+          group_name = "robot2_ur_manipulator";
+        }
+        else
+        {
+          RCLCPP_ERROR(node_->get_logger(), "Cannot determine planning group for joint: %s", first_joint.c_str());
+          return false;
+        }
+      }
+      else
+      {
+        RCLCPP_WARN(node_->get_logger(), "No joint names in trajectory, skipping");
+        continue;
+      }
+
+      RCLCPP_INFO(node_->get_logger(), "Executing sub-trajectory for group '%s' with %zu points",
+                  group_name.c_str(), sub_traj.trajectory.joint_trajectory.points.size());
+
+      // Create MoveGroupInterface for this group
+      auto move_group = std::make_shared<moveit::planning_interface::MoveGroupInterface>(node_, group_name);
+
+      // Execute the trajectory directly using the message
+      auto result = move_group->execute(sub_traj.trajectory);
+      
+      if (result != moveit::core::MoveItErrorCode::SUCCESS)
+      {
+        RCLCPP_ERROR(node_->get_logger(), "Sub-trajectory execution failed with error code: %d", result.val);
+        return false;
+      }
+    }
+
+    RCLCPP_INFO(node_->get_logger(), "Direct task execution succeeded");
+    return true;
+  }
+  catch (const std::exception& e)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Direct task execution exception: %s", e.what());
+    return false;
+  }
+}
+
+size_t MTCTaskBuilder::getNumSubTrajectories(mtc::Task& task)
+{
+  if (task.numSolutions() == 0)
+  {
+    return 0;
+  }
+
+  const auto& solution = task.solutions().front();
+  moveit_task_constructor_msgs::msg::Solution solution_msg;
+  solution->toMsg(solution_msg, nullptr);
+
+  size_t count = 0;
+  for (const auto& sub_traj : solution_msg.sub_trajectory)
+  {
+    if (!sub_traj.trajectory.joint_trajectory.points.empty() ||
+        !sub_traj.trajectory.multi_dof_joint_trajectory.points.empty())
+    {
+      count++;
+    }
+  }
+  return count;
+}
+
+bool MTCTaskBuilder::executeSubTrajectory(mtc::Task& task, size_t index)
+{
+  if (task.numSolutions() == 0)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "No solutions to execute");
+    return false;
+  }
+
+  try
+  {
+    const auto& solution = task.solutions().front();
+    moveit_task_constructor_msgs::msg::Solution solution_msg;
+    solution->toMsg(solution_msg, nullptr);
+
+    // Find the index-th non-empty sub-trajectory
+    size_t current_idx = 0;
+    for (const auto& sub_traj : solution_msg.sub_trajectory)
+    {
+      if (sub_traj.trajectory.joint_trajectory.points.empty() &&
+          sub_traj.trajectory.multi_dof_joint_trajectory.points.empty())
+      {
+        continue;
+      }
+
+      if (current_idx == index)
+      {
+        // Execute this sub-trajectory
+        std::string group_name;
+        if (!sub_traj.trajectory.joint_trajectory.joint_names.empty())
+        {
+          const auto& first_joint = sub_traj.trajectory.joint_trajectory.joint_names[0];
+          if (first_joint.find("robot1") != std::string::npos)
+          {
+            group_name = "robot1_ur_manipulator";
+          }
+          else if (first_joint.find("robot2") != std::string::npos)
+          {
+            group_name = "robot2_ur_manipulator";
+          }
+          else
+          {
+            RCLCPP_ERROR(node_->get_logger(), "Cannot determine planning group for joint: %s", first_joint.c_str());
+            return false;
+          }
+        }
+        else
+        {
+          RCLCPP_WARN(node_->get_logger(), "No joint names in trajectory");
+          return true;  // Skip empty trajectory
+        }
+
+        RCLCPP_INFO(node_->get_logger(), "Executing sub-trajectory %zu for group '%s' with %zu points",
+                    index, group_name.c_str(), sub_traj.trajectory.joint_trajectory.points.size());
+
+        auto move_group = std::make_shared<moveit::planning_interface::MoveGroupInterface>(node_, group_name);
+        auto result = move_group->execute(sub_traj.trajectory);
+
+        if (result != moveit::core::MoveItErrorCode::SUCCESS)
+        {
+          RCLCPP_ERROR(node_->get_logger(), "Sub-trajectory execution failed with error code: %d", result.val);
+          return false;
+        }
+        return true;
+      }
+      current_idx++;
+    }
+
+    RCLCPP_ERROR(node_->get_logger(), "Sub-trajectory index %zu out of range", index);
+    return false;
+  }
+  catch (const std::exception& e)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Sub-trajectory execution exception: %s", e.what());
+    return false;
+  }
+}
+
+void MTCTaskBuilder::addMoveJStage(
+  mtc::Task& task,
+  const rsy_mtc_planning::msg::MotionStep& step,
+  int step_index)
+{
+  std::string stage_name = "move_j_" + std::to_string(step_index);
+  std::string group = getPlanningGroup(step.robot_name);
+  std::string ee_link = getEndEffectorLink(step.robot_name);
+
+  // Set target pose
+  geometry_msgs::msg::PoseStamped target = step.target_pose;
+  if (target.header.frame_id.empty())
+  {
+    target.header.frame_id = "world";
+  }
+
+  RCLCPP_INFO(node_->get_logger(),
+    "MoveJ[%d] %s -> frame=%s pos=[%.3f, %.3f, %.3f] orient=[%.3f, %.3f, %.3f, %.3f]",
+    step_index, step.robot_name.c_str(), target.header.frame_id.c_str(),
+    target.pose.position.x, target.pose.position.y, target.pose.position.z,
+    target.pose.orientation.x, target.pose.orientation.y,
+    target.pose.orientation.z, target.pose.orientation.w);
+
+  // Use standard MoveTo stage for now
+  // Multi-IK exploration is handled by retry logic in motion_sequence_server
+  auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, sampling_planner_);
+  stage->setGroup(group);
+  stage->setGoal(target);
+  stage->setIKFrame(ee_link);
+
+  task.add(std::move(stage));
+}
+
+void MTCTaskBuilder::addMoveLStage(
+  mtc::Task& task,
+  const rsy_mtc_planning::msg::MotionStep& step,
+  int step_index)
+{
+  std::string stage_name = "move_l_" + std::to_string(step_index);
+  std::string group = getPlanningGroup(step.robot_name);
+  std::string ee_link = getEndEffectorLink(step.robot_name);
+
+  auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, cartesian_planner_);
+  stage->setGroup(group);
+
+  // Set target pose
+  geometry_msgs::msg::PoseStamped target = step.target_pose;
+  if (target.header.frame_id.empty())
+  {
+    target.header.frame_id = "world";
+  }
+
+  RCLCPP_INFO(node_->get_logger(),
+    "MoveL[%d] %s -> frame=%s pos=[%.3f, %.3f, %.3f] orient=[%.3f, %.3f, %.3f, %.3f]",
+    step_index, step.robot_name.c_str(), target.header.frame_id.c_str(),
+    target.pose.position.x, target.pose.position.y, target.pose.position.z,
+    target.pose.orientation.x, target.pose.orientation.y,
+    target.pose.orientation.z, target.pose.orientation.w);
+
+  stage->setGoal(target);
+
+  // Set IK frame to the end effector
+  stage->setIKFrame(ee_link);
+
+  task.add(std::move(stage));
+}
+
+void MTCTaskBuilder::addGripperStage(
+  mtc::Task& task,
+  const rsy_mtc_planning::msg::MotionStep& step,
+  int step_index)
+{
+  std::string gripper_group = getGripperGroup(step.robot_name);
+  bool is_open = (step.motion_type == rsy_mtc_planning::msg::MotionStep::GRIPPER_OPEN);
+  std::string stage_name = (is_open ? "gripper_open_" : "gripper_close_") + std::to_string(step_index);
+
+  auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, joint_interpolation_planner_);
+  stage->setGroup(gripper_group);
+
+  // Set target joint state (named target)
+  std::string target_state = is_open ? "open" : "closed";
+  stage->setGoal(target_state);
+
+  task.add(std::move(stage));
+}
+
+std::string MTCTaskBuilder::getPlanningGroup(const std::string& robot_name) const
+{
+  auto it = planning_groups_.find(robot_name);
+  if (it != planning_groups_.end())
+  {
+    return it->second;
+  }
+  RCLCPP_WARN(node_->get_logger(), "Unknown robot '%s', using default group", robot_name.c_str());
+  return robot_name + "_ur_manipulator";
+}
+
+std::string MTCTaskBuilder::getEndEffectorLink(const std::string& robot_name) const
+{
+  auto it = ee_links_.find(robot_name);
+  if (it != ee_links_.end())
+  {
+    return it->second;
+  }
+  RCLCPP_WARN(node_->get_logger(), "Unknown robot '%s', using default ee_link", robot_name.c_str());
+  return robot_name + "_tcp";
+}
+
+std::string MTCTaskBuilder::getGripperGroup(const std::string& robot_name) const
+{
+  auto it = gripper_groups_.find(robot_name);
+  if (it != gripper_groups_.end())
+  {
+    return it->second;
+  }
+  RCLCPP_WARN(node_->get_logger(), "Unknown robot '%s', using default gripper group", robot_name.c_str());
+  return robot_name + "_gripper";
+}
+
+}  // namespace rsy_mtc_planning
