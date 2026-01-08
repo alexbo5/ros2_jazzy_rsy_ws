@@ -1,0 +1,361 @@
+19:33:29.568 ========================================
+19:33:29.568 Cube Motion Log Started
+19:33:29.568 ========================================
+19:33:40.659 >>> [TakeUpCube] Started
+19:33:40.660   MTC sequence: 4 steps
+19:33:44.628     MTC result: OK - Completed all steps
+19:33:44.628 <<< [TakeUpCube] OK
+19:33:44.634 >>> [PresentCubeFace] Started: face U
+19:33:44.634   [PresentCubeFace] held by robot2
+19:33:44.635   MTC sequence: 1 steps
+19:33:46.272     MTC result: OK - Completed all steps
+19:33:46.272 <<< [PresentCubeFace] OK: U
+19:33:46.785 >>> [PresentCubeFace] Started: face D
+19:33:46.785   [PresentCubeFace] held by robot2
+19:33:46.786   MTC sequence: 1 steps
+19:33:48.573     MTC result: OK - Completed all steps
+19:33:48.574 <<< [PresentCubeFace] OK: D
+19:33:49.094 >>> [PresentCubeFace] Started: face F
+19:33:49.094   [PresentCubeFace] held by robot2
+19:33:49.095   MTC sequence: 1 steps
+19:33:50.888     MTC result: OK - Completed all steps
+19:33:50.890 <<< [PresentCubeFace] OK: F
+19:33:51.409 >>> [PresentCubeFace] Started: face B
+19:33:51.409   [PresentCubeFace] held by robot1
+19:33:51.409   [PresentCubeFace] HandOver required
+19:33:51.411 >>> [HandOver] Started: robot1 -> robot2
+19:33:51.414   MTC sequence: 8 steps
+19:34:01.063     MTC result: OK - Completed all steps
+19:34:01.064 <<< [HandOver] OK
+19:34:01.066   MTC sequence: 1 steps
+19:34:02.703     MTC result: OK - Completed all steps
+19:34:02.705 <<< [PresentCubeFace] OK: B
+19:34:03.221 >>> [PresentCubeFace] Started: face L
+19:34:03.222   [PresentCubeFace] held by robot1
+19:34:03.222   MTC sequence: 1 steps
+19:34:05.438     MTC result: OK - Completed all steps
+19:34:05.438 <<< [PresentCubeFace] OK: L
+19:34:05.951 >>> [PresentCubeFace] Started: face R
+19:34:05.952   [PresentCubeFace] held by robot1
+19:34:05.952   MTC sequence: 1 steps
+19:34:07.765     MTC result: OK - Completed all steps
+19:34:07.769 <<< [PresentCubeFace] OK: R
+19:34:08.291 >>> [RotateFace] Started: R2 (R 180)
+19:34:08.291   [RotateFace] face R pos [-0.385   0.3275  0.5   ]
+19:34:08.292   MTC sequence: 7 steps
+19:34:17.416     MTC result: OK - Completed all steps
+19:34:17.418 <<< [RotateFace] OK: R2
+19:34:17.429 >>> [RotateFace] Started: U' (U -90)
+19:34:17.429   [RotateFace] HandOver required
+19:34:17.432 >>> [HandOver] Started: robot2 -> robot1
+19:34:17.435   MTC sequence: 8 steps
+19:34:25.651     MTC result: OK - Completed all steps
+19:34:25.652 <<< [HandOver] OK
+19:34:25.653   [RotateFace] face U pos [-0.385   0.3275  0.5   ]
+19:34:25.655   MTC sequence: 7 steps
+19:34:32.135     MTC result: OK - Completed all steps
+19:34:32.138 <<< [RotateFace] OK: U'
+19:34:32.143 >>> [RotateFace] Started: B2 (B 180)
+19:34:32.143   [RotateFace] HandOver required
+19:34:32.145 >>> [HandOver] Started: robot1 -> robot2
+19:34:32.149   MTC sequence: 8 steps
+19:34:40.152     MTC result: OK - Completed all steps
+19:34:40.153 <<< [HandOver] OK
+19:34:40.154   [RotateFace] face B pos [-0.385   0.3275  0.5   ]
+19:34:40.157   MTC sequence: 7 steps
+19:34:47.496     MTC result: OK - Completed all steps
+19:34:47.496 <<< [RotateFace] OK: B2
+19:34:47.501 >>> [RotateFace] Started: D' (D -90)
+19:34:47.501   [RotateFace] HandOver required
+19:34:47.503 >>> [HandOver] Started: robot2 -> robot1
+19:34:47.504   MTC sequence: 8 steps
+19:34:55.620     MTC result: OK - Completed all steps
+19:34:55.621 <<< [HandOver] OK
+19:34:55.623   [RotateFace] face D pos [-0.385   0.3275  0.5   ]
+19:34:55.625   MTC sequence: 7 steps
+19:35:02.533     MTC result: OK - Completed all steps
+19:35:02.534 <<< [RotateFace] OK: D'
+19:35:02.541 >>> [RotateFace] Started: F2 (F 180)
+19:35:02.543   [RotateFace] face F pos [-0.385   0.3275  0.5   ]
+19:35:02.549   MTC sequence: 7 steps
+19:35:10.873     MTC result: OK - Completed all steps
+19:35:10.874 <<< [RotateFace] OK: F2
+19:35:10.880 >>> [RotateFace] Started: L2 (L 180)
+19:35:10.880   [RotateFace] HandOver required
+19:35:10.882 >>> [HandOver] Started: robot1 -> robot2
+19:35:10.886   MTC sequence: 8 steps
+19:35:19.566     MTC result: OK - Completed all steps
+19:35:19.567 <<< [HandOver] OK
+19:35:19.570   [RotateFace] face L pos [-0.385   0.3275  0.5   ]
+19:35:19.573   MTC sequence: 7 steps
+19:35:30.039     MTC result: OK - Completed all steps
+19:35:30.039 <<< [RotateFace] OK: L2
+19:35:30.048 >>> [RotateFace] Started: D (D 90)
+19:35:30.048   [RotateFace] HandOver required
+19:35:30.055 >>> [HandOver] Started: robot2 -> robot1
+19:35:30.058   MTC sequence: 8 steps
+19:35:37.827     MTC result: OK - Completed all steps
+19:35:37.828 <<< [HandOver] OK
+19:35:37.830   [RotateFace] face D pos [-0.385   0.3275  0.5   ]
+19:35:37.832   MTC sequence: 7 steps
+19:35:44.779     MTC result: OK - Completed all steps
+19:35:44.779 <<< [RotateFace] OK: D
+19:35:44.785 >>> [RotateFace] Started: R2 (R 180)
+19:35:44.786   [RotateFace] HandOver required
+19:35:44.789 >>> [HandOver] Started: robot1 -> robot2
+19:35:44.792   MTC sequence: 8 steps
+19:35:54.312     MTC result: OK - Completed all steps
+19:35:54.312 <<< [HandOver] OK
+19:35:54.314   [RotateFace] face R pos [-0.385   0.3275  0.5   ]
+19:35:54.317   MTC sequence: 7 steps
+19:36:03.552     MTC result: OK - Completed all steps
+19:36:03.553 <<< [RotateFace] OK: R2
+19:36:03.558 >>> [RotateFace] Started: U2 (U 180)
+19:36:03.558   [RotateFace] HandOver required
+19:36:03.560 >>> [HandOver] Started: robot2 -> robot1
+19:36:03.563   MTC sequence: 8 steps
+19:36:59.507     MTC result: OK - Completed all steps
+19:36:59.508 <<< [HandOver] OK
+19:36:59.509   [RotateFace] face U pos [-0.385   0.3275  0.5   ]
+19:36:59.512   MTC sequence: 7 steps
+19:37:07.200     MTC result: OK - Completed all steps
+19:37:07.201 <<< [RotateFace] OK: U2
+19:37:07.207 >>> [RotateFace] Started: B2 (B 180)
+19:37:07.207   [RotateFace] HandOver required
+19:37:07.213 >>> [HandOver] Started: robot1 -> robot2
+19:37:07.218   MTC sequence: 8 steps
+19:37:14.322     MTC result: OK - Completed all steps
+19:37:14.323 <<< [HandOver] OK
+19:37:14.325   [RotateFace] face B pos [-0.385   0.3275  0.5   ]
+19:37:14.327   MTC sequence: 7 steps
+19:37:21.666     MTC result: OK - Completed all steps
+19:37:21.667 <<< [RotateFace] OK: B2
+19:37:21.674 >>> [RotateFace] Started: U' (U -90)
+19:37:21.674   [RotateFace] HandOver required
+19:37:21.677 >>> [HandOver] Started: robot2 -> robot1
+19:37:21.681   MTC sequence: 8 steps
+19:37:29.868     MTC result: OK - Completed all steps
+19:37:29.869 <<< [HandOver] OK
+19:37:29.870   [RotateFace] face U pos [-0.385   0.3275  0.5   ]
+19:37:29.873   MTC sequence: 7 steps
+19:37:36.541     MTC result: OK - Completed all steps
+19:37:36.542 <<< [RotateFace] OK: U'
+19:37:36.551 >>> [RotateFace] Started: L' (L -90)
+19:37:36.552   [RotateFace] HandOver required
+19:37:36.556 >>> [HandOver] Started: robot1 -> robot2
+19:37:36.559   MTC sequence: 8 steps
+19:37:44.515     MTC result: OK - Completed all steps
+19:37:44.516 <<< [HandOver] OK
+19:37:44.518   [RotateFace] face L pos [-0.385   0.3275  0.5   ]
+19:37:44.520   MTC sequence: 7 steps
+19:37:53.142     MTC result: OK - Completed all steps
+19:37:53.143 <<< [RotateFace] OK: L'
+19:37:53.149 >>> [RotateFace] Started: D2 (D 180)
+19:37:53.149   [RotateFace] HandOver required
+19:37:53.151 >>> [HandOver] Started: robot2 -> robot1
+19:37:53.153   MTC sequence: 8 steps
+19:38:03.888     MTC result: OK - Completed all steps
+19:38:03.889 <<< [HandOver] OK
+19:38:03.891   [RotateFace] face D pos [-0.385   0.3275  0.5   ]
+19:38:03.894   MTC sequence: 7 steps
+19:38:12.035     MTC result: OK - Completed all steps
+19:38:12.035 <<< [RotateFace] OK: D2
+19:38:12.041 >>> [RotateFace] Started: B' (B -90)
+19:38:12.041   [RotateFace] HandOver required
+19:38:12.045 >>> [HandOver] Started: robot1 -> robot2
+19:38:12.049   MTC sequence: 8 steps
+19:38:20.832     MTC result: OK - Completed all steps
+19:38:20.833 <<< [HandOver] OK
+19:38:20.837   [RotateFace] face B pos [-0.385   0.3275  0.5   ]
+19:38:20.840   MTC sequence: 7 steps
+19:38:27.582     MTC result: OK - Completed all steps
+19:38:27.582 <<< [RotateFace] OK: B'
+19:38:27.589 >>> [RotateFace] Started: U (U 90)
+19:38:27.590   [RotateFace] HandOver required
+19:38:27.592 >>> [HandOver] Started: robot2 -> robot1
+19:38:27.595   MTC sequence: 8 steps
+19:38:35.364     MTC result: OK - Completed all steps
+19:38:35.364 <<< [HandOver] OK
+19:38:35.369   [RotateFace] face U pos [-0.385   0.3275  0.5   ]
+19:38:35.373   MTC sequence: 7 steps
+19:38:42.983     MTC result: OK - Completed all steps
+19:38:42.983 <<< [RotateFace] OK: U
+19:38:42.988 >>> [RotateFace] Started: F' (F -90)
+19:38:42.988   [RotateFace] face F pos [-0.385   0.3275  0.5   ]
+19:38:42.989   MTC sequence: 7 steps
+19:38:49.773     MTC result: OK - Completed all steps
+19:38:49.773 <<< [RotateFace] OK: F'
+19:38:49.786 >>> [RotateFace] Started: R' (R -90)
+19:38:49.787   [RotateFace] HandOver required
+19:38:49.791 >>> [HandOver] Started: robot1 -> robot2
+19:38:49.794   MTC sequence: 8 steps
+19:38:57.579     MTC result: OK - Completed all steps
+19:38:57.580 <<< [HandOver] OK
+19:38:57.582   [RotateFace] face R pos [-0.385   0.3275  0.5   ]
+19:38:57.590   MTC sequence: 7 steps
+19:39:06.459     MTC result: OK - Completed all steps
+19:39:06.460 <<< [RotateFace] OK: R'
+19:39:06.469 >>> [RotateFace] Started: B2 (B 180)
+19:39:06.469   [RotateFace] face B pos [-0.385   0.3275  0.5   ]
+19:39:06.471   MTC sequence: 7 steps
+19:39:14.496     MTC result: OK - Completed all steps
+19:39:14.498 <<< [RotateFace] OK: B2
+19:39:14.504 >>> [RotateFace] Started: L (L 90)
+19:39:14.505   [RotateFace] face L pos [-0.385   0.3275  0.5   ]
+19:39:14.506   MTC sequence: 7 steps
+19:39:20.612     MTC result: OK - Completed all steps
+19:39:20.612 <<< [RotateFace] OK: L
+19:39:20.618 >>> [RotateFace] Started: D' (D -90)
+19:39:20.619   [RotateFace] HandOver required
+19:39:20.622 >>> [HandOver] Started: robot2 -> robot1
+19:39:20.628   MTC sequence: 8 steps
+19:39:32.921     MTC result: OK - Completed all steps
+19:39:32.922 <<< [HandOver] OK
+19:39:32.924   [RotateFace] face D pos [-0.385   0.3275  0.5   ]
+19:39:32.927   MTC sequence: 7 steps
+19:39:39.957     MTC result: OK - Completed all steps
+19:39:39.958 <<< [RotateFace] OK: D'
+19:39:39.968 >>> [RotateFace] Started: F (F 90)
+19:39:39.969   [RotateFace] face F pos [-0.385   0.3275  0.5   ]
+19:39:39.974   MTC sequence: 7 steps
+19:39:46.842     MTC result: OK - Completed all steps
+19:39:46.843 <<< [RotateFace] OK: F
+19:39:46.849 >>> [RotateFace] Started: U2 (U 180)
+19:39:46.849   [RotateFace] face U pos [-0.385   0.3275  0.5   ]
+19:39:46.851   MTC sequence: 7 steps
+19:41:05.324     MTC result: OK - Completed all steps
+19:41:05.329 <<< [RotateFace] OK: U2
+19:41:05.390 >>> [RotateFace] Started: R' (R -90)
+19:41:05.392   [RotateFace] HandOver required
+19:41:05.413 >>> [HandOver] Started: robot1 -> robot2
+19:41:05.438   MTC sequence: 8 steps
+19:41:17.901     MTC result: OK - Completed all steps
+19:41:17.902 <<< [HandOver] OK
+19:41:17.905   [RotateFace] face R pos [-0.385   0.3275  0.5   ]
+19:41:17.908   MTC sequence: 7 steps
+19:41:26.555     MTC result: OK - Completed all steps
+19:41:26.556 <<< [RotateFace] OK: R'
+19:41:26.565 >>> [RotateFace] Started: F2 (F 180)
+19:41:26.565   [RotateFace] HandOver required
+19:41:26.567 >>> [HandOver] Started: robot2 -> robot1
+19:41:26.570   MTC sequence: 8 steps
+19:42:03.566     MTC result: OK - Completed all steps
+19:42:03.567 <<< [HandOver] OK
+19:42:03.570   [RotateFace] face F pos [-0.385   0.3275  0.5   ]
+19:42:03.573   MTC sequence: 7 steps
+19:42:10.957     MTC result: OK - Completed all steps
+19:42:10.958 <<< [RotateFace] OK: F2
+19:42:10.977 >>> [RotateFace] Started: L' (L -90)
+19:42:10.978   [RotateFace] HandOver required
+19:42:10.980 >>> [HandOver] Started: robot1 -> robot2
+19:42:10.983   MTC sequence: 8 steps
+19:42:19.348     MTC result: OK - Completed all steps
+19:42:19.348 <<< [HandOver] OK
+19:42:19.349   [RotateFace] face L pos [-0.385   0.3275  0.5   ]
+19:42:19.351   MTC sequence: 7 steps
+19:42:27.895     MTC result: OK - Completed all steps
+19:42:27.895 <<< [RotateFace] OK: L'
+19:42:27.906 >>> [RotateFace] Started: U (U 90)
+19:42:27.906   [RotateFace] HandOver required
+19:42:27.910 >>> [HandOver] Started: robot2 -> robot1
+19:42:27.913   MTC sequence: 8 steps
+19:42:37.439     MTC result: OK - Completed all steps
+19:42:37.439 <<< [HandOver] OK
+19:42:37.441   [RotateFace] face U pos [-0.385   0.3275  0.5   ]
+19:42:37.444   MTC sequence: 7 steps
+19:42:45.278     MTC result: OK - Completed all steps
+19:42:45.278 <<< [RotateFace] OK: U
+19:42:45.284 >>> [RotateFace] Started: B2 (B 180)
+19:42:45.284   [RotateFace] HandOver required
+19:42:45.287 >>> [HandOver] Started: robot1 -> robot2
+19:42:45.291   MTC sequence: 8 steps
+19:42:53.240     MTC result: OK - Completed all steps
+19:42:53.240 <<< [HandOver] OK
+19:42:53.242   [RotateFace] face B pos [-0.385   0.3275  0.5   ]
+19:42:53.249   MTC sequence: 7 steps
+19:43:00.687     MTC result: OK - Completed all steps
+19:43:00.687 <<< [RotateFace] OK: B2
+19:43:00.696 >>> [RotateFace] Started: R2 (R 180)
+19:43:00.697   [RotateFace] face R pos [-0.385   0.3275  0.5   ]
+19:43:00.700   MTC sequence: 7 steps
+19:43:09.334     MTC result: OK - Completed all steps
+19:43:09.335 <<< [RotateFace] OK: R2
+19:43:09.342 >>> [RotateFace] Started: D (D 90)
+19:43:09.343   [RotateFace] HandOver required
+19:43:09.348 >>> [HandOver] Started: robot2 -> robot1
+19:43:09.352   MTC sequence: 8 steps
+19:43:17.996     MTC result: OK - Completed all steps
+19:43:17.996 <<< [HandOver] OK
+19:43:17.999   [RotateFace] face D pos [-0.385   0.3275  0.5   ]
+19:43:18.008   MTC sequence: 7 steps
+19:43:25.314     MTC result: OK - Completed all steps
+19:43:25.314 <<< [RotateFace] OK: D
+19:43:25.321 >>> [RotateFace] Started: F2 (F 180)
+19:43:25.321   [RotateFace] face F pos [-0.385   0.3275  0.5   ]
+19:43:25.324   MTC sequence: 7 steps
+19:43:33.493     MTC result: OK - Completed all steps
+19:43:33.496 <<< [RotateFace] OK: F2
+19:43:33.510 >>> [RotateFace] Started: L2 (L 180)
+19:43:33.510   [RotateFace] HandOver required
+19:43:33.519 >>> [HandOver] Started: robot1 -> robot2
+19:43:33.524   MTC sequence: 8 steps
+19:43:42.038     MTC result: OK - Completed all steps
+19:43:42.039 <<< [HandOver] OK
+19:43:42.041   [RotateFace] face L pos [-0.385   0.3275  0.5   ]
+19:43:42.044   MTC sequence: 7 steps
+19:44:01.786     MTC result: OK - Completed all steps
+19:44:01.787 <<< [RotateFace] OK: L2
+19:44:01.794 >>> [RotateFace] Started: U' (U -90)
+19:44:01.794   [RotateFace] HandOver required
+19:44:01.797 >>> [HandOver] Started: robot2 -> robot1
+19:44:01.800   MTC sequence: 8 steps
+19:44:12.003     MTC result: OK - Completed all steps
+19:44:12.003 <<< [HandOver] OK
+19:44:12.006   [RotateFace] face U pos [-0.385   0.3275  0.5   ]
+19:44:12.008   MTC sequence: 7 steps
+19:44:18.714     MTC result: OK - Completed all steps
+19:44:18.714 <<< [RotateFace] OK: U'
+19:44:18.724 >>> [RotateFace] Started: R2 (R 180)
+19:44:18.724   [RotateFace] HandOver required
+19:44:18.731 >>> [HandOver] Started: robot1 -> robot2
+19:44:18.737   MTC sequence: 8 steps
+19:44:26.874     MTC result: OK - Completed all steps
+19:44:26.874 <<< [HandOver] OK
+19:44:26.879   [RotateFace] face R pos [-0.385   0.3275  0.5   ]
+19:44:26.883   MTC sequence: 7 steps
+19:44:36.933     MTC result: OK - Completed all steps
+19:44:36.933 <<< [RotateFace] OK: R2
+19:44:36.940 >>> [RotateFace] Started: B2 (B 180)
+19:44:36.941   [RotateFace] face B pos [-0.385   0.3275  0.5   ]
+19:44:36.944   MTC sequence: 7 steps
+19:44:46.391     MTC result: OK - Completed all steps
+19:44:46.392 <<< [RotateFace] OK: B2
+19:44:46.407 >>> [RotateFace] Started: D' (D -90)
+19:44:46.407   [RotateFace] HandOver required
+19:44:46.409 >>> [HandOver] Started: robot2 -> robot1
+19:44:46.414   MTC sequence: 8 steps
+19:44:55.395     MTC result: OK - Completed all steps
+19:44:55.396 <<< [HandOver] OK
+19:44:55.398   [RotateFace] face D pos [-0.385   0.3275  0.5   ]
+19:44:55.401   MTC sequence: 7 steps
+19:45:02.420     MTC result: OK - Completed all steps
+19:45:02.421 <<< [RotateFace] OK: D'
+19:45:02.435 >>> [RotateFace] Started: L2 (L 180)
+19:45:02.439   [RotateFace] HandOver required
+19:45:02.442 >>> [HandOver] Started: robot1 -> robot2
+19:45:02.445   MTC sequence: 8 steps
+19:45:10.594     MTC result: OK - Completed all steps
+19:45:10.595 <<< [HandOver] OK
+19:45:10.597   [RotateFace] face L pos [-0.385   0.3275  0.5   ]
+19:45:10.600   MTC sequence: 7 steps
+19:45:22.208     MTC result: OK - Completed all steps
+19:45:22.208 <<< [RotateFace] OK: L2
+19:45:22.219 >>> [RotateFace] Started: B2 (B 180)
+19:45:22.220   [RotateFace] face B pos [-0.385   0.3275  0.5   ]
+19:45:22.222   MTC sequence: 7 steps
+19:45:32.586     MTC result: OK - Completed all steps
+19:45:32.588 <<< [RotateFace] OK: B2
+19:45:32.603 >>> [PutDownCube] Started
+19:45:32.603   [PutDownCube] HandOver required
+19:45:32.605 >>> [HandOver] Started: robot2 -> robot1
+19:45:32.608   MTC sequence: 8 steps

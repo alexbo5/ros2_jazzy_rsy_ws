@@ -12,6 +12,7 @@
 #include "rsy_mtc_planning/action/execute_motion_sequence.hpp"
 #include "rsy_mtc_planning/msg/motion_step.hpp"
 #include "rsy_mtc_planning/mtc_task_builder.hpp"
+#include "rsy_mtc_planning/planning_logger.hpp"
 
 namespace rsy_mtc_planning
 {
@@ -60,6 +61,9 @@ private:
   // Execution thread (joinable instead of detached for proper cleanup)
   std::thread execution_thread_;
   std::mutex thread_mutex_;
+
+  // Planning logger for file-based detailed logging
+  std::unique_ptr<PlanningLogger> logger_;
 };
 
 }  // namespace rsy_mtc_planning

@@ -7,9 +7,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -31,6 +29,12 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/TakeUpCube.action"
   "action/PutDownCube.action"
   "action/PresentCubeFace.action"
+)
+
+# Install Python modules to the same location as rosidl-generated Python files
+install(FILES
+  rsy_cube_motion/logging_utils.py
+  DESTINATION "lib/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages/${PROJECT_NAME}"
 )
 
 install(PROGRAMS

@@ -87,7 +87,7 @@ MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node)
   gripper_groups_["robot1"] = "robot1_gripper";
   gripper_groups_["robot2"] = "robot2_gripper";
 
-  RCLCPP_INFO(node_->get_logger(), "MTCTaskBuilder initialized");
+  RCLCPP_DEBUG(node_->get_logger(), "MTCTaskBuilder initialized");
 }
 
 mtc::Task MTCTaskBuilder::buildTask(
@@ -146,17 +146,17 @@ bool MTCTaskBuilder::planTask(mtc::Task& task, int max_solutions)
     // Plan the task
     if (!task.plan(max_solutions))
     {
-      RCLCPP_ERROR(node_->get_logger(), "Task planning failed");
+      RCLCPP_DEBUG(node_->get_logger(), "Task planning failed");
       return false;
     }
 
-    RCLCPP_INFO(node_->get_logger(), "Task planning succeeded with %zu solutions",
+    RCLCPP_DEBUG(node_->get_logger(), "Task planning succeeded with %zu solutions",
                 task.numSolutions());
     return true;
   }
   catch (const std::exception& e)
   {
-    RCLCPP_ERROR(node_->get_logger(), "Task planning exception: %s", e.what());
+    RCLCPP_DEBUG(node_->get_logger(), "Task planning exception: %s", e.what());
     return false;
   }
 }
@@ -173,18 +173,18 @@ bool MTCTaskBuilder::executeTask(mtc::Task& task)
   {
     // Get the first solution
     const auto& solution = task.solutions().front();
-    
-    RCLCPP_INFO(node_->get_logger(), "Executing task '%s'", task.name().c_str());
+
+    RCLCPP_DEBUG(node_->get_logger(), "Executing task '%s'", task.name().c_str());
 
     // Execute the solution using MTC's execute
     auto result = task.execute(*solution);
     if (result.val != moveit_msgs::msg::MoveItErrorCodes::SUCCESS)
     {
-      RCLCPP_ERROR(node_->get_logger(), "Task execution failed with error code: %d", result.val);
+      RCLCPP_ERROR(node_->get_logger(), "Task execution failed: code=%d", result.val);
       return false;
     }
 
-    RCLCPP_INFO(node_->get_logger(), "Task execution succeeded");
+    RCLCPP_DEBUG(node_->get_logger(), "Task execution succeeded");
     return true;
   }
   catch (const std::exception& e)
@@ -206,8 +206,8 @@ bool MTCTaskBuilder::executeTaskDirect(mtc::Task& task)
   {
     // Get the first solution
     const auto& solution = task.solutions().front();
-    
-    RCLCPP_INFO(node_->get_logger(), "Executing task '%s' (direct execution via MoveGroupInterface)", task.name().c_str());
+
+    RCLCPP_DEBUG(node_->get_logger(), "Executing task '%s' direct", task.name().c_str());
 
     // Get the trajectory from the solution - use toMsg() to get the full trajectory
     moveit_task_constructor_msgs::msg::Solution solution_msg;
@@ -219,8 +219,7 @@ bool MTCTaskBuilder::executeTaskDirect(mtc::Task& task)
       if (sub_traj.trajectory.joint_trajectory.points.empty() &&
           sub_traj.trajectory.multi_dof_joint_trajectory.points.empty())
       {
-        RCLCPP_DEBUG(node_->get_logger(), "Skipping empty sub-trajectory");
-        continue;
+        continue;  // Skip empty sub-trajectories silently
       }
 
       // Determine which planning group this trajectory is for
@@ -238,17 +237,16 @@ bool MTCTaskBuilder::executeTaskDirect(mtc::Task& task)
         }
         else
         {
-          RCLCPP_ERROR(node_->get_logger(), "Cannot determine planning group for joint: %s", first_joint.c_str());
+          RCLCPP_ERROR(node_->get_logger(), "Unknown planning group for joint: %s", first_joint.c_str());
           return false;
         }
       }
       else
       {
-        RCLCPP_WARN(node_->get_logger(), "No joint names in trajectory, skipping");
-        continue;
+        continue;  // Skip trajectories without joint names
       }
 
-      RCLCPP_INFO(node_->get_logger(), "Executing sub-trajectory for group '%s' with %zu points",
+      RCLCPP_DEBUG(node_->get_logger(), "Executing sub-trajectory: %s (%zu pts)",
                   group_name.c_str(), sub_traj.trajectory.joint_trajectory.points.size());
 
       // Create MoveGroupInterface for this group
@@ -256,20 +254,20 @@ bool MTCTaskBuilder::executeTaskDirect(mtc::Task& task)
 
       // Execute the trajectory directly using the message
       auto result = move_group->execute(sub_traj.trajectory);
-      
+
       if (result != moveit::core::MoveItErrorCode::SUCCESS)
       {
-        RCLCPP_ERROR(node_->get_logger(), "Sub-trajectory execution failed with error code: %d", result.val);
+        RCLCPP_ERROR(node_->get_logger(), "Sub-trajectory failed: code=%d", result.val);
         return false;
       }
     }
 
-    RCLCPP_INFO(node_->get_logger(), "Direct task execution succeeded");
+    RCLCPP_DEBUG(node_->get_logger(), "Direct execution succeeded");
     return true;
   }
   catch (const std::exception& e)
   {
-    RCLCPP_ERROR(node_->get_logger(), "Direct task execution exception: %s", e.what());
+    RCLCPP_ERROR(node_->get_logger(), "Direct execution exception: %s", e.what());
     return false;
   }
 }
@@ -338,17 +336,16 @@ bool MTCTaskBuilder::executeSubTrajectory(mtc::Task& task, size_t index)
           }
           else
           {
-            RCLCPP_ERROR(node_->get_logger(), "Cannot determine planning group for joint: %s", first_joint.c_str());
+            RCLCPP_ERROR(node_->get_logger(), "Unknown group for joint: %s", first_joint.c_str());
             return false;
           }
         }
         else
         {
-          RCLCPP_WARN(node_->get_logger(), "No joint names in trajectory");
           return true;  // Skip empty trajectory
         }
 
-        RCLCPP_INFO(node_->get_logger(), "Executing sub-trajectory %zu for group '%s' with %zu points",
+        RCLCPP_DEBUG(node_->get_logger(), "Executing traj %zu: %s (%zu pts)",
                     index, group_name.c_str(), sub_traj.trajectory.joint_trajectory.points.size());
 
         auto move_group = std::make_shared<moveit::planning_interface::MoveGroupInterface>(node_, group_name);
@@ -356,7 +353,7 @@ bool MTCTaskBuilder::executeSubTrajectory(mtc::Task& task, size_t index)
 
         if (result != moveit::core::MoveItErrorCode::SUCCESS)
         {
-          RCLCPP_ERROR(node_->get_logger(), "Sub-trajectory execution failed with error code: %d", result.val);
+          RCLCPP_ERROR(node_->get_logger(), "Trajectory %zu failed: code=%d", index, result.val);
           return false;
         }
         return true;
@@ -364,12 +361,12 @@ bool MTCTaskBuilder::executeSubTrajectory(mtc::Task& task, size_t index)
       current_idx++;
     }
 
-    RCLCPP_ERROR(node_->get_logger(), "Sub-trajectory index %zu out of range", index);
+    RCLCPP_ERROR(node_->get_logger(), "Trajectory index %zu out of range", index);
     return false;
   }
   catch (const std::exception& e)
   {
-    RCLCPP_ERROR(node_->get_logger(), "Sub-trajectory execution exception: %s", e.what());
+    RCLCPP_ERROR(node_->get_logger(), "Trajectory execution exception: %s", e.what());
     return false;
   }
 }
@@ -391,18 +388,8 @@ void MTCTaskBuilder::addMoveJStage(
     target.header.frame_id = "world";
   }
 
-  // Select planner:
-  // - Pilz PTP: Plans in joint space with minimal joint motion (deterministic)
-  // - OMPL RRTConnect: Can find paths around obstacles (randomized, good for retries)
+  // Select planner
   auto& planner = use_ompl ? sampling_planner_ : ptp_planner_;
-  const char* planner_name = use_ompl ? "OMPL" : "Pilz-PTP";
-
-  RCLCPP_INFO(node_->get_logger(),
-    "MoveJ[%d] %s [%s] -> frame=%s pos=[%.3f, %.3f, %.3f] orient=[%.3f, %.3f, %.3f, %.3f]",
-    step_index, step.robot_name.c_str(), planner_name, target.header.frame_id.c_str(),
-    target.pose.position.x, target.pose.position.y, target.pose.position.z,
-    target.pose.orientation.x, target.pose.orientation.y,
-    target.pose.orientation.z, target.pose.orientation.w);
 
   auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, planner);
   stage->setGroup(group);
@@ -422,7 +409,6 @@ void MTCTaskBuilder::addMoveLStage(
   std::string ee_link = getEndEffectorLink(step.robot_name);
 
   // Use Pilz LIN planner for Cartesian linear motions
-  // It's specifically designed for linear paths and handles singularities better
   auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, lin_planner_);
   stage->setGroup(group);
 
@@ -433,16 +419,7 @@ void MTCTaskBuilder::addMoveLStage(
     target.header.frame_id = "world";
   }
 
-  RCLCPP_INFO(node_->get_logger(),
-    "MoveL[%d] %s [Pilz-LIN] -> frame=%s pos=[%.3f, %.3f, %.3f] orient=[%.3f, %.3f, %.3f, %.3f]",
-    step_index, step.robot_name.c_str(), target.header.frame_id.c_str(),
-    target.pose.position.x, target.pose.position.y, target.pose.position.z,
-    target.pose.orientation.x, target.pose.orientation.y,
-    target.pose.orientation.z, target.pose.orientation.w);
-
   stage->setGoal(target);
-
-  // Set IK frame to the end effector
   stage->setIKFrame(ee_link);
 
   task.add(std::move(stage));
@@ -579,8 +556,6 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
         sol.joint_values = joint_values;
         sol.planning_group = group_name;
         solutions.push_back(sol);
-
-        RCLCPP_DEBUG(node_->get_logger(), "Found IK solution %zu for %s", solutions.size(), robot_name.c_str());
       }
     }
   }
@@ -599,9 +574,8 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
       return dist_a < dist_b;
     });
 
-  RCLCPP_INFO(node_->get_logger(), "Computed %zu IK solutions for %s at pos=[%.3f, %.3f, %.3f] (sorted by distance)",
-              solutions.size(), robot_name.c_str(),
-              target_pose.pose.position.x, target_pose.pose.position.y, target_pose.pose.position.z);
+  RCLCPP_DEBUG(node_->get_logger(), "IK: %zu solutions for %s",
+              solutions.size(), robot_name.c_str());
 
   return solutions;
 }
@@ -638,21 +612,8 @@ void MTCTaskBuilder::addMoveJStageWithJoints(
     joint_goal[joint_names[i]] = joint_values[i];
   }
 
-  // Select planner:
-  // - Pilz PTP: Direct joint interpolation, minimal motion (but may fail if obstacles in path)
-  // - OMPL: Can plan around obstacles (but paths may have more joint movement)
+  // Select planner
   auto& planner = use_sampling_planner ? sampling_planner_ : ptp_planner_;
-  const char* planner_name = use_sampling_planner ? "OMPL" : "Pilz-PTP";
-
-  RCLCPP_DEBUG(node_->get_logger(),
-    "MoveJ[%d] %s [%s] -> j0=%.3f j1=%.3f j2=%.3f j3=%.3f j4=%.3f j5=%.3f",
-    step_index, robot_name.c_str(), planner_name,
-    joint_values.size() > 0 ? joint_values[0] : 0.0,
-    joint_values.size() > 1 ? joint_values[1] : 0.0,
-    joint_values.size() > 2 ? joint_values[2] : 0.0,
-    joint_values.size() > 3 ? joint_values[3] : 0.0,
-    joint_values.size() > 4 ? joint_values[4] : 0.0,
-    joint_values.size() > 5 ? joint_values[5] : 0.0);
 
   auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, planner);
   stage->setGroup(group);
