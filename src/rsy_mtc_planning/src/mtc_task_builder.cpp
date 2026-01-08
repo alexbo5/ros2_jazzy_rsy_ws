@@ -24,6 +24,9 @@
 #include <moveit/task_constructor/stages/move_to.h>
 #include <moveit/task_constructor/stages/move_relative.h>
 #include <moveit_task_constructor_msgs/msg/solution.hpp>
+#include <tf2_eigen/tf2_eigen.hpp>
+#include <set>
+#include <algorithm>
 
 namespace rsy_mtc_planning
 {
@@ -54,8 +57,18 @@ MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node)
   planning_scene_ = std::make_shared<planning_scene::PlanningScene>(robot_model_);
 
   // Create planners
-  sampling_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_);
+  // OMPL RRTConnect planner (fast, explores configuration space randomly)
+  sampling_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "ompl", "RRTConnect");
   sampling_planner_->setTimeout(10.0);  // Increase from default 1.0s to 10s for RRTConnect
+
+  // Pilz PTP planner for MoveJ - plans in joint space with minimal joint motion
+  // This planner interpolates in joint space and is deterministic (no random seeds)
+  ptp_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "pilz_industrial_motion_planner", "PTP");
+  ptp_planner_->setTimeout(5.0);
+
+  // Pilz LIN planner for Cartesian linear motions
+  lin_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "pilz_industrial_motion_planner", "LIN");
+  lin_planner_->setTimeout(5.0);
 
   cartesian_planner_ = std::make_shared<mtc::solvers::CartesianPath>();
   joint_interpolation_planner_ = std::make_shared<mtc::solvers::JointInterpolationPlanner>();
@@ -79,7 +92,8 @@ MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node)
 
 mtc::Task MTCTaskBuilder::buildTask(
   const std::vector<rsy_mtc_planning::msg::MotionStep>& steps,
-  const std::string& task_name)
+  const std::string& task_name,
+  bool use_ompl_fallback)
 {
   mtc::Task task;
   task.setName(task_name);  // Set the task name on the task object
@@ -101,7 +115,7 @@ mtc::Task MTCTaskBuilder::buildTask(
     switch (step.motion_type)
     {
       case rsy_mtc_planning::msg::MotionStep::MOVE_J:
-        addMoveJStage(task, step, static_cast<int>(i));
+        addMoveJStage(task, step, static_cast<int>(i), use_ompl_fallback);
         break;
 
       case rsy_mtc_planning::msg::MotionStep::MOVE_L:
@@ -363,7 +377,8 @@ bool MTCTaskBuilder::executeSubTrajectory(mtc::Task& task, size_t index)
 void MTCTaskBuilder::addMoveJStage(
   mtc::Task& task,
   const rsy_mtc_planning::msg::MotionStep& step,
-  int step_index)
+  int step_index,
+  bool use_ompl)
 {
   std::string stage_name = "move_j_" + std::to_string(step_index);
   std::string group = getPlanningGroup(step.robot_name);
@@ -376,16 +391,20 @@ void MTCTaskBuilder::addMoveJStage(
     target.header.frame_id = "world";
   }
 
+  // Select planner:
+  // - Pilz PTP: Plans in joint space with minimal joint motion (deterministic)
+  // - OMPL RRTConnect: Can find paths around obstacles (randomized, good for retries)
+  auto& planner = use_ompl ? sampling_planner_ : ptp_planner_;
+  const char* planner_name = use_ompl ? "OMPL" : "Pilz-PTP";
+
   RCLCPP_INFO(node_->get_logger(),
-    "MoveJ[%d] %s -> frame=%s pos=[%.3f, %.3f, %.3f] orient=[%.3f, %.3f, %.3f, %.3f]",
-    step_index, step.robot_name.c_str(), target.header.frame_id.c_str(),
+    "MoveJ[%d] %s [%s] -> frame=%s pos=[%.3f, %.3f, %.3f] orient=[%.3f, %.3f, %.3f, %.3f]",
+    step_index, step.robot_name.c_str(), planner_name, target.header.frame_id.c_str(),
     target.pose.position.x, target.pose.position.y, target.pose.position.z,
     target.pose.orientation.x, target.pose.orientation.y,
     target.pose.orientation.z, target.pose.orientation.w);
 
-  // Use standard MoveTo stage for now
-  // Multi-IK exploration is handled by retry logic in motion_sequence_server
-  auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, sampling_planner_);
+  auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, planner);
   stage->setGroup(group);
   stage->setGoal(target);
   stage->setIKFrame(ee_link);
@@ -402,7 +421,9 @@ void MTCTaskBuilder::addMoveLStage(
   std::string group = getPlanningGroup(step.robot_name);
   std::string ee_link = getEndEffectorLink(step.robot_name);
 
-  auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, cartesian_planner_);
+  // Use Pilz LIN planner for Cartesian linear motions
+  // It's specifically designed for linear paths and handles singularities better
+  auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, lin_planner_);
   stage->setGroup(group);
 
   // Set target pose
@@ -413,7 +434,7 @@ void MTCTaskBuilder::addMoveLStage(
   }
 
   RCLCPP_INFO(node_->get_logger(),
-    "MoveL[%d] %s -> frame=%s pos=[%.3f, %.3f, %.3f] orient=[%.3f, %.3f, %.3f, %.3f]",
+    "MoveL[%d] %s [Pilz-LIN] -> frame=%s pos=[%.3f, %.3f, %.3f] orient=[%.3f, %.3f, %.3f, %.3f]",
     step_index, step.robot_name.c_str(), target.header.frame_id.c_str(),
     target.pose.position.x, target.pose.position.y, target.pose.position.z,
     target.pose.orientation.x, target.pose.orientation.y,
@@ -477,6 +498,249 @@ std::string MTCTaskBuilder::getGripperGroup(const std::string& robot_name) const
   }
   RCLCPP_WARN(node_->get_logger(), "Unknown robot '%s', using default gripper group", robot_name.c_str());
   return robot_name + "_gripper";
+}
+
+void MTCTaskBuilder::updatePlanningScene()
+{
+  planning_scene_monitor_->requestPlanningSceneState();
+  planning_scene_monitor::LockedPlanningSceneRO locked_scene(planning_scene_monitor_);
+  planning_scene_ = locked_scene->diff();
+}
+
+std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
+  const std::string& robot_name,
+  const geometry_msgs::msg::PoseStamped& target_pose,
+  int max_solutions)
+{
+  std::vector<IKSolution> solutions;
+
+  std::string group_name = getPlanningGroup(robot_name);
+  std::string ee_link = getEndEffectorLink(robot_name);
+
+  const moveit::core::JointModelGroup* jmg = robot_model_->getJointModelGroup(group_name);
+  if (!jmg)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Failed to get joint model group '%s'", group_name.c_str());
+    return solutions;
+  }
+
+  // Get current state from planning scene monitor
+  planning_scene_monitor_->requestPlanningSceneState();
+  moveit::core::RobotState robot_state(robot_model_);
+  std::vector<double> current_joint_values;
+  {
+    planning_scene_monitor::LockedPlanningSceneRO locked_scene(planning_scene_monitor_);
+    robot_state = locked_scene->getCurrentState();
+    robot_state.copyJointGroupPositions(jmg, current_joint_values);
+  }
+
+  // Convert pose to Eigen
+  Eigen::Isometry3d target_eigen;
+  tf2::fromMsg(target_pose.pose, target_eigen);
+
+  // Try to find multiple IK solutions using random seeds
+  std::set<std::vector<int>> seen_configs;  // To avoid duplicates (discretized)
+
+  for (int attempt = 0; attempt < max_solutions * 15 && static_cast<int>(solutions.size()) < max_solutions; ++attempt)
+  {
+    // Randomize joint positions for this attempt (to get different IK solutions)
+    if (attempt > 0)
+    {
+      robot_state.setToRandomPositions(jmg);
+    }
+
+    // Compute IK
+    if (robot_state.setFromIK(jmg, target_eigen, ee_link, 0.05))  // 0.05s timeout (faster)
+    {
+      // Check for collisions in current planning scene
+      planning_scene_monitor::LockedPlanningSceneRO locked_scene(planning_scene_monitor_);
+      if (locked_scene->isStateColliding(robot_state, group_name))
+      {
+        continue;  // Skip collision configurations
+      }
+
+      // Get joint values
+      std::vector<double> joint_values;
+      robot_state.copyJointGroupPositions(jmg, joint_values);
+
+      // Discretize for duplicate detection (0.1 rad resolution)
+      std::vector<int> discretized;
+      for (double v : joint_values)
+      {
+        discretized.push_back(static_cast<int>(v * 10));
+      }
+
+      // Check if we've seen this configuration before
+      if (seen_configs.find(discretized) == seen_configs.end())
+      {
+        seen_configs.insert(discretized);
+
+        IKSolution sol;
+        sol.joint_values = joint_values;
+        sol.planning_group = group_name;
+        solutions.push_back(sol);
+
+        RCLCPP_DEBUG(node_->get_logger(), "Found IK solution %zu for %s", solutions.size(), robot_name.c_str());
+      }
+    }
+  }
+
+  // Sort solutions by distance from current configuration (prefer closer solutions)
+  std::sort(solutions.begin(), solutions.end(),
+    [&current_joint_values](const IKSolution& a, const IKSolution& b) {
+      double dist_a = 0.0, dist_b = 0.0;
+      for (size_t i = 0; i < current_joint_values.size() && i < a.joint_values.size(); ++i)
+      {
+        double diff_a = a.joint_values[i] - current_joint_values[i];
+        double diff_b = b.joint_values[i] - current_joint_values[i];
+        dist_a += diff_a * diff_a;
+        dist_b += diff_b * diff_b;
+      }
+      return dist_a < dist_b;
+    });
+
+  RCLCPP_INFO(node_->get_logger(), "Computed %zu IK solutions for %s at pos=[%.3f, %.3f, %.3f] (sorted by distance)",
+              solutions.size(), robot_name.c_str(),
+              target_pose.pose.position.x, target_pose.pose.position.y, target_pose.pose.position.z);
+
+  return solutions;
+}
+
+void MTCTaskBuilder::addMoveJStageWithJoints(
+  mtc::Task& task,
+  const std::string& robot_name,
+  const std::vector<double>& joint_values,
+  int step_index,
+  bool use_sampling_planner)
+{
+  std::string stage_name = "move_j_" + std::to_string(step_index);
+  std::string group = getPlanningGroup(robot_name);
+
+  // Create joint-space goal
+  std::map<std::string, double> joint_goal;
+  const moveit::core::JointModelGroup* jmg = robot_model_->getJointModelGroup(group);
+  if (!jmg)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Failed to get joint model group '%s'", group.c_str());
+    return;
+  }
+
+  const std::vector<std::string>& joint_names = jmg->getVariableNames();
+  if (joint_names.size() != joint_values.size())
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Joint values size mismatch: expected %zu, got %zu",
+                 joint_names.size(), joint_values.size());
+    return;
+  }
+
+  for (size_t i = 0; i < joint_names.size(); ++i)
+  {
+    joint_goal[joint_names[i]] = joint_values[i];
+  }
+
+  // Select planner:
+  // - Pilz PTP: Direct joint interpolation, minimal motion (but may fail if obstacles in path)
+  // - OMPL: Can plan around obstacles (but paths may have more joint movement)
+  auto& planner = use_sampling_planner ? sampling_planner_ : ptp_planner_;
+  const char* planner_name = use_sampling_planner ? "OMPL" : "Pilz-PTP";
+
+  RCLCPP_DEBUG(node_->get_logger(),
+    "MoveJ[%d] %s [%s] -> j0=%.3f j1=%.3f j2=%.3f j3=%.3f j4=%.3f j5=%.3f",
+    step_index, robot_name.c_str(), planner_name,
+    joint_values.size() > 0 ? joint_values[0] : 0.0,
+    joint_values.size() > 1 ? joint_values[1] : 0.0,
+    joint_values.size() > 2 ? joint_values[2] : 0.0,
+    joint_values.size() > 3 ? joint_values[3] : 0.0,
+    joint_values.size() > 4 ? joint_values[4] : 0.0,
+    joint_values.size() > 5 ? joint_values[5] : 0.0);
+
+  auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, planner);
+  stage->setGroup(group);
+  stage->setGoal(joint_goal);
+
+  task.add(std::move(stage));
+}
+
+mtc::Task MTCTaskBuilder::buildTaskWithIK(
+  const std::vector<rsy_mtc_planning::msg::MotionStep>& steps,
+  const std::map<size_t, size_t>& ik_indices,
+  const std::vector<MoveJIKData>& movej_ik_data,
+  const std::string& task_name,
+  bool use_sampling_planner)
+{
+  mtc::Task task;
+  task.setName(task_name);
+  task.stages()->setName(task_name);
+  task.setRobotModel(robot_model_);
+  task.enableIntrospection();
+
+  // Add current state as the starting point
+  auto current_state = std::make_unique<mtc::stages::CurrentState>("current_state");
+  task.add(std::move(current_state));
+
+  // Create a map from step index to MoveJIKData index for quick lookup
+  std::map<size_t, size_t> step_to_movej_data;
+  for (size_t i = 0; i < movej_ik_data.size(); ++i)
+  {
+    step_to_movej_data[movej_ik_data[i].step_index] = i;
+  }
+
+  // Add stages for each motion step
+  for (size_t i = 0; i < steps.size(); ++i)
+  {
+    const auto& step = steps[i];
+
+    switch (step.motion_type)
+    {
+      case rsy_mtc_planning::msg::MotionStep::MOVE_J:
+      {
+        // Check if we have IK data and a selected index for this step
+        auto data_it = step_to_movej_data.find(i);
+        auto idx_it = ik_indices.find(i);
+
+        if (data_it != step_to_movej_data.end() && idx_it != ik_indices.end())
+        {
+          const auto& ik_data = movej_ik_data[data_it->second];
+          size_t ik_idx = idx_it->second;
+
+          if (ik_idx < ik_data.ik_solutions.size())
+          {
+            // Use specific IK solution with selected planner
+            addMoveJStageWithJoints(task, step.robot_name,
+                                    ik_data.ik_solutions[ik_idx].joint_values,
+                                    static_cast<int>(i),
+                                    use_sampling_planner);
+          }
+          else
+          {
+            // Fallback to pose goal
+            addMoveJStage(task, step, static_cast<int>(i), use_sampling_planner);
+          }
+        }
+        else
+        {
+          // No IK data, use pose goal
+          addMoveJStage(task, step, static_cast<int>(i), use_sampling_planner);
+        }
+        break;
+      }
+
+      case rsy_mtc_planning::msg::MotionStep::MOVE_L:
+        addMoveLStage(task, step, static_cast<int>(i));
+        break;
+
+      case rsy_mtc_planning::msg::MotionStep::GRIPPER_OPEN:
+      case rsy_mtc_planning::msg::MotionStep::GRIPPER_CLOSE:
+        addGripperStage(task, step, static_cast<int>(i));
+        break;
+
+      default:
+        RCLCPP_WARN(node_->get_logger(), "Unknown motion type %d at step %zu", step.motion_type, i);
+        break;
+    }
+  }
+
+  return task;
 }
 
 }  // namespace rsy_mtc_planning

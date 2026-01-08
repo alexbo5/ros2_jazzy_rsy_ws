@@ -21,6 +21,8 @@
   <depend>moveit_ros_planning</depend>
   <depend>moveit_ros_planning_interface</depend>
   <depend>moveit_task_constructor_core</depend>
+  <depend>moveit_task_constructor_msgs</depend>
+  <depend>tf2_eigen</depend>
 
   <!-- Project dependencies -->
   <depend>rsy_gripper_controller</depend>

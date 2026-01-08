@@ -60,7 +60,7 @@ GRIPPER_FORWARD_DIRECTION = np.array([0.0, 0.0, 1.0])
 # distance (mm) from cube center to gripper contact point
 OFFSET_DIST_HOLD_CUBE = 0     # distance when holding the cube (grasps 2 rows of cube)
 OFFSET_DIST_SPIN_CUBE = 20    # distance when spinning the cube (grasps 1 row of cube)
-OFFSET_DIST_PRE_TARGET = 100   # distance when approaching the cube (pre-grasp position)
+OFFSET_DIST_PRE_TARGET = 150   # distance when approaching the cube (pre-grasp position)
 OFFSET_DIST_TAKE_CUBE = 40    # distance when taking up the cube from rest position
 
 

@@ -14,10 +14,32 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <map>
 #include <unordered_map>
+#include <optional>
 
 namespace rsy_mtc_planning
 {
+
+/**
+ * @brief Represents an IK solution for a MoveJ step
+ */
+struct IKSolution
+{
+  std::vector<double> joint_values;
+  std::string planning_group;
+};
+
+/**
+ * @brief Represents IK solutions for a MoveJ step with metadata
+ */
+struct MoveJIKData
+{
+  size_t step_index;                      // Index in original motion steps
+  std::string robot_name;
+  geometry_msgs::msg::PoseStamped target_pose;
+  std::vector<IKSolution> ik_solutions;   // All valid IK solutions for this pose
+};
 
 /**
  * @brief Builder class for constructing MoveIt Task Constructor tasks
@@ -38,11 +60,13 @@ public:
    * @brief Build a task from a sequence of motion steps
    * @param steps Vector of motion steps to execute
    * @param task_name Name for the task
+   * @param use_ompl_fallback If true, use OMPL for MoveJ instead of Pilz PTP
    * @return Configured Task object
    */
   moveit::task_constructor::Task buildTask(
     const std::vector<rsy_mtc_planning::msg::MotionStep>& steps,
-    const std::string& task_name = "motion_sequence");
+    const std::string& task_name = "motion_sequence",
+    bool use_ompl_fallback = false);
 
   /**
    * @brief Plan the task
@@ -81,12 +105,60 @@ public:
    */
   bool executeSubTrajectory(moveit::task_constructor::Task& task, size_t index);
 
+  /**
+   * @brief Compute multiple IK solutions for a target pose
+   * @param robot_name The robot name ("robot1" or "robot2")
+   * @param target_pose Target pose for the end effector
+   * @param max_solutions Maximum number of IK solutions to compute
+   * @return Vector of IK solutions (may be empty if no valid IK found)
+   */
+  std::vector<IKSolution> computeIKSolutions(
+    const std::string& robot_name,
+    const geometry_msgs::msg::PoseStamped& target_pose,
+    int max_solutions = 8);
+
+  /**
+   * @brief Build a task with specific IK configurations for MoveJ steps
+   * @param steps Vector of motion steps
+   * @param ik_indices Map from step index to IK solution index (for MoveJ steps)
+   * @param movej_ik_data Pre-computed IK data for MoveJ steps
+   * @param task_name Name for the task
+   * @param use_sampling_planner If true, use OMPL for MoveJ (obstacle avoidance); false uses Pilz PTP (minimal motion)
+   * @return Configured Task object
+   */
+  moveit::task_constructor::Task buildTaskWithIK(
+    const std::vector<rsy_mtc_planning::msg::MotionStep>& steps,
+    const std::map<size_t, size_t>& ik_indices,
+    const std::vector<MoveJIKData>& movej_ik_data,
+    const std::string& task_name = "motion_sequence",
+    bool use_sampling_planner = false);
+
+  /**
+   * @brief Get the robot model for IK computation
+   */
+  moveit::core::RobotModelPtr getRobotModel() const { return robot_model_; }
+
+  /**
+   * @brief Update planning scene from current state
+   */
+  void updatePlanningScene();
+
 private:
-  // Add a MoveJ (PTP) stage to the task
+  // Add a MoveJ (PTP) stage to the task with pose goal
   void addMoveJStage(
     moveit::task_constructor::Task& task,
     const rsy_mtc_planning::msg::MotionStep& step,
-    int step_index);
+    int step_index,
+    bool use_ompl = false);
+
+  // Add a MoveJ (PTP) stage with joint-space goal (specific IK solution)
+  // use_sampling_planner: if true, use OMPL (for obstacle avoidance); if false, use Pilz PTP (minimal motion)
+  void addMoveJStageWithJoints(
+    moveit::task_constructor::Task& task,
+    const std::string& robot_name,
+    const std::vector<double>& joint_values,
+    int step_index,
+    bool use_sampling_planner = false);
 
   // Add a MoveL (Linear) stage to the task
   void addMoveLStage(
@@ -122,8 +194,10 @@ private:
   planning_scene::PlanningScenePtr planning_scene_;
 
   // Planners for different motion types
-  std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner_;
-  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner_;
+  std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner_;      // OMPL RRTConnect
+  std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> ptp_planner_;           // Pilz PTP (minimal joint motion)
+  std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> lin_planner_;           // Pilz LIN (Cartesian linear)
+  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner_;       // MTC CartesianPath (fallback)
   std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> joint_interpolation_planner_;
 
   // Configuration

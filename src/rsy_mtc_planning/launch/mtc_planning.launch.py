@@ -35,6 +35,9 @@ def generate_launch_description():
     # Load joint limits explicitly for robot_description_planning parameter
     joint_limits = load_yaml('rsy_moveit_startup', 'config/joint_limits.yaml')
 
+    # Load cartesian limits for Pilz planner
+    cartesian_limits = load_yaml('rsy_moveit_startup', 'config/pilz_cartesian_limits.yaml')
+
     mtc_server = Node(
         package='rsy_mtc_planning',
         executable='mtc_motion_sequence_server',
@@ -47,9 +50,12 @@ def generate_launch_description():
             moveit_config.robot_description_kinematics,
             moveit_config.joint_limits,
             moveit_config.planning_pipelines,
-            # Joint limits must be under robot_description_planning.joint_limits for
-            # TimeOptimalTrajectoryGeneration to find acceleration limits
-            {"robot_description_planning": {"joint_limits": joint_limits}},
+            # Joint limits and cartesian limits must be under robot_description_planning
+            # for Pilz planner and TimeOptimalTrajectoryGeneration to work
+            {"robot_description_planning": {
+                "joint_limits": joint_limits,
+                "cartesian_limits": cartesian_limits["cartesian_limits"]
+            }},
             # Increase timeout for waiting on robot_description topics
             {'robot_description_timeout': 30.0},
         ],

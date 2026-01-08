@@ -138,52 +138,172 @@ void MotionSequenceServer::process_motion_sequence(
   // Update feedback
   feedback->current_step = 0;
   feedback->total_steps = static_cast<int32_t>(goal->motion_steps.size());
-  feedback->status = "Planning entire motion sequence";
+  feedback->status = "Computing IK solutions for backtracking";
   goal_handle->publish_feedback(feedback);
 
-  // Retry planning multiple times - each attempt uses different random seeds
-  const int max_planning_retries = 50;
+  // ===== TRUE BACKTRACKING WITH IK EXPLORATION =====
+  // 1. Identify all MoveJ steps and compute multiple IK solutions for each
+  // 2. Systematically try different combinations of IK solutions
+  // 3. Use backtracking to explore the search space
+
+  // Collect MoveJ steps and compute IK solutions
+  std::vector<MoveJIKData> movej_ik_data;
+  const int max_ik_per_step = 16;  // Maximum IK solutions to compute per MoveJ step
+
+  for (size_t i = 0; i < all_motion_steps.size(); ++i)
+  {
+    const auto& step = all_motion_steps[i];
+    if (step.motion_type == MotionStep::MOVE_J)
+    {
+      MoveJIKData ik_data;
+      ik_data.step_index = i;
+      ik_data.robot_name = step.robot_name;
+      ik_data.target_pose = step.target_pose;
+      ik_data.ik_solutions = task_builder_->computeIKSolutions(step.robot_name, step.target_pose, max_ik_per_step);
+
+      if (ik_data.ik_solutions.empty())
+      {
+        RCLCPP_WARN(get_logger(), "No IK solutions found for MoveJ step %zu (%s), will use pose goal",
+                    i, step.robot_name.c_str());
+      }
+
+      movej_ik_data.push_back(ik_data);
+    }
+  }
+
+  // Calculate total combinations
+  size_t total_combinations = 1;
+  for (const auto& ik_data : movej_ik_data)
+  {
+    size_t num_solutions = ik_data.ik_solutions.empty() ? 1 : ik_data.ik_solutions.size();
+    total_combinations *= num_solutions;
+  }
+
+  RCLCPP_INFO(get_logger(), "Found %zu MoveJ steps with %zu total IK combinations to explore",
+              movej_ik_data.size(), total_combinations);
+
+  // Update feedback
+  feedback->status = "Exploring IK combinations with backtracking";
+  goal_handle->publish_feedback(feedback);
+
+  // ===== TWO-PHASE BACKTRACKING SEARCH =====
+  // Phase 1: Try with Pilz PTP (fast, minimal joint motion)
+  // Phase 2: If phase 1 fails, try with OMPL (can avoid obstacles, but more joint motion)
+
   bool planning_succeeded = false;
   moveit::task_constructor::Task successful_task;
+  size_t total_combinations_tried = 0;
 
-  for (int retry = 0; retry < max_planning_retries && !planning_succeeded; ++retry)
+  for (int phase = 1; phase <= 2 && !planning_succeeded; ++phase)
   {
-    if (goal_handle->is_canceling())
-    {
-      result->success = false;
-      result->message = "Canceled";
-      goal_handle->canceled(result);
-      return;
-    }
+    bool use_ompl = (phase == 2);
+    const char* planner_name = use_ompl ? "OMPL" : "Pilz-PTP";
 
-    if (retry > 0)
-    {
-      RCLCPP_INFO(get_logger(), "Retrying planning (attempt %d/%d)", retry + 1, max_planning_retries);
-    }
+    // Phase 1 (Pilz): Try fewer combinations since they're sorted by distance
+    // Phase 2 (OMPL): Try more combinations since OMPL can find paths around obstacles
+    const size_t phase_max = use_ompl ?
+      std::min(total_combinations, static_cast<size_t>(1000)) :
+      std::min(total_combinations, static_cast<size_t>(500));
 
-    try
-    {
-      // Build task with ALL motion steps
-      auto task = task_builder_->buildTask(all_motion_steps, "full_motion_sequence");
+    RCLCPP_INFO(get_logger(), "=== Phase %d: Using %s planner (up to %zu combinations) ===",
+                phase, planner_name, phase_max);
 
-      // Plan with multiple solutions so MTC can explore different IK options
-      if (task_builder_->planTask(task, 10))
+    // Reset IK indices for this phase
+    std::vector<size_t> current_ik_indices(movej_ik_data.size(), 0);
+    size_t combinations_tried = 0;
+
+    while (!planning_succeeded && combinations_tried < phase_max)
+    {
+      if (goal_handle->is_canceling())
       {
-        planning_succeeded = true;
-        successful_task = std::move(task);
+        result->success = false;
+        result->message = "Canceled";
+        goal_handle->canceled(result);
+        return;
       }
-    }
-    catch (const std::exception& e)
-    {
-      RCLCPP_WARN(get_logger(), "Planning attempt %d failed: %s", retry + 1, e.what());
+
+      combinations_tried++;
+      total_combinations_tried++;
+
+      // Build ik_indices map for buildTaskWithIK
+      std::map<size_t, size_t> ik_indices;
+      for (size_t i = 0; i < movej_ik_data.size(); ++i)
+      {
+        if (!movej_ik_data[i].ik_solutions.empty())
+        {
+          ik_indices[movej_ik_data[i].step_index] = current_ik_indices[i];
+        }
+      }
+
+      // Log progress (less frequently for speed)
+      if (combinations_tried == 1 || combinations_tried % 100 == 0)
+      {
+        std::string combo_str;
+        for (size_t i = 0; i < current_ik_indices.size(); ++i)
+        {
+          combo_str += std::to_string(current_ik_indices[i]);
+          if (i < current_ik_indices.size() - 1) combo_str += ",";
+        }
+        RCLCPP_INFO(get_logger(), "[%s] Trying IK combination %zu/%zu [%s]",
+                    planner_name, combinations_tried, phase_max, combo_str.c_str());
+      }
+
+      try
+      {
+        // Build task with specific IK solutions and selected planner
+        auto task = task_builder_->buildTaskWithIK(all_motion_steps, ik_indices, movej_ik_data,
+                                                    "full_motion_sequence", use_ompl);
+
+        // Try to plan
+        if (task_builder_->planTask(task, 1))
+        {
+          planning_succeeded = true;
+          successful_task = std::move(task);
+          RCLCPP_INFO(get_logger(), "Planning succeeded with %s at combination %zu (total: %zu)!",
+                      planner_name, combinations_tried, total_combinations_tried);
+        }
+      }
+      catch (const std::exception& e)
+      {
+        RCLCPP_DEBUG(get_logger(), "[%s] IK combination %zu failed: %s", planner_name, combinations_tried, e.what());
+      }
+
+      if (!planning_succeeded)
+      {
+        // Advance to next combination (like counting in mixed-radix)
+        bool carry = true;
+        for (size_t i = movej_ik_data.size(); i > 0 && carry; --i)
+        {
+          size_t idx = i - 1;
+          size_t max_idx = movej_ik_data[idx].ik_solutions.empty() ? 1 : movej_ik_data[idx].ik_solutions.size();
+
+          current_ik_indices[idx]++;
+          if (current_ik_indices[idx] >= max_idx)
+          {
+            current_ik_indices[idx] = 0;
+          }
+          else
+          {
+            carry = false;
+          }
+        }
+
+        // If we've wrapped around completely, we're done with this phase
+        if (carry)
+        {
+          RCLCPP_INFO(get_logger(), "[%s] Exhausted all %zu IK combinations", planner_name, combinations_tried);
+          break;
+        }
+      }
     }
   }
 
   if (!planning_succeeded)
   {
-    RCLCPP_ERROR(get_logger(), "Planning failed after %d attempts", max_planning_retries);
+    RCLCPP_ERROR(get_logger(), "Planning failed after trying %zu IK combinations in both phases",
+                 total_combinations_tried);
     result->success = false;
-    result->message = "Planning failed for motion sequence";
+    result->message = "Planning failed: no IK combination allows feasible paths";
     result->failed_step_index = 0;
     goal_handle->abort(result);
     return;

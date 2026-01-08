@@ -19,6 +19,7 @@ find_package(moveit_task_constructor_core REQUIRED)
 find_package(moveit_task_constructor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(rsy_gripper_controller REQUIRED)
+find_package(tf2_eigen REQUIRED)
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -51,6 +52,7 @@ ament_target_dependencies(mtc_motion_sequence_server
   moveit_task_constructor_core
   moveit_task_constructor_msgs
   rsy_gripper_controller
+  tf2_eigen
 )
 
 target_link_libraries(mtc_motion_sequence_server "${cpp_typesupport_target}")
