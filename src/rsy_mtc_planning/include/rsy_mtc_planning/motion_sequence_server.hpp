@@ -15,6 +15,7 @@
 #include "rsy_mtc_planning/action/execute_motion_sequence.hpp"
 #include "rsy_mtc_planning/msg/motion_step.hpp"
 #include "rsy_mtc_planning/mtc_task_builder.hpp"
+#include "rsy_mtc_planning/planning_logger.hpp"
 
 namespace rsy_mtc_planning
 {
@@ -84,6 +85,10 @@ private:
   size_t max_pilz_combinations_{500};
   size_t max_ompl_combinations_{1000};
   double robot_description_timeout_{30.0};
+
+  // Planning logger for performance analysis
+  std::unique_ptr<PlanningLogger> planning_logger_;
+  std::string log_file_path_;
 };
 
 }  // namespace rsy_mtc_planning

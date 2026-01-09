@@ -39,6 +39,7 @@ add_executable(mtc_motion_sequence_server
   src/main.cpp
   src/motion_sequence_server.cpp
   src/mtc_task_builder.cpp
+  src/planning_logger.cpp
 )
 
 ament_target_dependencies(mtc_motion_sequence_server

@@ -142,6 +142,82 @@ bool MTCTaskBuilder::planTask(mtc::Task& task, int max_solutions)
   }
 }
 
+PlanningResult MTCTaskBuilder::planTaskWithResult(mtc::Task& task, int max_solutions)
+{
+  PlanningResult result;
+
+  try
+  {
+    task.init();
+
+    if (!task.plan(max_solutions))
+    {
+      // Planning failed - try to identify which stage failed
+      result.success = false;
+
+      // Iterate through stages to find the one that failed
+      const auto* stages = task.stages();
+      if (stages)
+      {
+        for (size_t i = 0; i < stages->numChildren(); ++i)
+        {
+          const auto* stage = (*stages)[i];
+          if (stage && stage->solutions().empty() && !stage->failures().empty())
+          {
+            result.failed_stage_name = stage->name();
+
+            // Parse stage name to extract info (format: "move_j_X" or "move_l_X")
+            if (result.failed_stage_name.find("move_l_") == 0)
+            {
+              result.is_movel = true;
+              try {
+                result.failed_stage_index = std::stoi(result.failed_stage_name.substr(7));
+              } catch (...) {
+                result.failed_stage_index = -1;
+              }
+            }
+            else if (result.failed_stage_name.find("move_j_") == 0)
+            {
+              result.is_movel = false;
+              try {
+                result.failed_stage_index = std::stoi(result.failed_stage_name.substr(7));
+              } catch (...) {
+                result.failed_stage_index = -1;
+              }
+            }
+
+            // Extract robot name from planning group if available
+            // Stage names don't include robot, so we need to check the group
+            // For now, we'll extract it from the failed stage's properties if possible
+            result.error_message = "Stage '" + result.failed_stage_name + "' failed to find solution";
+
+            RCLCPP_DEBUG(node_->get_logger(), "Planning failed at stage '%s' (index %d, is_movel=%d)",
+                        result.failed_stage_name.c_str(), result.failed_stage_index, result.is_movel);
+            break;
+          }
+        }
+      }
+
+      if (result.failed_stage_name.empty())
+      {
+        result.error_message = "Planning failed (unknown stage)";
+      }
+
+      return result;
+    }
+
+    result.success = true;
+    return result;
+  }
+  catch (const std::exception& e)
+  {
+    result.success = false;
+    result.error_message = e.what();
+    RCLCPP_DEBUG(node_->get_logger(), "Planning exception: %s", e.what());
+    return result;
+  }
+}
+
 bool MTCTaskBuilder::executeTask(mtc::Task& task)
 {
   if (task.numSolutions() == 0)

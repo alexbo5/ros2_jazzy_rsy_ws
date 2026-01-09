@@ -16,28 +16,28 @@ mtc_motion_sequence_server:
 
     # Velocity scaling (0.0 - 1.0)
     velocity_scaling:
-      ptp: 0.5    # Point-to-point motions
-      lin: 0.3    # Linear motions (slower for precision)
+      ptp: 0.05    # Point-to-point motions
+      lin: 0.03    # Linear motions (slower for precision)
 
     # Acceleration scaling (0.0 - 1.0)
     acceleration_scaling:
-      ptp: 0.5
-      lin: 0.3
+      ptp: 0.05
+      lin: 0.03
 
     # IK computation settings
     ik:
-      max_solutions_per_step: 16    # Maximum IK solutions to compute per MoveJ step
+      max_solutions_per_step: 32    # Maximum IK solutions to compute per MoveJ step
 
     # Backtracking search limits
     backtracking:
-      max_pilz_combinations: 200    # Max combinations to try with Pilz PTP (phase 1)
-      max_ompl_combinations: 1000   # Max combinations to try with OMPL (phase 2)
+      max_pilz_combinations: 20    # Max combinations to try with Pilz PTP (phase 1)
+      max_ompl_combinations: 1024   # Max combinations to try with OMPL (phase 2)
 
     # Planner timeouts (seconds)
     planner_timeout:
-      ompl: 10.0       # OMPL planner timeout
-      pilz_ptp: 5.0    # Pilz PTP planner timeout
-      pilz_lin: 5.0    # Pilz LIN planner timeout
+      ompl: 30.0       # OMPL planner timeout (increased for better solutions)
+      pilz_ptp: 15.0   # Pilz PTP planner timeout (increased for robot2)
+      pilz_lin: 15.0   # Pilz LIN planner timeout (increased for robot2)
 
     # OMPL planner configuration
     # Available planners: RRTConnect, RRTstar, PRMstar, LazyPRMstar, TRRT

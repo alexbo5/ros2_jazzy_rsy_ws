@@ -62,6 +62,19 @@ struct MoveJIKData
 };
 
 /**
+ * @brief Result of a planning attempt with failure information
+ */
+struct PlanningResult
+{
+  bool success = false;
+  std::string failed_stage_name;          // Name of the stage that failed (e.g., "move_j_0", "move_l_2")
+  int failed_stage_index = -1;            // Index in the motion sequence (-1 if unknown)
+  std::string robot_name;                 // Robot involved in the failed stage
+  bool is_movel = false;                  // True if the failed stage was a MoveL
+  std::string error_message;
+};
+
+/**
  * @brief Builder class for constructing MoveIt Task Constructor tasks
  * 
  * This class provides methods to build motion sequences from MotionStep messages,
@@ -96,6 +109,14 @@ public:
    * @return true if planning succeeded
    */
   bool planTask(moveit::task_constructor::Task& task, int max_solutions = 1);
+
+  /**
+   * @brief Plan the task with detailed failure information
+   * @param task The task to plan
+   * @param max_solutions Maximum number of solutions to find
+   * @return PlanningResult with success status and failure details
+   */
+  PlanningResult planTaskWithResult(moveit::task_constructor::Task& task, int max_solutions = 1);
 
   /**
    * @brief Execute a planned task
