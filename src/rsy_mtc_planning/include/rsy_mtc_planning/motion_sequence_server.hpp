@@ -75,6 +75,15 @@ private:
 
   // Wait for robot_description to be received
   bool wait_for_robot_description(double timeout_sec = 30.0);
+
+  // Load planner configuration from parameters
+  PlannerConfig load_planner_config();
+
+  // Configurable parameters
+  int max_ik_per_step_{16};
+  size_t max_pilz_combinations_{500};
+  size_t max_ompl_combinations_{1000};
+  double robot_description_timeout_{30.0};
 };
 
 }  // namespace rsy_mtc_planning

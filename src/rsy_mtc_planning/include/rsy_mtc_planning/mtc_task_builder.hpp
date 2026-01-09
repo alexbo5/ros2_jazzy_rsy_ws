@@ -22,6 +22,26 @@ namespace rsy_mtc_planning
 {
 
 /**
+ * @brief Configuration for planner parameters
+ */
+struct PlannerConfig
+{
+  // Velocity and acceleration scaling
+  double velocity_scaling_ptp = 0.5;
+  double velocity_scaling_lin = 0.3;
+  double acceleration_scaling_ptp = 0.5;
+  double acceleration_scaling_lin = 0.3;
+
+  // Planner timeouts (seconds)
+  double timeout_ompl = 10.0;
+  double timeout_pilz_ptp = 5.0;
+  double timeout_pilz_lin = 5.0;
+
+  // OMPL planner configuration
+  std::string ompl_planner_id = "RRTstar";
+};
+
+/**
  * @brief Represents an IK solution for a MoveJ step
  */
 struct IKSolution
@@ -53,8 +73,9 @@ public:
   /**
    * @brief Construct a new MTCTaskBuilder
    * @param node Shared pointer to the ROS node for parameter access and logging
+   * @param config Planner configuration (optional, uses defaults if not provided)
    */
-  explicit MTCTaskBuilder(const rclcpp::Node::SharedPtr& node);
+  explicit MTCTaskBuilder(const rclcpp::Node::SharedPtr& node, const PlannerConfig& config = PlannerConfig());
 
   /**
    * @brief Build a task from a sequence of motion steps
@@ -166,20 +187,11 @@ private:
     const rsy_mtc_planning::msg::MotionStep& step,
     int step_index);
 
-  // Add a gripper stage to the task
-  void addGripperStage(
-    moveit::task_constructor::Task& task,
-    const rsy_mtc_planning::msg::MotionStep& step,
-    int step_index);
-
   // Get the planning group for a robot
   std::string getPlanningGroup(const std::string& robot_name) const;
 
   // Get the end effector link for a robot
   std::string getEndEffectorLink(const std::string& robot_name) const;
-
-  // Get the gripper group for a robot
-  std::string getGripperGroup(const std::string& robot_name) const;
 
   // Node reference for logging and parameters
   rclcpp::Node::SharedPtr node_;
@@ -194,11 +206,9 @@ private:
   planning_scene::PlanningScenePtr planning_scene_;
 
   // Planners for different motion types
-  std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner_;      // OMPL RRTConnect
+  std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner_;      // OMPL (configurable)
   std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> ptp_planner_;           // Pilz PTP (minimal joint motion)
   std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> lin_planner_;           // Pilz LIN (Cartesian linear)
-  std::shared_ptr<moveit::task_constructor::solvers::CartesianPath> cartesian_planner_;       // MTC CartesianPath (fallback)
-  std::shared_ptr<moveit::task_constructor::solvers::JointInterpolationPlanner> joint_interpolation_planner_;
 
   // Configuration
   double velocity_scaling_ptp_ = 0.5;
@@ -209,7 +219,6 @@ private:
   // Robot configurations
   std::unordered_map<std::string, std::string> planning_groups_;
   std::unordered_map<std::string, std::string> ee_links_;
-  std::unordered_map<std::string, std::string> gripper_groups_;
 
   // Planning scene monitor for trajectory execution
   planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor_;

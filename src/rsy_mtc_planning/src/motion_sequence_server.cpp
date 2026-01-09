@@ -6,6 +6,17 @@ namespace rsy_mtc_planning
 MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   : Node("motion_sequence_server", options)
 {
+  // Declare and load configurable parameters
+  this->declare_parameter("ik.max_solutions_per_step", 16);
+  this->declare_parameter("backtracking.max_pilz_combinations", 500);
+  this->declare_parameter("backtracking.max_ompl_combinations", 1000);
+  this->declare_parameter("robot_description_timeout", 30.0);
+
+  max_ik_per_step_ = this->get_parameter("ik.max_solutions_per_step").as_int();
+  max_pilz_combinations_ = static_cast<size_t>(this->get_parameter("backtracking.max_pilz_combinations").as_int());
+  max_ompl_combinations_ = static_cast<size_t>(this->get_parameter("backtracking.max_ompl_combinations").as_int());
+  robot_description_timeout_ = this->get_parameter("robot_description_timeout").as_double();
+
   // Check if robot_description is already available as a parameter
   if (this->has_parameter("robot_description"))
   {
@@ -15,18 +26,13 @@ MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   else
   {
     // Subscribe to /robot_description topic from robot_state_publisher
-    // This provides a single source of truth for the robot URDF
     RCLCPP_INFO(get_logger(), "Will subscribe to /robot_description topic...");
 
-    // Use transient_local QoS to get the last published message (robot_state_publisher uses this)
     auto qos = rclcpp::QoS(1).transient_local();
 
     robot_description_sub_ = this->create_subscription<std_msgs::msg::String>(
       "/robot_description", qos,
       std::bind(&MotionSequenceServer::robot_description_callback, this, std::placeholders::_1));
-
-    // Note: We don't wait here because the executor isn't running yet.
-    // The robot_description will be received when the executor starts spinning.
   }
 
   // Create action server
@@ -118,7 +124,8 @@ void MotionSequenceServer::process_motion_sequence(
 
     try
     {
-      task_builder_ = std::make_shared<MTCTaskBuilder>(shared_from_this());
+      PlannerConfig config = load_planner_config();
+      task_builder_ = std::make_shared<MTCTaskBuilder>(shared_from_this(), config);
     }
     catch (const std::exception& e)
     {
@@ -191,7 +198,6 @@ void MotionSequenceServer::process_motion_sequence(
 
   // Collect MoveJ steps and compute IK solutions
   std::vector<MoveJIKData> movej_ik_data;
-  const int max_ik_per_step = 16;  // Maximum IK solutions to compute per MoveJ step
 
   for (size_t i = 0; i < all_motion_steps.size(); ++i)
   {
@@ -202,7 +208,7 @@ void MotionSequenceServer::process_motion_sequence(
       ik_data.step_index = i;
       ik_data.robot_name = step.robot_name;
       ik_data.target_pose = step.target_pose;
-      ik_data.ik_solutions = task_builder_->computeIKSolutions(step.robot_name, step.target_pose, max_ik_per_step);
+      ik_data.ik_solutions = task_builder_->computeIKSolutions(step.robot_name, step.target_pose, max_ik_per_step_);
 
       if (ik_data.ik_solutions.empty())
       {
@@ -246,8 +252,8 @@ void MotionSequenceServer::process_motion_sequence(
     // Phase 1 (Pilz): Try fewer combinations since they're sorted by distance
     // Phase 2 (OMPL): Try more combinations since OMPL can find paths around obstacles
     const size_t phase_max = use_ompl ?
-      std::min(total_combinations, static_cast<size_t>(1000)) :
-      std::min(total_combinations, static_cast<size_t>(500));
+      std::min(total_combinations, max_ompl_combinations_) :
+      std::min(total_combinations, max_pilz_combinations_);
 
     RCLCPP_INFO(get_logger(), "Phase %d: %s (max %zu)", phase, planner_name.c_str(), phase_max);
 
@@ -529,6 +535,36 @@ bool MotionSequenceServer::wait_for_robot_description(double timeout_sec)
   return robot_description_cv_.wait_for(lock, std::chrono::duration<double>(timeout_sec), [this]() {
     return robot_description_received_.load();
   });
+}
+
+PlannerConfig MotionSequenceServer::load_planner_config()
+{
+  PlannerConfig config;
+
+  // Declare parameters with defaults
+  this->declare_parameter("velocity_scaling.ptp", config.velocity_scaling_ptp);
+  this->declare_parameter("velocity_scaling.lin", config.velocity_scaling_lin);
+  this->declare_parameter("acceleration_scaling.ptp", config.acceleration_scaling_ptp);
+  this->declare_parameter("acceleration_scaling.lin", config.acceleration_scaling_lin);
+  this->declare_parameter("planner_timeout.ompl", config.timeout_ompl);
+  this->declare_parameter("planner_timeout.pilz_ptp", config.timeout_pilz_ptp);
+  this->declare_parameter("planner_timeout.pilz_lin", config.timeout_pilz_lin);
+  this->declare_parameter("ompl.planner_id", config.ompl_planner_id);
+
+  // Load values
+  config.velocity_scaling_ptp = this->get_parameter("velocity_scaling.ptp").as_double();
+  config.velocity_scaling_lin = this->get_parameter("velocity_scaling.lin").as_double();
+  config.acceleration_scaling_ptp = this->get_parameter("acceleration_scaling.ptp").as_double();
+  config.acceleration_scaling_lin = this->get_parameter("acceleration_scaling.lin").as_double();
+  config.timeout_ompl = this->get_parameter("planner_timeout.ompl").as_double();
+  config.timeout_pilz_ptp = this->get_parameter("planner_timeout.pilz_ptp").as_double();
+  config.timeout_pilz_lin = this->get_parameter("planner_timeout.pilz_lin").as_double();
+  config.ompl_planner_id = this->get_parameter("ompl.planner_id").as_string();
+
+  RCLCPP_INFO(get_logger(), "Loaded planner config: vel_ptp=%.2f, vel_lin=%.2f, ompl=%s",
+              config.velocity_scaling_ptp, config.velocity_scaling_lin, config.ompl_planner_id.c_str());
+
+  return config;
 }
 
 }  // namespace rsy_mtc_planning

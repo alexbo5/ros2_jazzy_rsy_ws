@@ -13,7 +13,8 @@
       "Bash(done)",
       "WebFetch(domain:automaticaddison.com)",
       "WebFetch(domain:moveit.picknik.ai)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(ls:*)"
     ]
   }
 }

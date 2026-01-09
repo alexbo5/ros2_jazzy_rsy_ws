@@ -31,7 +31,6 @@ def generate_launch_description():
     bringup_pkg = get_package_share_directory("rsy_bringup")
     robot_pkg = get_package_share_directory("rsy_robot_startup")
     moveit_pkg = get_package_share_directory("rsy_moveit_startup")
-    path_planning_pkg = get_package_share_directory("rsy_path_planning")
     mtc_planning_pkg = get_package_share_directory("rsy_mtc_planning")
     cube_motion_pkg = get_package_share_directory("rsy_cube_motion")
     cube_perception_pkg = get_package_share_directory("rsy_cube_perception")
@@ -101,12 +100,6 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(mtc_planning_pkg, "launch", "mtc_planning.launch.py")
-            )
-        ),
-        # Legacy path planning (kept for compatibility)
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(path_planning_pkg, "launch", "path_planning.launch.py")
             )
         ),
         IncludeLaunchDescription(

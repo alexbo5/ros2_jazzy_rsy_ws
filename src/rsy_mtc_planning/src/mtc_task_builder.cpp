@@ -27,89 +27,18 @@
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <set>
 #include <algorithm>
-#include <fstream>
-#include <chrono>
-#include <iomanip>
-#include <ctime>
 
 namespace rsy_mtc_planning
 {
 
-// ============================================================================
-// COORDINATE DEBUG LOGGER - writes to /tmp/mtc_coordinates.log
-// ============================================================================
-class CoordinateLogger {
-public:
-  static CoordinateLogger& instance() {
-    static CoordinateLogger logger;
-    return logger;
-  }
-
-  void log(const std::string& message) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (!file_.is_open()) {
-      file_.open("/tmp/mtc_coordinates.log", std::ios::app);
-    }
-    if (file_.is_open()) {
-      auto now = std::chrono::system_clock::now();
-      auto time_t = std::chrono::system_clock::to_time_t(now);
-      auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                  now.time_since_epoch()) % 1000;
-      file_ << std::put_time(std::localtime(&time_t), "%H:%M:%S")
-            << "." << std::setfill('0') << std::setw(3) << ms.count()
-            << " | " << message << std::endl;
-      file_.flush();
-    }
-  }
-
-  void logSeparator(const std::string& title = "") {
-    std::string sep(70, '=');
-    log(sep);
-    if (!title.empty()) {
-      log("  " + title);
-      log(sep);
-    }
-  }
-
-  void logPose(const std::string& label, const std::string& robot,
-               const std::string& frame, double x, double y, double z,
-               double qx = 0, double qy = 0, double qz = 0, double qw = 1) {
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(6);
-    oss << label << " | robot=" << robot << " | frame=" << frame;
-    oss << " | pos=[" << x << ", " << y << ", " << z << "]";
-    oss << " | quat=[" << qx << ", " << qy << ", " << qz << ", " << qw << "]";
-    log(oss.str());
-  }
-
-  void logIKResult(const std::string& robot, size_t solution_idx,
-                   double x, double y, double z, bool collision_free) {
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(6);
-    oss << "IK_RESULT | robot=" << robot << " | solution=" << solution_idx;
-    oss << " | tcp_world_pos=[" << x << ", " << y << ", " << z << "]";
-    oss << " | collision_free=" << (collision_free ? "yes" : "no");
-    log(oss.str());
-  }
-
-private:
-  CoordinateLogger() = default;
-  ~CoordinateLogger() { if (file_.is_open()) file_.close(); }
-  std::ofstream file_;
-  std::mutex mutex_;
-};
-
-#define COORD_LOG(msg) CoordinateLogger::instance().log(msg)
-#define COORD_SEP(title) CoordinateLogger::instance().logSeparator(title)
-#define COORD_POSE(label, robot, frame, x, y, z, qx, qy, qz, qw) \
-  CoordinateLogger::instance().logPose(label, robot, frame, x, y, z, qx, qy, qz, qw)
-#define COORD_IK(robot, idx, x, y, z, ok) \
-  CoordinateLogger::instance().logIKResult(robot, idx, x, y, z, ok)
-
 namespace mtc = moveit::task_constructor;
 
-MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node)
-  : node_(node)
+MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node, const PlannerConfig& config)
+  : node_(node),
+    velocity_scaling_ptp_(config.velocity_scaling_ptp),
+    velocity_scaling_lin_(config.velocity_scaling_lin),
+    acceleration_scaling_ptp_(config.acceleration_scaling_ptp),
+    acceleration_scaling_lin_(config.acceleration_scaling_lin)
 {
   // Load robot model
   robot_model_loader_ = std::make_shared<robot_model_loader::RobotModelLoader>(node_, "robot_description");
@@ -131,36 +60,23 @@ MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node)
   // Create planning scene
   planning_scene_ = std::make_shared<planning_scene::PlanningScene>(robot_model_);
 
-  // Create planners
-  // OMPL RRTConnect planner (fast, explores configuration space randomly)
-  sampling_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "ompl", "RRTConnect");
-  sampling_planner_->setTimeout(10.0);  // Increase from default 1.0s to 10s for RRTConnect
+  // Create planners with configurable timeouts
+  sampling_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "ompl", config.ompl_planner_id);
+  sampling_planner_->setTimeout(config.timeout_ompl);
 
-  // Pilz PTP planner for MoveJ - plans in joint space with minimal joint motion
-  // This planner interpolates in joint space and is deterministic (no random seeds)
   ptp_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "pilz_industrial_motion_planner", "PTP");
-  ptp_planner_->setTimeout(5.0);
+  ptp_planner_->setTimeout(config.timeout_pilz_ptp);
 
-  // Pilz LIN planner for Cartesian linear motions
   lin_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "pilz_industrial_motion_planner", "LIN");
-  lin_planner_->setTimeout(5.0);
+  lin_planner_->setTimeout(config.timeout_pilz_lin);
 
-  cartesian_planner_ = std::make_shared<mtc::solvers::CartesianPath>();
-  joint_interpolation_planner_ = std::make_shared<mtc::solvers::JointInterpolationPlanner>();
-
-  // Configure cartesian planner
-  cartesian_planner_->setMaxVelocityScalingFactor(velocity_scaling_lin_);
-  cartesian_planner_->setMaxAccelerationScalingFactor(acceleration_scaling_lin_);
-  cartesian_planner_->setStepSize(0.01);
-  cartesian_planner_->setMinFraction(0.95);   // Allow 95% completion (was defaulting to 1.0)
+  RCLCPP_INFO(node_->get_logger(), "Using OMPL planner: %s", config.ompl_planner_id.c_str());
 
   // Setup robot configurations
   planning_groups_["robot1"] = "robot1_ur_manipulator";
   planning_groups_["robot2"] = "robot2_ur_manipulator";
   ee_links_["robot1"] = "robot1_tcp";
   ee_links_["robot2"] = "robot2_tcp";
-  gripper_groups_["robot1"] = "robot1_gripper";
-  gripper_groups_["robot2"] = "robot2_gripper";
 
   RCLCPP_DEBUG(node_->get_logger(), "MTCTaskBuilder initialized");
 }
@@ -170,11 +86,6 @@ mtc::Task MTCTaskBuilder::buildTask(
   const std::string& task_name,
   bool use_ompl_fallback)
 {
-  // Log new task to coordinate debug file
-  COORD_SEP("NEW TASK: " + task_name);
-  COORD_LOG("Building task with " + std::to_string(steps.size()) + " steps, ompl_fallback=" +
-            (use_ompl_fallback ? "true" : "false"));
-
   mtc::Task task;
   task.setName(task_name);  // Set the task name on the task object
   task.stages()->setName(task_name);
@@ -202,11 +113,6 @@ mtc::Task MTCTaskBuilder::buildTask(
         addMoveLStage(task, step, static_cast<int>(i));
         break;
 
-      case rsy_mtc_planning::msg::MotionStep::GRIPPER_OPEN:
-      case rsy_mtc_planning::msg::MotionStep::GRIPPER_CLOSE:
-        addGripperStage(task, step, static_cast<int>(i));
-        break;
-
       default:
         RCLCPP_WARN(node_->get_logger(), "Unknown motion type %d at step %zu", step.motion_type, i);
         break;
@@ -218,26 +124,20 @@ mtc::Task MTCTaskBuilder::buildTask(
 
 bool MTCTaskBuilder::planTask(mtc::Task& task, int max_solutions)
 {
-  COORD_LOG("PLANNING_START | task=" + task.name() + " | max_solutions=" + std::to_string(max_solutions));
-
   try
   {
-    // Initialize the task
     task.init();
 
-    // Plan the task
     if (!task.plan(max_solutions))
     {
-      COORD_LOG("PLANNING_FAILED | task=" + task.name() + " | reason=plan_returned_false");
       return false;
     }
 
-    COORD_LOG("PLANNING_SUCCESS | task=" + task.name() + " | solutions=" + std::to_string(task.numSolutions()));
     return true;
   }
   catch (const std::exception& e)
   {
-    COORD_LOG("PLANNING_FAILED | task=" + task.name() + " | exception=" + std::string(e.what()));
+    RCLCPP_DEBUG(node_->get_logger(), "Planning failed: %s", e.what());
     return false;
   }
 }
@@ -462,22 +362,12 @@ void MTCTaskBuilder::addMoveJStage(
   std::string group = getPlanningGroup(step.robot_name);
   std::string ee_link = getEndEffectorLink(step.robot_name);
 
-  // Set target pose
   geometry_msgs::msg::PoseStamped target = step.target_pose;
   if (target.header.frame_id.empty())
   {
     target.header.frame_id = "world";
   }
 
-  // Log to coordinate debug file
-  COORD_POSE("MOVE_J_REQUEST", step.robot_name, target.header.frame_id,
-             target.pose.position.x, target.pose.position.y, target.pose.position.z,
-             target.pose.orientation.x, target.pose.orientation.y,
-             target.pose.orientation.z, target.pose.orientation.w);
-  COORD_LOG("  -> step=" + std::to_string(step_index) + " ee_link=" + ee_link +
-            " planner=" + (use_ompl ? "OMPL" : "PTP"));
-
-  // Select planner
   auto& planner = use_ompl ? sampling_planner_ : ptp_planner_;
 
   auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, planner);
@@ -497,45 +387,17 @@ void MTCTaskBuilder::addMoveLStage(
   std::string group = getPlanningGroup(step.robot_name);
   std::string ee_link = getEndEffectorLink(step.robot_name);
 
-  // Use Pilz LIN planner for Cartesian linear motions
   auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, lin_planner_);
   stage->setGroup(group);
 
-  // Set target pose
   geometry_msgs::msg::PoseStamped target = step.target_pose;
   if (target.header.frame_id.empty())
   {
     target.header.frame_id = "world";
   }
 
-  // Log to coordinate debug file
-  COORD_POSE("MOVE_L_REQUEST", step.robot_name, target.header.frame_id,
-             target.pose.position.x, target.pose.position.y, target.pose.position.z,
-             target.pose.orientation.x, target.pose.orientation.y,
-             target.pose.orientation.z, target.pose.orientation.w);
-  COORD_LOG("  -> step=" + std::to_string(step_index) + " ee_link=" + ee_link);
-
   stage->setGoal(target);
   stage->setIKFrame(ee_link);
-
-  task.add(std::move(stage));
-}
-
-void MTCTaskBuilder::addGripperStage(
-  mtc::Task& task,
-  const rsy_mtc_planning::msg::MotionStep& step,
-  int step_index)
-{
-  std::string gripper_group = getGripperGroup(step.robot_name);
-  bool is_open = (step.motion_type == rsy_mtc_planning::msg::MotionStep::GRIPPER_OPEN);
-  std::string stage_name = (is_open ? "gripper_open_" : "gripper_close_") + std::to_string(step_index);
-
-  auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, joint_interpolation_planner_);
-  stage->setGroup(gripper_group);
-
-  // Set target joint state (named target)
-  std::string target_state = is_open ? "open" : "closed";
-  stage->setGoal(target_state);
 
   task.add(std::move(stage));
 }
@@ -560,17 +422,6 @@ std::string MTCTaskBuilder::getEndEffectorLink(const std::string& robot_name) co
   }
   RCLCPP_WARN(node_->get_logger(), "Unknown robot '%s', using default ee_link", robot_name.c_str());
   return robot_name + "_tcp";
-}
-
-std::string MTCTaskBuilder::getGripperGroup(const std::string& robot_name) const
-{
-  auto it = gripper_groups_.find(robot_name);
-  if (it != gripper_groups_.end())
-  {
-    return it->second;
-  }
-  RCLCPP_WARN(node_->get_logger(), "Unknown robot '%s', using default gripper group", robot_name.c_str());
-  return robot_name + "_gripper";
 }
 
 void MTCTaskBuilder::updatePlanningScene()
@@ -611,14 +462,6 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
   Eigen::Isometry3d target_eigen;
   tf2::fromMsg(target_pose.pose, target_eigen);
 
-  // Log IK request to coordinate debug file
-  COORD_SEP("IK COMPUTATION for " + robot_name);
-  COORD_POSE("IK_TARGET", robot_name, target_pose.header.frame_id,
-             target_pose.pose.position.x, target_pose.pose.position.y, target_pose.pose.position.z,
-             target_pose.pose.orientation.x, target_pose.pose.orientation.y,
-             target_pose.pose.orientation.z, target_pose.pose.orientation.w);
-  COORD_LOG("  -> group=" + group_name + " ee_link=" + ee_link);
-
   // Try to find multiple IK solutions using random seeds
   std::set<std::vector<int>> seen_configs;  // To avoid duplicates (discretized)
 
@@ -656,19 +499,6 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
       {
         seen_configs.insert(discretized);
 
-        // Verify the resulting TCP pose in world frame and log to file
-        robot_state.update();
-        const Eigen::Isometry3d& result_pose = robot_state.getGlobalLinkTransform(ee_link);
-        Eigen::Vector3d result_pos = result_pose.translation();
-        Eigen::Quaterniond result_quat(result_pose.rotation());
-
-        // Log IK result to coordinate debug file
-        COORD_IK(robot_name, solutions.size(), result_pos.x(), result_pos.y(), result_pos.z(), true);
-
-        // Also log position error (difference between requested and result)
-        double pos_error = (result_pos - target_eigen.translation()).norm();
-        COORD_LOG("  -> pos_error=" + std::to_string(pos_error * 1000.0) + "mm");
-
         IKSolution sol;
         sol.joint_values = joint_values;
         sol.planning_group = group_name;
@@ -690,12 +520,6 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
       }
       return dist_a < dist_b;
     });
-
-  // Log IK summary to coordinate debug file
-  COORD_LOG("IK_SUMMARY | robot=" + robot_name + " | solutions_found=" + std::to_string(solutions.size()));
-  if (solutions.empty()) {
-    COORD_LOG("  -> WARNING: No valid IK solutions found!");
-  }
 
   return solutions;
 }
@@ -808,11 +632,6 @@ mtc::Task MTCTaskBuilder::buildTaskWithIK(
 
       case rsy_mtc_planning::msg::MotionStep::MOVE_L:
         addMoveLStage(task, step, static_cast<int>(i));
-        break;
-
-      case rsy_mtc_planning::msg::MotionStep::GRIPPER_OPEN:
-      case rsy_mtc_planning::msg::MotionStep::GRIPPER_CLOSE:
-        addGripperStage(task, step, static_cast<int>(i));
         break;
 
       default:

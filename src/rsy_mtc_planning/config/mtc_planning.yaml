@@ -24,10 +24,30 @@ mtc_motion_sequence_server:
       ptp: 0.5
       lin: 0.3
 
-    # Retry configuration
-    retry:
-      max_attempts: 3
+    # IK computation settings
+    ik:
+      max_solutions_per_step: 16    # Maximum IK solutions to compute per MoveJ step
+
+    # Backtracking search limits
+    backtracking:
+      max_pilz_combinations: 200    # Max combinations to try with Pilz PTP (phase 1)
+      max_ompl_combinations: 1000   # Max combinations to try with OMPL (phase 2)
+
+    # Planner timeouts (seconds)
+    planner_timeout:
+      ompl: 10.0       # OMPL planner timeout
+      pilz_ptp: 5.0    # Pilz PTP planner timeout
+      pilz_lin: 5.0    # Pilz LIN planner timeout
+
+    # OMPL planner configuration
+    # Available planners: RRTConnect, RRTstar, PRMstar, LazyPRMstar, TRRT
+    # RRTstar optimizes for path length (less joint movement) but is slower
+    ompl:
+      planner_id: "RRTstar"
 
     # Gripper configuration
     gripper:
       timeout: 5.0  # seconds to wait for gripper response
+
+    # Robot description timeout (seconds to wait for /robot_description topic)
+    robot_description_timeout: 30.0
