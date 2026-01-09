@@ -6,6 +6,29 @@ namespace rsy_mtc_planning
 MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   : Node("motion_sequence_server", options)
 {
+  // Check if robot_description is already available as a parameter
+  if (this->has_parameter("robot_description"))
+  {
+    RCLCPP_INFO(get_logger(), "Using robot_description from parameter");
+    robot_description_received_ = true;
+  }
+  else
+  {
+    // Subscribe to /robot_description topic from robot_state_publisher
+    // This provides a single source of truth for the robot URDF
+    RCLCPP_INFO(get_logger(), "Will subscribe to /robot_description topic...");
+
+    // Use transient_local QoS to get the last published message (robot_state_publisher uses this)
+    auto qos = rclcpp::QoS(1).transient_local();
+
+    robot_description_sub_ = this->create_subscription<std_msgs::msg::String>(
+      "/robot_description", qos,
+      std::bind(&MotionSequenceServer::robot_description_callback, this, std::placeholders::_1));
+
+    // Note: We don't wait here because the executor isn't running yet.
+    // The robot_description will be received when the executor starts spinning.
+  }
+
   // Create action server
   action_server_ = rclcpp_action::create_server<ExecuteMotionSequence>(
     this,
@@ -73,6 +96,26 @@ void MotionSequenceServer::process_motion_sequence(
   // Initialize task builder if not done yet
   if (!task_builder_)
   {
+    // Wait for robot_description if not received yet
+    if (!robot_description_received_)
+    {
+      RCLCPP_INFO(get_logger(), "Waiting for robot_description from topic...");
+      double timeout = 30.0;
+      if (this->has_parameter("robot_description_timeout"))
+      {
+        timeout = this->get_parameter("robot_description_timeout").as_double();
+      }
+
+      if (!wait_for_robot_description(timeout))
+      {
+        RCLCPP_ERROR(get_logger(), "Timeout waiting for /robot_description topic");
+        result->success = false;
+        result->message = "Failed to receive robot_description from topic";
+        goal_handle->abort(result);
+        return;
+      }
+    }
+
     try
     {
       task_builder_ = std::make_shared<MTCTaskBuilder>(shared_from_this());
@@ -457,6 +500,35 @@ bool MotionSequenceServer::execute_gripper_action(const std::string& robot_name,
   }
 
   return true;
+}
+
+void MotionSequenceServer::robot_description_callback(const std_msgs::msg::String::SharedPtr msg)
+{
+  if (robot_description_received_)
+  {
+    return;  // Already received, ignore duplicate messages
+  }
+
+  RCLCPP_INFO(get_logger(), "Received robot_description from topic (%zu bytes)", msg->data.size());
+
+  // Set the robot_description as a parameter on this node
+  // This makes it available to RobotModelLoader
+  this->declare_parameter<std::string>("robot_description", msg->data);
+
+  {
+    std::lock_guard<std::mutex> lock(robot_description_mutex_);
+    robot_description_received_ = true;
+  }
+  robot_description_cv_.notify_all();
+}
+
+bool MotionSequenceServer::wait_for_robot_description(double timeout_sec)
+{
+  // Wait using condition variable - the executor will call our callback
+  std::unique_lock<std::mutex> lock(robot_description_mutex_);
+  return robot_description_cv_.wait_for(lock, std::chrono::duration<double>(timeout_sec), [this]() {
+    return robot_description_received_.load();
+  });
 }
 
 }  // namespace rsy_mtc_planning

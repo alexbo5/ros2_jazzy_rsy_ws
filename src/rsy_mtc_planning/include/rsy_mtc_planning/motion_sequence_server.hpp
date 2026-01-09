@@ -4,9 +4,12 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <atomic>
+#include <condition_variable>
 
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <rsy_gripper_controller/srv/robotiq_gripper.hpp>
 
 #include "rsy_mtc_planning/action/execute_motion_sequence.hpp"
@@ -60,6 +63,18 @@ private:
   // Execution thread (joinable instead of detached for proper cleanup)
   std::thread execution_thread_;
   std::mutex thread_mutex_;
+
+  // Robot description subscription (subscribes to /robot_description topic from robot_state_publisher)
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_sub_;
+  std::atomic<bool> robot_description_received_{false};
+  std::mutex robot_description_mutex_;
+  std::condition_variable robot_description_cv_;
+
+  // Callback for robot_description topic
+  void robot_description_callback(const std_msgs::msg::String::SharedPtr msg);
+
+  // Wait for robot_description to be received
+  bool wait_for_robot_description(double timeout_sec = 30.0);
 };
 
 }  // namespace rsy_mtc_planning

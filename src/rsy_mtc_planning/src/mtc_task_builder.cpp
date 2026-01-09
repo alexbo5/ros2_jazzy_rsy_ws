@@ -27,9 +27,84 @@
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <set>
 #include <algorithm>
+#include <fstream>
+#include <chrono>
+#include <iomanip>
+#include <ctime>
 
 namespace rsy_mtc_planning
 {
+
+// ============================================================================
+// COORDINATE DEBUG LOGGER - writes to /tmp/mtc_coordinates.log
+// ============================================================================
+class CoordinateLogger {
+public:
+  static CoordinateLogger& instance() {
+    static CoordinateLogger logger;
+    return logger;
+  }
+
+  void log(const std::string& message) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!file_.is_open()) {
+      file_.open("/tmp/mtc_coordinates.log", std::ios::app);
+    }
+    if (file_.is_open()) {
+      auto now = std::chrono::system_clock::now();
+      auto time_t = std::chrono::system_clock::to_time_t(now);
+      auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  now.time_since_epoch()) % 1000;
+      file_ << std::put_time(std::localtime(&time_t), "%H:%M:%S")
+            << "." << std::setfill('0') << std::setw(3) << ms.count()
+            << " | " << message << std::endl;
+      file_.flush();
+    }
+  }
+
+  void logSeparator(const std::string& title = "") {
+    std::string sep(70, '=');
+    log(sep);
+    if (!title.empty()) {
+      log("  " + title);
+      log(sep);
+    }
+  }
+
+  void logPose(const std::string& label, const std::string& robot,
+               const std::string& frame, double x, double y, double z,
+               double qx = 0, double qy = 0, double qz = 0, double qw = 1) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(6);
+    oss << label << " | robot=" << robot << " | frame=" << frame;
+    oss << " | pos=[" << x << ", " << y << ", " << z << "]";
+    oss << " | quat=[" << qx << ", " << qy << ", " << qz << ", " << qw << "]";
+    log(oss.str());
+  }
+
+  void logIKResult(const std::string& robot, size_t solution_idx,
+                   double x, double y, double z, bool collision_free) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(6);
+    oss << "IK_RESULT | robot=" << robot << " | solution=" << solution_idx;
+    oss << " | tcp_world_pos=[" << x << ", " << y << ", " << z << "]";
+    oss << " | collision_free=" << (collision_free ? "yes" : "no");
+    log(oss.str());
+  }
+
+private:
+  CoordinateLogger() = default;
+  ~CoordinateLogger() { if (file_.is_open()) file_.close(); }
+  std::ofstream file_;
+  std::mutex mutex_;
+};
+
+#define COORD_LOG(msg) CoordinateLogger::instance().log(msg)
+#define COORD_SEP(title) CoordinateLogger::instance().logSeparator(title)
+#define COORD_POSE(label, robot, frame, x, y, z, qx, qy, qz, qw) \
+  CoordinateLogger::instance().logPose(label, robot, frame, x, y, z, qx, qy, qz, qw)
+#define COORD_IK(robot, idx, x, y, z, ok) \
+  CoordinateLogger::instance().logIKResult(robot, idx, x, y, z, ok)
 
 namespace mtc = moveit::task_constructor;
 
@@ -95,6 +170,11 @@ mtc::Task MTCTaskBuilder::buildTask(
   const std::string& task_name,
   bool use_ompl_fallback)
 {
+  // Log new task to coordinate debug file
+  COORD_SEP("NEW TASK: " + task_name);
+  COORD_LOG("Building task with " + std::to_string(steps.size()) + " steps, ompl_fallback=" +
+            (use_ompl_fallback ? "true" : "false"));
+
   mtc::Task task;
   task.setName(task_name);  // Set the task name on the task object
   task.stages()->setName(task_name);
@@ -138,6 +218,8 @@ mtc::Task MTCTaskBuilder::buildTask(
 
 bool MTCTaskBuilder::planTask(mtc::Task& task, int max_solutions)
 {
+  COORD_LOG("PLANNING_START | task=" + task.name() + " | max_solutions=" + std::to_string(max_solutions));
+
   try
   {
     // Initialize the task
@@ -146,17 +228,16 @@ bool MTCTaskBuilder::planTask(mtc::Task& task, int max_solutions)
     // Plan the task
     if (!task.plan(max_solutions))
     {
-      RCLCPP_DEBUG(node_->get_logger(), "Task planning failed");
+      COORD_LOG("PLANNING_FAILED | task=" + task.name() + " | reason=plan_returned_false");
       return false;
     }
 
-    RCLCPP_DEBUG(node_->get_logger(), "Task planning succeeded with %zu solutions",
-                task.numSolutions());
+    COORD_LOG("PLANNING_SUCCESS | task=" + task.name() + " | solutions=" + std::to_string(task.numSolutions()));
     return true;
   }
   catch (const std::exception& e)
   {
-    RCLCPP_DEBUG(node_->get_logger(), "Task planning exception: %s", e.what());
+    COORD_LOG("PLANNING_FAILED | task=" + task.name() + " | exception=" + std::string(e.what()));
     return false;
   }
 }
@@ -388,6 +469,14 @@ void MTCTaskBuilder::addMoveJStage(
     target.header.frame_id = "world";
   }
 
+  // Log to coordinate debug file
+  COORD_POSE("MOVE_J_REQUEST", step.robot_name, target.header.frame_id,
+             target.pose.position.x, target.pose.position.y, target.pose.position.z,
+             target.pose.orientation.x, target.pose.orientation.y,
+             target.pose.orientation.z, target.pose.orientation.w);
+  COORD_LOG("  -> step=" + std::to_string(step_index) + " ee_link=" + ee_link +
+            " planner=" + (use_ompl ? "OMPL" : "PTP"));
+
   // Select planner
   auto& planner = use_ompl ? sampling_planner_ : ptp_planner_;
 
@@ -418,6 +507,13 @@ void MTCTaskBuilder::addMoveLStage(
   {
     target.header.frame_id = "world";
   }
+
+  // Log to coordinate debug file
+  COORD_POSE("MOVE_L_REQUEST", step.robot_name, target.header.frame_id,
+             target.pose.position.x, target.pose.position.y, target.pose.position.z,
+             target.pose.orientation.x, target.pose.orientation.y,
+             target.pose.orientation.z, target.pose.orientation.w);
+  COORD_LOG("  -> step=" + std::to_string(step_index) + " ee_link=" + ee_link);
 
   stage->setGoal(target);
   stage->setIKFrame(ee_link);
@@ -515,6 +611,14 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
   Eigen::Isometry3d target_eigen;
   tf2::fromMsg(target_pose.pose, target_eigen);
 
+  // Log IK request to coordinate debug file
+  COORD_SEP("IK COMPUTATION for " + robot_name);
+  COORD_POSE("IK_TARGET", robot_name, target_pose.header.frame_id,
+             target_pose.pose.position.x, target_pose.pose.position.y, target_pose.pose.position.z,
+             target_pose.pose.orientation.x, target_pose.pose.orientation.y,
+             target_pose.pose.orientation.z, target_pose.pose.orientation.w);
+  COORD_LOG("  -> group=" + group_name + " ee_link=" + ee_link);
+
   // Try to find multiple IK solutions using random seeds
   std::set<std::vector<int>> seen_configs;  // To avoid duplicates (discretized)
 
@@ -552,6 +656,19 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
       {
         seen_configs.insert(discretized);
 
+        // Verify the resulting TCP pose in world frame and log to file
+        robot_state.update();
+        const Eigen::Isometry3d& result_pose = robot_state.getGlobalLinkTransform(ee_link);
+        Eigen::Vector3d result_pos = result_pose.translation();
+        Eigen::Quaterniond result_quat(result_pose.rotation());
+
+        // Log IK result to coordinate debug file
+        COORD_IK(robot_name, solutions.size(), result_pos.x(), result_pos.y(), result_pos.z(), true);
+
+        // Also log position error (difference between requested and result)
+        double pos_error = (result_pos - target_eigen.translation()).norm();
+        COORD_LOG("  -> pos_error=" + std::to_string(pos_error * 1000.0) + "mm");
+
         IKSolution sol;
         sol.joint_values = joint_values;
         sol.planning_group = group_name;
@@ -574,8 +691,11 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
       return dist_a < dist_b;
     });
 
-  RCLCPP_DEBUG(node_->get_logger(), "IK: %zu solutions for %s",
-              solutions.size(), robot_name.c_str());
+  // Log IK summary to coordinate debug file
+  COORD_LOG("IK_SUMMARY | robot=" + robot_name + " | solutions_found=" + std::to_string(solutions.size()));
+  if (solutions.empty()) {
+    COORD_LOG("  -> WARNING: No valid IK solutions found!");
+  }
 
   return solutions;
 }

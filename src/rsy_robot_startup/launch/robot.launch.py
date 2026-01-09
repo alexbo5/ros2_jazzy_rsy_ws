@@ -1,6 +1,9 @@
 """
 Robot startup launch file.
 Launches robot_state_publisher with URDF and ros2_control with controllers.
+
+This is the primary source of robot_description in the system. The MTC server
+subscribes to /robot_description topic to get the same URDF.
 """
 
 import os
@@ -21,18 +24,13 @@ from launch.substitutions import Command
 from launch.conditions import UnlessCondition
 
 
-def load_config(config_path):
-    """Load configuration from YAML file."""
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
-
-
 def generate_launch_description():
     pkg_share = get_package_share_directory("rsy_robot_startup")
 
     # Load robot configuration
     config_path = os.path.join(pkg_share, "config", "robot_config.yaml")
-    config = load_config(config_path)
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
 
     robot1_config = config.get('robot1', {})
     robot2_config = config.get('robot2', {})

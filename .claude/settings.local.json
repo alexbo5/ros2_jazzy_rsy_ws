@@ -12,7 +12,8 @@
       "Bash(apt-cache search:*)",
       "Bash(done)",
       "WebFetch(domain:automaticaddison.com)",
-      "WebFetch(domain:moveit.picknik.ai)"
+      "WebFetch(domain:moveit.picknik.ai)",
+      "Bash(xargs cat:*)"
     ]
   }
 }

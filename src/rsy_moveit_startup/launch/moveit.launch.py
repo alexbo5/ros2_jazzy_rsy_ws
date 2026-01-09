@@ -1,4 +1,8 @@
-"""MoveIt2 launch file for dual UR robot setup."""
+"""MoveIt2 launch file for dual UR robot setup.
+
+Loads robot configuration from robot_config.yaml to ensure consistency
+with robot.launch.py. Both use the same URDF xacro with identical mappings.
+"""
 
 import os
 import yaml
@@ -19,11 +23,39 @@ def generate_launch_description():
     robot_pkg = "rsy_robot_startup"
     moveit_pkg = "rsy_moveit_startup"
 
-    # Build MoveIt configuration
+    # Load robot configuration (same source as robot.launch.py)
+    config_path = os.path.join(get_package_share_directory(robot_pkg), "config", "robot_config.yaml")
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    robot1_config = config.get('robot1', {})
+    robot2_config = config.get('robot2', {})
+    robot2_pos = robot2_config.get('position', {})
+    robot2_ori = robot2_config.get('orientation', {})
+
+    # Build xacro mappings from robot_config.yaml
+    xacro_mappings = {
+        "robot1_robot_ip": robot1_config.get('robot_ip', '192.168.0.51'),
+        "robot2_robot_ip": robot2_config.get('robot_ip', '192.168.0.11'),
+        "robot2_x": str(robot2_pos.get('x', -0.77)),
+        "robot2_y": str(robot2_pos.get('y', 0.655)),
+        "robot2_z": str(robot2_pos.get('z', 0.0)),
+        "robot2_roll": str(robot2_ori.get('roll', 0.0)),
+        "robot2_pitch": str(robot2_ori.get('pitch', 0.0)),
+        "robot2_yaw": str(robot2_ori.get('yaw', 3.141592)),
+        "robot1_use_mock_hardware": "true",
+        "robot2_use_mock_hardware": "true",
+    }
+
+    urdf_path = os.path.join(get_package_share_directory(robot_pkg), "config", "ur.urdf.xacro")
+
+    # Build MoveIt configuration with robot_config.yaml values
     moveit_config = (
         MoveItConfigsBuilder("ur", package_name=moveit_pkg)
-        .robot_description(file_path=os.path.join(
-            get_package_share_directory(robot_pkg), "config", "ur.urdf.xacro"))
+        .robot_description(
+            file_path=urdf_path,
+            mappings=xacro_mappings
+        )
         .robot_description_semantic(file_path="config/ur.srdf")
         .robot_description_kinematics(file_path="config/kinematics.yaml")
         .joint_limits(file_path="config/joint_limits.yaml")
