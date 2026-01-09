@@ -194,6 +194,56 @@
   <origin xyz="-1.07 0.955 0" rpy="0 0 0"/>
 </joint>
 
+<!-- CUBE Robot1 -->
+<link name="cube_robot1">
+  <collision>
+    <geometry>
+      <box size="0.06 0.06 0.06"/>
+    </geometry>
+    <origin xyz="0.03 0.03 0.03" rpy="0 0 0"/>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.06 0.06 0.06"/>
+    </geometry>
+    <origin xyz="0.03 0.03 0.03" rpy="0 0 0"/>
+    <material name="yellow">
+      <color rgba="1.0 1.0 0.0 1.0"/>
+    </material>
+  </visual>
+</link>
+
+<joint name="robot1_tcp_to_cube_robot1" type="fixed">
+  <parent link="robot1_tcp"/>
+  <child link="cube_robot1"/>
+  <origin xyz="-0.03 -0.03 -0.03" rpy="0 0 0"/>
+</joint>
+
+<!-- CUBE Robot2 -->
+<link name="cube_robot2">
+  <collision>
+    <geometry>
+      <box size="0.06 0.06 0.06"/>
+    </geometry>
+    <origin xyz="0.03 0.03 0.03" rpy="0 0 0"/>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.06 0.06 0.06"/>
+    </geometry>
+    <origin xyz="0.03 0.03 0.03" rpy="0 0 0"/>
+    <material name="yellow">
+      <color rgba="1.0 1.0 0.0 1.0"/>
+    </material>
+  </visual>
+</link>
+
+<joint name="robot2_tcp_to_cube_robot2" type="fixed">
+  <parent link="robot2_tcp"/>
+  <child link="cube_robot2"/>
+  <origin xyz="-0.03 -0.03 -0.03" rpy="0 0 0"/>
+</joint>
+
 <xacro:ur_robot
     name="robot1"
     tf_prefix="robot1_"

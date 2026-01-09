@@ -22,16 +22,16 @@ ROBOT_FACES = ["U", "F", "D"], ["L", "B", "R"]
 #     This unambiguously defines the cube's 3D orientation in world coordinates.
 CUBE_POSE_DEFS = {
     # face: (position_xyz, face_normal_orientation=[nx, ny, nz, rotation_rad], holding_angle)
-    "U": ([-0.385, 0.3275, 0.5], [1.0, 0.0, 0.0, 3.14159], [90]),
-    "D": ([-0.385, 0.3275, 0.5], [1.0, 0.0, 0.0, 0.0], [-90]),
-    "F": ([-0.385, 0.3275, 0.5], [1.0, 0.0, 0.0, 0.0], [180]),
-    "B": ([-0.385, 0.3275, 0.5], [-1.0, 0.0, 0.0, 0.0], [180]),
-    "L": ([-0.385, 0.3275, 0.5], [-1.0, 0.0, 0.0, 3.14159], [-90]),
-    "R": ([-0.385, 0.3275, 0.5], [-1.0, 0.0, 0.0, 0.0], [90]),
+    "U": ([-0.38313, 0.32432, 0.5], [1.0, 0.0, 0.0, 3.14159], [90]),
+    "D": ([-0.38313, 0.32432, 0.5], [1.0, 0.0, 0.0, 0.0], [-90]),
+    "F": ([-0.38313, 0.32432, 0.5], [1.0, 0.0, 0.0, 0.0], [180]),
+    "B": ([-0.38313, 0.32432, 0.5], [-1.0, 0.0, 0.0, 0.0], [180]),
+    "L": ([-0.38313, 0.32432, 0.5], [-1.0, 0.0, 0.0, 3.14159], [-90]),
+    "R": ([-0.38313, 0.32432, 0.5], [-1.0, 0.0, 0.0, 0.0], [90]),
 }
 
 HAND_OVER_POSE_DEF = {
-    "position": [-0.385, 0.3275, 0.5],
+    "position": [-0.38313, 0.32432, 0.5],
     "orientation_vector": [1.0, 0.0, 0.0]  # approach axis
 }
 
@@ -46,20 +46,20 @@ CUBE_REST_POSE_DEF = {
 # These poses are used by PresentCubeFace action to show each face for scanning
 # Format: face -> (position, face_normal_orientation, robot_holding_angle)
 CUBE_PRESENT_POSES = {
-    "U": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, -3.14159/2.0], [-90]),
-    "D": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, 3.14159/2.0], [90]),
-    "F": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, 0.0], [180]),
-    "B": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, 0.0], [180]),
-    "L": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, -3.14159/2.0], [90]),
-    "R": ([-0.385, 0.3275, 0.5], [0.0, 0.0, 1.0, 3.14159/2.0], [-90]),
+    "U": ([-0.38313, 0.32432, 0.5], [0.0, 0.0, 1.0, -3.14159/2.0], [-90]),
+    "D": ([-0.38313, 0.32432, 0.5], [0.0, 0.0, 1.0, 3.14159/2.0], [90]),
+    "F": ([-0.38313, 0.32432, 0.5], [0.0, 0.0, 1.0, 0.0], [180]),
+    "B": ([-0.38313, 0.32432, 0.5], [0.0, 0.0, 1.0, 0.0], [180]),
+    "L": ([-0.38313, 0.32432, 0.5], [0.0, 0.0, 1.0, -3.14159/2.0], [90]),
+    "R": ([-0.38313, 0.32432, 0.5], [0.0, 0.0, 1.0, 3.14159/2.0], [-90]),
 }
 
 # Define gripper reference forward vector in gripper's local frame (tool Z-axis?)
 GRIPPER_FORWARD_DIRECTION = np.array([0.0, 0.0, 1.0])
 
 # distance (mm) from cube center to gripper contact point
-OFFSET_DIST_HOLD_CUBE = 0     # distance when holding the cube (grasps 2 rows of cube)
-OFFSET_DIST_SPIN_CUBE = 20    # distance when spinning the cube (grasps 1 row of cube)
+OFFSET_DIST_HOLD_CUBE = -4     # distance when holding the cube (grasps 2 rows of cube)
+OFFSET_DIST_SPIN_CUBE = 16    # distance when spinning the cube (grasps 1 row of cube)
 OFFSET_DIST_PRE_TARGET = 150   # distance when approaching the cube (pre-grasp position)
 OFFSET_DIST_TAKE_CUBE = 40    # distance when taking up the cube from rest position
 
@@ -621,6 +621,10 @@ class CubeMotionServer(Node):
         # New robot moves linearly to grasp cube
         new_target = self.get_gripper_pose(self.handover_pose, approach_direction=new_spinning_robot_approach_direction, offset_dist=OFFSET_DIST_HOLD_CUBE, twist_angle=np.pi/2)
         steps.append(self._move_l_step(new_spinning_robot, new_target))
+
+        # DEBUG: Log the target poses with full precision
+        self.get_logger().info(f"[HandOver DEBUG] {old_spinning_robot} target: pos=[{old_target.position[0]:.6f}, {old_target.position[1]:.6f}, {old_target.position[2]:.6f}]")
+        self.get_logger().info(f"[HandOver DEBUG] {new_spinning_robot} target: pos=[{new_target.position[0]:.6f}, {new_target.position[1]:.6f}, {new_target.position[2]:.6f}]")
 
         # Gripper exchange: new robot grabs, old robot releases
         steps.append(self._gripper_open_step(new_spinning_robot))
