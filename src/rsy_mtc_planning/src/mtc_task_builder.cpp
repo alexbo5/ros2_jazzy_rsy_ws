@@ -60,17 +60,25 @@ MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node, const Planne
   // Create planning scene
   planning_scene_ = std::make_shared<planning_scene::PlanningScene>(robot_model_);
 
-  // Create planners with configurable timeouts
+  // Create planners with configurable timeouts and velocity/acceleration scaling
   sampling_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "ompl", config.ompl_planner_id);
   sampling_planner_->setTimeout(config.timeout_ompl);
+  sampling_planner_->setMaxVelocityScalingFactor(velocity_scaling_ptp_);
+  sampling_planner_->setMaxAccelerationScalingFactor(acceleration_scaling_ptp_);
+  // Note: OMPL-specific parameters (goal_bias, etc.) are set in ompl_planning.yaml
 
   ptp_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "pilz_industrial_motion_planner", "PTP");
   ptp_planner_->setTimeout(config.timeout_pilz_ptp);
+  ptp_planner_->setMaxVelocityScalingFactor(velocity_scaling_ptp_);
+  ptp_planner_->setMaxAccelerationScalingFactor(acceleration_scaling_ptp_);
 
   lin_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "pilz_industrial_motion_planner", "LIN");
   lin_planner_->setTimeout(config.timeout_pilz_lin);
+  lin_planner_->setMaxVelocityScalingFactor(velocity_scaling_lin_);
+  lin_planner_->setMaxAccelerationScalingFactor(acceleration_scaling_lin_);
 
-  RCLCPP_INFO(node_->get_logger(), "Using OMPL planner: %s", config.ompl_planner_id.c_str());
+  RCLCPP_DEBUG(node_->get_logger(), "Planner config: OMPL=%s, vel_ptp=%.2f, vel_lin=%.2f",
+              config.ompl_planner_id.c_str(), velocity_scaling_ptp_, velocity_scaling_lin_);
 
   // Setup robot configurations
   planning_groups_["robot1"] = "robot1_ur_manipulator";

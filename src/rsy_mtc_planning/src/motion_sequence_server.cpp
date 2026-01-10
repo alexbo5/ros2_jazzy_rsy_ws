@@ -302,7 +302,7 @@ void MotionSequenceServer::process_motion_sequence(
   }
 
   // Log IK computation summary
-  RCLCPP_INFO(get_logger(), "IK: %zu MoveJ steps, %zu combinations", movej_ik_data.size(), total_combinations);
+  RCLCPP_DEBUG(get_logger(), "IK: %zu MoveJ steps, %zu combinations", movej_ik_data.size(), total_combinations);
 
   // Record input metrics for logging
   size_t movel_count = all_motion_steps.size() - movej_ik_data.size();
@@ -377,7 +377,7 @@ void MotionSequenceServer::process_motion_sequence(
       std::min(total_combinations, max_ompl_combinations_) :
       std::min(total_combinations, max_pilz_combinations_);
 
-    RCLCPP_INFO(get_logger(), "Phase %d: %s (max %zu)", phase, planner_name.c_str(), phase_max);
+    RCLCPP_DEBUG(get_logger(), "Phase %d: %s (max %zu)", phase, planner_name.c_str(), phase_max);
 
     planning_logger_->startPhase(planner_name, phase_max);
 
@@ -414,7 +414,7 @@ void MotionSequenceServer::process_motion_sequence(
 
       if (combinations_tried == 1 || combinations_tried % 100 == 0)
       {
-        RCLCPP_INFO(get_logger(), "[%s] %zu/%zu", planner_name.c_str(), combinations_tried, total_combinations);
+        RCLCPP_DEBUG(get_logger(), "[%s] %zu/%zu", planner_name.c_str(), combinations_tried, total_combinations);
       }
 
       try
@@ -497,7 +497,7 @@ void MotionSequenceServer::process_motion_sequence(
             std::vector<size_t> indices_before = current_ik_indices;
             if (!advance_combination(current_ik_indices))
             {
-              RCLCPP_INFO(get_logger(), "Phase %d exhausted after %zu attempts", phase, combinations_tried);
+              RCLCPP_DEBUG(get_logger(), "Phase %d exhausted after %zu attempts", phase, combinations_tried);
               planning_logger_->endPhase(combinations_tried, false);
               break;
             }
@@ -517,7 +517,7 @@ void MotionSequenceServer::process_motion_sequence(
         std::vector<size_t> indices_before = current_ik_indices;
         if (!advance_combination(current_ik_indices))
         {
-          RCLCPP_INFO(get_logger(), "Phase %d exhausted after %zu attempts", phase, combinations_tried);
+          RCLCPP_DEBUG(get_logger(), "Phase %d exhausted after %zu attempts", phase, combinations_tried);
           planning_logger_->endPhase(combinations_tried, false);
           break;
         }
@@ -775,8 +775,10 @@ PlannerConfig MotionSequenceServer::load_planner_config()
   config.timeout_pilz_lin = this->get_parameter("planner_timeout.pilz_lin").as_double();
   config.ompl_planner_id = this->get_parameter("ompl.planner_id").as_string();
 
-  RCLCPP_INFO(get_logger(), "Loaded planner config: vel_ptp=%.2f, vel_lin=%.2f, ompl=%s",
-              config.velocity_scaling_ptp, config.velocity_scaling_lin, config.ompl_planner_id.c_str());
+  RCLCPP_INFO(get_logger(), "Planner config: vel=%.2f/%.2f, acc=%.2f/%.2f, ompl=%s",
+              config.velocity_scaling_ptp, config.velocity_scaling_lin,
+              config.acceleration_scaling_ptp, config.acceleration_scaling_lin,
+              config.ompl_planner_id.c_str());
 
   return config;
 }

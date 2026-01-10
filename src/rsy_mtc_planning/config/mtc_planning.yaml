@@ -3,6 +3,10 @@ mtc_motion_sequence_server:
     # Planning frame
     planning_frame: world
 
+    # Logging level: debug, info, warn, error
+    # Set to 'warn' to reduce MTC output, 'debug' for troubleshooting
+    log_level: info
+
     # Robot configurations
     robots:
       robot1:
@@ -16,32 +20,36 @@ mtc_motion_sequence_server:
 
     # Velocity scaling (0.0 - 1.0)
     velocity_scaling:
-      ptp: 0.05    # Point-to-point motions
-      lin: 0.03    # Linear motions (slower for precision)
+      ptp: 1.0    # Point-to-point motions
+      lin: 1.0    # Linear motions (slower for precision)
 
     # Acceleration scaling (0.0 - 1.0)
     acceleration_scaling:
-      ptp: 0.05
-      lin: 0.03
+      ptp: 1.0
+      lin: 1.0
 
     # IK computation settings
     ik:
-      max_solutions_per_step: 32    # Maximum IK solutions to compute per MoveJ step
+      max_solutions_per_step: 16    # Maximum IK solutions to compute per MoveJ step
 
     # Backtracking search limits
     backtracking:
-      max_pilz_combinations: 20    # Max combinations to try with Pilz PTP (phase 1)
-      max_ompl_combinations: 1024   # Max combinations to try with OMPL (phase 2)
+      max_pilz_combinations: 64    # Max combinations to try with Pilz PTP (phase 1)
+      max_ompl_combinations: 256   # Max combinations to try with OMPL (phase 2)
 
     # Planner timeouts (seconds)
+    # Longer timeouts allow OMPL planners (especially RRTstar) to find better solutions
     planner_timeout:
-      ompl: 30.0       # OMPL planner timeout (increased for better solutions)
-      pilz_ptp: 15.0   # Pilz PTP planner timeout (increased for robot2)
-      pilz_lin: 15.0   # Pilz LIN planner timeout (increased for robot2)
+      ompl: 5.0        # OMPL planner timeout per attempt
+      pilz_ptp: 5.0    # Pilz PTP planner timeout
+      pilz_lin: 5.0    # Pilz LIN planner timeout
 
-    # OMPL planner configuration
-    # Available planners: RRTConnect, RRTstar, PRMstar, LazyPRMstar, TRRT
-    # RRTstar optimizes for path length (less joint movement) but is slower
+    # OMPL planner selection
+    # Available: RRTConnect, RRTstar, PRMstar
+    # - RRTConnect: Fast but may produce suboptimal paths
+    # - RRTstar: Optimizes for path length (less joint movement), needs more time
+    # - PRMstar: Good for repeated queries
+    # Planner-specific params (goal_bias, range) are in rsy_moveit_startup/config/ompl_planning.yaml
     ompl:
       planner_id: "RRTstar"
 

@@ -10,6 +10,8 @@
       - RRTstar
       - PRMstar
     longest_valid_segment_fraction: 0.005
+    simplify_solutions: true              # Post-process to smooth paths
+    num_planning_attempts: 3              # Multiple attempts for better solutions
 
   robot2_ur_manipulator:
     default_planner_config: RRTstar
@@ -18,6 +20,8 @@
       - RRTstar
       - PRMstar
     longest_valid_segment_fraction: 0.005
+    simplify_solutions: true              # Post-process to smooth paths
+    num_planning_attempts: 3              # Multiple attempts for better solutions
 
   # RRTConnect: Fast bidirectional RRT, good for finding any path quickly
   RRTConnect:
@@ -28,9 +32,9 @@
   # Note: May be slower than RRTConnect but produces better quality paths
   RRTstar:
     type: geometric::RRTstar
-    range: 0.0
-    goal_bias: 0.05
-    delay_collision_checking: true
+    range: 0.0                      # Step size (0 = auto-calculate based on space)
+    goal_bias: 0.1                  # Probability of sampling toward goal (0.05-0.2)
+    delay_collision_checking: true  # Faster tree growth
 
   # PRMstar: Probabilistic Roadmap, good for repeated queries in same environment
   PRMstar:

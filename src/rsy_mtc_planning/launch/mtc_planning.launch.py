@@ -38,16 +38,31 @@ def generate_launch_description():
     ompl_config = load_yaml('rsy_moveit_startup', 'config/ompl_planning.yaml')
     pilz_config = load_yaml('rsy_moveit_startup', 'config/pilz_industrial_motion_planner_planning.yaml')
 
+    # Load MTC planning config to get log level
+    mtc_config = load_yaml('rsy_mtc_planning', 'config/mtc_planning.yaml')
+    mtc_params = mtc_config.get('mtc_motion_sequence_server', {}).get('ros__parameters', {})
+    log_level_arg = mtc_params.get('log_level', 'info')
+
     # Load SRDF for semantic description
     srdf_path = os.path.join(moveit_pkg, "config", "ur.srdf")
     with open(srdf_path, 'r') as f:
         robot_description_semantic = f.read()
+
+    # Configure logging to reduce MTC verbosity
+    # Log level from config (debug, info, warn, error)
 
     mtc_server = Node(
         package='rsy_mtc_planning',
         executable='mtc_motion_sequence_server',
         name='mtc_motion_sequence_server',
         output='screen',
+        arguments=['--ros-args', '--log-level', log_level_arg,
+                   # Reduce MTC internal logging
+                   '--log-level', 'moveit_task_constructor:=warn',
+                   '--log-level', 'moveit_ros.planning_scene_monitor:=warn',
+                   '--log-level', 'moveit_ros.robot_model_loader:=warn',
+                   '--log-level', 'moveit.ompl_planning:=warn',
+                   '--log-level', 'moveit.pilz_industrial_motion_planner:=warn'],
         parameters=[
             config_file,
             # robot_description is NOT passed here - the node subscribes to /robot_description topic

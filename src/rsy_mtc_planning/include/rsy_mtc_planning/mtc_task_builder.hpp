@@ -33,7 +33,7 @@ struct PlannerConfig
   double acceleration_scaling_lin = 0.3;
 
   // Planner timeouts (seconds)
-  double timeout_ompl = 10.0;
+  double timeout_ompl = 5.0;
   double timeout_pilz_ptp = 5.0;
   double timeout_pilz_lin = 5.0;
 
