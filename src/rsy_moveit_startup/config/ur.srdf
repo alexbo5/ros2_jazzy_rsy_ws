@@ -63,7 +63,6 @@
   <disable_collisions link1="ground_plane" link2="robot1_base_link_inertia" reason="Adjacent"/>
   <disable_collisions link1="ground_plane" link2="robot2_base_link" reason="Adjacent"/>
   <disable_collisions link1="ground_plane" link2="robot2_base_link_inertia" reason="Adjacent"/>
-  <disable_collisions link1="coneyor_belt" link2="ground_plane" reason="Adjacent"/>
 
   <!-- Robot1 gripper collision exclusions -->
   <disable_collisions link1="robot1_robotiq_85_base_link" link2="robot1_wrist_3_link" reason="Adjacent"/>
