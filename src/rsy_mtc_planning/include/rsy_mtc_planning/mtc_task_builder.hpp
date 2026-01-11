@@ -23,21 +23,19 @@ namespace rsy_mtc_planning
 
 /**
  * @brief Configuration for planner parameters
+ *
+ * Values are set in motion_sequence_server.cpp constructor.
+ * Defaults here are fallbacks only.
  */
 struct PlannerConfig
 {
-  // Velocity and acceleration scaling
-  double velocity_scaling_ptp = 0.5;
-  double velocity_scaling_lin = 0.3;
-  double acceleration_scaling_ptp = 0.5;
-  double acceleration_scaling_lin = 0.3;
-
-  // Planner timeouts (seconds)
-  double timeout_ompl = 5.0;
-  double timeout_pilz_ptp = 5.0;
-  double timeout_pilz_lin = 5.0;
-
-  // OMPL planner configuration
+  double velocity_scaling_ptp = 1.0;
+  double velocity_scaling_lin = 1.0;
+  double acceleration_scaling_ptp = 1.0;
+  double acceleration_scaling_lin = 1.0;
+  double timeout_ompl = 10.0;
+  double timeout_pilz_ptp = 10.0;
+  double timeout_pilz_lin = 10.0;
   std::string ompl_planner_id = "RRTstar";
 };
 
@@ -214,6 +212,10 @@ private:
   // Get the end effector link for a robot
   std::string getEndEffectorLink(const std::string& robot_name) const;
 
+  // Declare hardcoded OMPL parameters on the node
+  // This bypasses YAML config files and ensures MoveIt can find the planner configs
+  void declareOmplParameters(const std::string& default_planner);
+
   // Node reference for logging and parameters
   rclcpp::Node::SharedPtr node_;
 
@@ -230,12 +232,6 @@ private:
   std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> sampling_planner_;      // OMPL (configurable)
   std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> ptp_planner_;           // Pilz PTP (minimal joint motion)
   std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> lin_planner_;           // Pilz LIN (Cartesian linear)
-
-  // Configuration
-  double velocity_scaling_ptp_ = 0.5;
-  double velocity_scaling_lin_ = 0.3;
-  double acceleration_scaling_ptp_ = 0.5;
-  double acceleration_scaling_lin_ = 0.3;
 
   // Robot configurations
   std::unordered_map<std::string, std::string> planning_groups_;

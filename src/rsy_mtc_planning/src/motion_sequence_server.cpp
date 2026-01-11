@@ -6,22 +6,40 @@ namespace rsy_mtc_planning
 MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   : Node("motion_sequence_server", options)
 {
-  // Declare and load configurable parameters
-  this->declare_parameter("ik.max_solutions_per_step", 16);
-  this->declare_parameter("backtracking.max_pilz_combinations", 500);
-  this->declare_parameter("backtracking.max_ompl_combinations", 1000);
-  this->declare_parameter("robot_description_timeout", 30.0);
-  this->declare_parameter("planning_log_file", "/tmp/mtc_planning.log");
+  // ========== HARDCODED CONFIGURATION ==========
+  // All values are hardcoded here - no YAML config files needed
 
-  max_ik_per_step_ = this->get_parameter("ik.max_solutions_per_step").as_int();
-  max_pilz_combinations_ = static_cast<size_t>(this->get_parameter("backtracking.max_pilz_combinations").as_int());
-  max_ompl_combinations_ = static_cast<size_t>(this->get_parameter("backtracking.max_ompl_combinations").as_int());
-  robot_description_timeout_ = this->get_parameter("robot_description_timeout").as_double();
-  log_file_path_ = this->get_parameter("planning_log_file").as_string();
+  // IK and backtracking settings
+  max_ik_per_step_ = 16;               // Max IK solutions per MoveJ step
+  max_pilz_combinations_ = 64;          // Phase 1: Pilz PTP (0 = skip)
+  max_ompl_combinations_ = 256;        // Phase 2: OMPL combinations to try
+  robot_description_timeout_ = 30.0;   // Seconds to wait for robot_description
+
+  // Planner configuration - all hardcoded
+  planner_config_.timeout_ompl = 10.0;          // OMPL planner timeout (seconds)
+  planner_config_.timeout_pilz_ptp = 10.0;      // Pilz PTP timeout
+  planner_config_.timeout_pilz_lin = 10.0;      // Pilz LIN timeout
+  planner_config_.velocity_scaling_ptp = 1.0;   // PTP velocity (0.0-1.0)
+  planner_config_.velocity_scaling_lin = 1.0;   // LIN velocity
+  planner_config_.acceleration_scaling_ptp = 1.0;
+  planner_config_.acceleration_scaling_lin = 1.0;
+  // OMPL planner name (short name, looked up in planner_configs)
+  // Options: RRTConnect, RRTstar, PRMstar
+  planner_config_.ompl_planner_id = "RRTstar";
+
+  RCLCPP_INFO(get_logger(),
+    "Hardcoded config: ik=%d, backtrack(pilz=%zu, ompl=%zu), "
+    "timeout(ompl=%.1fs, ptp=%.1fs, lin=%.1fs), planner=%s",
+    max_ik_per_step_, max_pilz_combinations_, max_ompl_combinations_,
+    planner_config_.timeout_ompl, planner_config_.timeout_pilz_ptp, planner_config_.timeout_pilz_lin,
+    planner_config_.ompl_planner_id.c_str());
+
+  // ========== DECLARE OMPL PARAMETERS AT STARTUP ==========
+  // MoveIt needs these parameters to configure the OMPL planner
+  declareOmplParameters();
 
   // Initialize planning logger
-  planning_logger_ = std::make_unique<PlanningLogger>(log_file_path_);
-  RCLCPP_INFO(get_logger(), "Planning metrics will be logged to: %s", log_file_path_.c_str());
+  planning_logger_ = std::make_unique<PlanningLogger>("/tmp/mtc_planning.log");
 
   // Check if robot_description is already available as a parameter
   if (this->has_parameter("robot_description"))
@@ -32,7 +50,7 @@ MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   else
   {
     // Subscribe to /robot_description topic from robot_state_publisher
-    RCLCPP_INFO(get_logger(), "Will subscribe to /robot_description topic...");
+    RCLCPP_INFO(get_logger(), "Subscribing to /robot_description topic...");
 
     auto qos = rclcpp::QoS(1).transient_local();
 
@@ -112,13 +130,8 @@ void MotionSequenceServer::process_motion_sequence(
     if (!robot_description_received_)
     {
       RCLCPP_INFO(get_logger(), "Waiting for robot_description from topic...");
-      double timeout = 30.0;
-      if (this->has_parameter("robot_description_timeout"))
-      {
-        timeout = this->get_parameter("robot_description_timeout").as_double();
-      }
 
-      if (!wait_for_robot_description(timeout))
+      if (!wait_for_robot_description(robot_description_timeout_))
       {
         RCLCPP_ERROR(get_logger(), "Timeout waiting for /robot_description topic");
         result->success = false;
@@ -130,8 +143,8 @@ void MotionSequenceServer::process_motion_sequence(
 
     try
     {
-      PlannerConfig config = load_planner_config();
-      task_builder_ = std::make_shared<MTCTaskBuilder>(shared_from_this(), config);
+      // Use the planner_config_ loaded at startup
+      task_builder_ = std::make_shared<MTCTaskBuilder>(shared_from_this(), planner_config_);
     }
     catch (const std::exception& e)
     {
@@ -314,13 +327,13 @@ void MotionSequenceServer::process_motion_sequence(
     ik_counts,
     total_combinations);
 
-  // Record planner configuration (use get_parameter since params are already declared)
+  // Record planner configuration
   planning_logger_->recordPlannerConfig(
     max_pilz_combinations_,
     max_ompl_combinations_,
-    this->get_parameter("planner_timeout.pilz_ptp").as_double(),
-    this->get_parameter("planner_timeout.ompl").as_double(),
-    this->get_parameter("ompl.planner_id").as_string());
+    planner_config_.timeout_pilz_ptp,
+    planner_config_.timeout_ompl,
+    planner_config_.ompl_planner_id);
 
   // Update feedback
   feedback->status = "Exploring IK combinations with backtracking";
@@ -422,7 +435,6 @@ void MotionSequenceServer::process_motion_sequence(
         auto task = task_builder_->buildTaskWithIK(all_motion_steps, ik_indices, movej_ik_data,
                                                     "full_motion_sequence", use_ompl);
 
-        // Use planTaskWithResult to get failure information
         auto plan_result = task_builder_->planTaskWithResult(task, 1);
 
         if (plan_result.success)
@@ -645,49 +657,6 @@ void MotionSequenceServer::process_motion_sequence(
   goal_handle->succeed(result);
 }
 
-bool MotionSequenceServer::execute_motion_step(const MotionStep& step)
-{
-  RCLCPP_DEBUG(get_logger(), "Executing step: type=%d, robot=%s", step.motion_type, step.robot_name.c_str());
-
-  // Handle gripper operations directly
-  if (step.motion_type == MotionStep::GRIPPER_OPEN)
-  {
-    return execute_gripper_action(step.robot_name, true);
-  }
-  else if (step.motion_type == MotionStep::GRIPPER_CLOSE)
-  {
-    return execute_gripper_action(step.robot_name, false);
-  }
-
-  // For motion steps, build and execute a single-step MTC task
-  std::vector<MotionStep> single_step = {step};
-
-  try
-  {
-    auto task = task_builder_->buildTask(single_step, "single_motion");
-
-    if (!task_builder_->planTask(task, 1))
-    {
-      RCLCPP_ERROR(get_logger(), "Planning failed for single motion step");
-      return false;
-    }
-
-    // Use direct execution to bypass buggy MTC execute_task_solution action
-    if (!task_builder_->executeTaskDirect(task))
-    {
-      RCLCPP_ERROR(get_logger(), "Execution failed for single motion step");
-      return false;
-    }
-
-    return true;
-  }
-  catch (const std::exception& e)
-  {
-    RCLCPP_ERROR(get_logger(), "Exception during motion step: %s", e.what());
-    return false;
-  }
-}
-
 bool MotionSequenceServer::execute_gripper_action(const std::string& robot_name, bool open)
 {
   auto client = (robot_name == "robot1") ? robot1_gripper_client_ : robot2_gripper_client_;
@@ -751,36 +720,77 @@ bool MotionSequenceServer::wait_for_robot_description(double timeout_sec)
   });
 }
 
-PlannerConfig MotionSequenceServer::load_planner_config()
+void MotionSequenceServer::declareOmplParameters()
 {
-  PlannerConfig config;
+  // Declare OMPL parameters so MoveIt can find them
+  // This must be done at node startup, before the planning pipeline is created
+  //
+  // MoveIt's OMPL planning context manager expects:
+  // - ompl.planner_configs.<name>.type = "geometric::<PlannerType>"
+  // - ompl.<group>.planner_configs = ["<name1>", "<name2>", ...]
+  // - ompl.<group>.default_planner_config = "<name>"
 
-  // Declare parameters with defaults
-  this->declare_parameter("velocity_scaling.ptp", config.velocity_scaling_ptp);
-  this->declare_parameter("velocity_scaling.lin", config.velocity_scaling_lin);
-  this->declare_parameter("acceleration_scaling.ptp", config.acceleration_scaling_ptp);
-  this->declare_parameter("acceleration_scaling.lin", config.acceleration_scaling_lin);
-  this->declare_parameter("planner_timeout.ompl", config.timeout_ompl);
-  this->declare_parameter("planner_timeout.pilz_ptp", config.timeout_pilz_ptp);
-  this->declare_parameter("planner_timeout.pilz_lin", config.timeout_pilz_lin);
-  this->declare_parameter("ompl.planner_id", config.ompl_planner_id);
+  auto declare_param = [this](const std::string& name, const rclcpp::ParameterValue& value) {
+    if (!this->has_parameter(name))
+    {
+      this->declare_parameter(name, value);
+    }
+  };
 
-  // Load values
-  config.velocity_scaling_ptp = this->get_parameter("velocity_scaling.ptp").as_double();
-  config.velocity_scaling_lin = this->get_parameter("velocity_scaling.lin").as_double();
-  config.acceleration_scaling_ptp = this->get_parameter("acceleration_scaling.ptp").as_double();
-  config.acceleration_scaling_lin = this->get_parameter("acceleration_scaling.lin").as_double();
-  config.timeout_ompl = this->get_parameter("planner_timeout.ompl").as_double();
-  config.timeout_pilz_ptp = this->get_parameter("planner_timeout.pilz_ptp").as_double();
-  config.timeout_pilz_lin = this->get_parameter("planner_timeout.pilz_lin").as_double();
-  config.ompl_planner_id = this->get_parameter("ompl.planner_id").as_string();
+  RCLCPP_INFO(get_logger(), "Declaring OMPL parameters for planner: %s", planner_config_.ompl_planner_id.c_str());
 
-  RCLCPP_INFO(get_logger(), "Planner config: vel=%.2f/%.2f, acc=%.2f/%.2f, ompl=%s",
-              config.velocity_scaling_ptp, config.velocity_scaling_lin,
-              config.acceleration_scaling_ptp, config.acceleration_scaling_lin,
-              config.ompl_planner_id.c_str());
+  // OMPL pipeline configuration
+  declare_param("ompl.planning_plugins", rclcpp::ParameterValue(std::vector<std::string>{"ompl_interface/OMPLPlanner"}));
+  declare_param("ompl.start_state_max_bounds_error", rclcpp::ParameterValue(0.1));
 
-  return config;
+  // Request/response adapters
+  declare_param("ompl.request_adapters", rclcpp::ParameterValue(std::vector<std::string>{
+    "default_planning_request_adapters/ResolveConstraintFrames",
+    "default_planning_request_adapters/ValidateWorkspaceBounds",
+    "default_planning_request_adapters/CheckStartStateBounds",
+    "default_planning_request_adapters/CheckStartStateCollision"
+  }));
+  declare_param("ompl.response_adapters", rclcpp::ParameterValue(std::vector<std::string>{
+    "default_planning_response_adapters/AddTimeOptimalParameterization",
+    "default_planning_response_adapters/ValidateSolution",
+    "default_planning_response_adapters/DisplayMotionPath"
+  }));
+
+  // Planner configurations under planner_configs.<name>.*
+  // MoveIt looks up planners by name in this structure
+  declare_param("ompl.planner_configs.RRTConnect.type", rclcpp::ParameterValue(std::string("geometric::RRTConnect")));
+  declare_param("ompl.planner_configs.RRTConnect.range", rclcpp::ParameterValue(0.0));
+
+  declare_param("ompl.planner_configs.RRTstar.type", rclcpp::ParameterValue(std::string("geometric::RRTstar")));
+  declare_param("ompl.planner_configs.RRTstar.goal_bias", rclcpp::ParameterValue(0.05));
+  declare_param("ompl.planner_configs.RRTstar.range", rclcpp::ParameterValue(0.0));
+  declare_param("ompl.planner_configs.RRTstar.delay_collision_checking", rclcpp::ParameterValue(true));
+
+  // Planning timeout - set per group and globally
+  declare_param("ompl.planning_time", rclcpp::ParameterValue(planner_config_.timeout_ompl));
+  declare_param("ompl.default_planning_time", rclcpp::ParameterValue(planner_config_.timeout_ompl));
+  declare_param("ompl.robot1_ur_manipulator.planning_time", rclcpp::ParameterValue(planner_config_.timeout_ompl));
+  declare_param("ompl.robot2_ur_manipulator.planning_time", rclcpp::ParameterValue(planner_config_.timeout_ompl));
+  declare_param("ompl.robot1_ur_manipulator.longest_valid_segment_fraction", rclcpp::ParameterValue(0.005));
+  declare_param("ompl.robot2_ur_manipulator.longest_valid_segment_fraction", rclcpp::ParameterValue(0.005));
+
+  declare_param("ompl.planner_configs.PRMstar.type", rclcpp::ParameterValue(std::string("geometric::PRMstar")));
+
+  // Group configurations - use short names that match planner_configs keys
+  std::vector<std::string> planners = {"RRTConnect", "RRTstar", "PRMstar"};
+
+  declare_param("ompl.robot1_ur_manipulator.default_planner_config", rclcpp::ParameterValue(planner_config_.ompl_planner_id));
+  declare_param("ompl.robot1_ur_manipulator.planner_configs", rclcpp::ParameterValue(planners));
+  declare_param("ompl.robot1_ur_manipulator.projection_evaluator",
+    rclcpp::ParameterValue(std::string("joints(robot1_shoulder_pan_joint,robot1_shoulder_lift_joint)")));
+
+  declare_param("ompl.robot2_ur_manipulator.default_planner_config", rclcpp::ParameterValue(planner_config_.ompl_planner_id));
+  declare_param("ompl.robot2_ur_manipulator.planner_configs", rclcpp::ParameterValue(planners));
+  declare_param("ompl.robot2_ur_manipulator.projection_evaluator",
+    rclcpp::ParameterValue(std::string("joints(robot2_shoulder_pan_joint,robot2_shoulder_lift_joint)")));
+
+  auto params = this->list_parameters({"ompl"}, 10);
+  RCLCPP_INFO(get_logger(), "Declared %zu OMPL parameters", params.names.size());
 }
 
 }  // namespace rsy_mtc_planning

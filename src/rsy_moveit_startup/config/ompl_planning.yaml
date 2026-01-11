@@ -1,54 +1,44 @@
-# OMPL planning configuration
+planning_plugins:
+  - ompl_interface/OMPLPlanner
 
-  planning_plugins:
-    - ompl_interface/OMPLPlanner
+request_adapters:
+  - default_planning_request_adapters/ResolveConstraintFrames
+  - default_planning_request_adapters/ValidateWorkspaceBounds
+  - default_planning_request_adapters/CheckStartStateBounds
+  - default_planning_request_adapters/CheckStartStateCollision
 
-  robot1_ur_manipulator:
-    default_planner_config: RRTstar
-    planner_configs:
-      - RRTConnect
-      - RRTstar
-      - PRMstar
-    longest_valid_segment_fraction: 0.005
-    simplify_solutions: true              # Post-process to smooth paths
-    num_planning_attempts: 3              # Multiple attempts for better solutions
+response_adapters:
+  - default_planning_response_adapters/AddTimeOptimalParameterization
+  - default_planning_response_adapters/ValidateSolution
+  - default_planning_response_adapters/DisplayMotionPath
 
-  robot2_ur_manipulator:
-    default_planner_config: RRTstar
-    planner_configs:
-      - RRTConnect
-      - RRTstar
-      - PRMstar
-    longest_valid_segment_fraction: 0.005
-    simplify_solutions: true              # Post-process to smooth paths
-    num_planning_attempts: 3              # Multiple attempts for better solutions
+start_state_max_bounds_error: 0.1
 
-  # RRTConnect: Fast bidirectional RRT, good for finding any path quickly
-  RRTConnect:
-    type: geometric::RRTConnect
-    range: 0.0
+robot1_ur_manipulator:
+  default_planner_config: RRTConnect
+  planner_configs:
+    - RRTConnect
+    - RRTstar
+    - PRMstar
+  projection_evaluator: joints(robot1_shoulder_pan_joint,robot1_shoulder_lift_joint)
 
-  # RRTstar: Optimal RRT, converges to shortest path over time (less joint movement)
-  # Note: May be slower than RRTConnect but produces better quality paths
-  RRTstar:
-    type: geometric::RRTstar
-    range: 0.0                      # Step size (0 = auto-calculate based on space)
-    goal_bias: 0.1                  # Probability of sampling toward goal (0.05-0.2)
-    delay_collision_checking: true  # Faster tree growth
+robot2_ur_manipulator:
+  default_planner_config: RRTConnect
+  planner_configs:
+    - RRTConnect
+    - RRTstar
+    - PRMstar
+  projection_evaluator: joints(robot2_shoulder_pan_joint,robot2_shoulder_lift_joint)
 
-  # PRMstar: Probabilistic Roadmap, good for repeated queries in same environment
-  PRMstar:
-    type: geometric::PRMstar
+RRTConnect:
+  type: geometric::RRTConnect
+  range: 0.0
 
-  start_state_max_bounds_error: 0.1
+RRTstar:
+  type: geometric::RRTstar
+  range: 0.0
+  goal_bias: 0.1
+  delay_collision_checking: 1
 
-  request_adapters:
-    - default_planning_request_adapters/ResolveConstraintFrames
-    - default_planning_request_adapters/ValidateWorkspaceBounds
-    - default_planning_request_adapters/CheckStartStateBounds
-    - default_planning_request_adapters/CheckStartStateCollision
-
-  response_adapters:
-    - default_planning_response_adapters/AddTimeOptimalParameterization
-    - default_planning_response_adapters/ValidateSolution
-    - default_planning_response_adapters/DisplayMotionPath
+PRMstar:
+  type: geometric::PRMstar

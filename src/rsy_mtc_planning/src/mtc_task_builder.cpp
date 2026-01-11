@@ -34,12 +34,11 @@ namespace rsy_mtc_planning
 namespace mtc = moveit::task_constructor;
 
 MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node, const PlannerConfig& config)
-  : node_(node),
-    velocity_scaling_ptp_(config.velocity_scaling_ptp),
-    velocity_scaling_lin_(config.velocity_scaling_lin),
-    acceleration_scaling_ptp_(config.acceleration_scaling_ptp),
-    acceleration_scaling_lin_(config.acceleration_scaling_lin)
+  : node_(node)
 {
+  // NOTE: OMPL parameters are declared in MotionSequenceServer::declareOmplParameters()
+  // at node startup, before this constructor is called
+
   // Load robot model
   robot_model_loader_ = std::make_shared<robot_model_loader::RobotModelLoader>(node_, "robot_description");
   robot_model_ = robot_model_loader_->getModel();
@@ -50,43 +49,58 @@ MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node, const Planne
     throw std::runtime_error("Failed to load robot model");
   }
 
-  // Create planning scene monitor for execution
+  // Create planning scene monitor for execution and MTC access
   planning_scene_monitor_ = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(
     node_, robot_model_loader_, "planning_scene_monitor");
-  planning_scene_monitor_->startSceneMonitor();
-  planning_scene_monitor_->startStateMonitor();
+
+  // Start monitoring robot state (requires /joint_states topic)
+  planning_scene_monitor_->startStateMonitor("/joint_states");
+
+  // Start publishing the planning scene so MTC's CurrentState stage can access it
+  // This publishes to /monitored_planning_scene topic
+  planning_scene_monitor_->startPublishingPlanningScene(
+    planning_scene_monitor::PlanningSceneMonitor::UPDATE_SCENE,
+    "/monitored_planning_scene");
+
+  // Start scene and world geometry monitors
+  planning_scene_monitor_->startSceneMonitor("/planning_scene");
   planning_scene_monitor_->startWorldGeometryMonitor();
+
+  // Provide the planning scene service that MTC needs
+  planning_scene_monitor_->providePlanningSceneService("/get_planning_scene");
 
   // Create planning scene
   planning_scene_ = std::make_shared<planning_scene::PlanningScene>(robot_model_);
 
-  // Create planners with configurable timeouts and velocity/acceleration scaling
+  // Create OMPL planner for sampling-based planning
   sampling_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "ompl", config.ompl_planner_id);
   sampling_planner_->setTimeout(config.timeout_ompl);
-  sampling_planner_->setMaxVelocityScalingFactor(velocity_scaling_ptp_);
-  sampling_planner_->setMaxAccelerationScalingFactor(acceleration_scaling_ptp_);
-  // Note: OMPL-specific parameters (goal_bias, etc.) are set in ompl_planning.yaml
+  sampling_planner_->setMaxVelocityScalingFactor(config.velocity_scaling_ptp);
+  sampling_planner_->setMaxAccelerationScalingFactor(config.acceleration_scaling_ptp);
 
+  RCLCPP_INFO(node_->get_logger(), "OMPL planner created: id=%s, timeout=%.1fs",
+              config.ompl_planner_id.c_str(), config.timeout_ompl);
+
+  // Create Pilz PTP planner for point-to-point motions
   ptp_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "pilz_industrial_motion_planner", "PTP");
   ptp_planner_->setTimeout(config.timeout_pilz_ptp);
-  ptp_planner_->setMaxVelocityScalingFactor(velocity_scaling_ptp_);
-  ptp_planner_->setMaxAccelerationScalingFactor(acceleration_scaling_ptp_);
+  ptp_planner_->setMaxVelocityScalingFactor(config.velocity_scaling_ptp);
+  ptp_planner_->setMaxAccelerationScalingFactor(config.acceleration_scaling_ptp);
 
+  // Create Pilz LIN planner for linear Cartesian motions
   lin_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "pilz_industrial_motion_planner", "LIN");
   lin_planner_->setTimeout(config.timeout_pilz_lin);
-  lin_planner_->setMaxVelocityScalingFactor(velocity_scaling_lin_);
-  lin_planner_->setMaxAccelerationScalingFactor(acceleration_scaling_lin_);
+  lin_planner_->setMaxVelocityScalingFactor(config.velocity_scaling_lin);
+  lin_planner_->setMaxAccelerationScalingFactor(config.acceleration_scaling_lin);
 
-  RCLCPP_DEBUG(node_->get_logger(), "Planner config: OMPL=%s, vel_ptp=%.2f, vel_lin=%.2f",
-              config.ompl_planner_id.c_str(), velocity_scaling_ptp_, velocity_scaling_lin_);
+  RCLCPP_INFO(node_->get_logger(), "MTCTaskBuilder: OMPL=%s (%.1fs), Pilz PTP (%.1fs), Pilz LIN (%.1fs)",
+              config.ompl_planner_id.c_str(), config.timeout_ompl, config.timeout_pilz_ptp, config.timeout_pilz_lin);
 
   // Setup robot configurations
   planning_groups_["robot1"] = "robot1_ur_manipulator";
   planning_groups_["robot2"] = "robot2_ur_manipulator";
   ee_links_["robot1"] = "robot1_tcp";
   ee_links_["robot2"] = "robot2_tcp";
-
-  RCLCPP_DEBUG(node_->get_logger(), "MTCTaskBuilder initialized");
 }
 
 mtc::Task MTCTaskBuilder::buildTask(
@@ -341,6 +355,7 @@ size_t MTCTaskBuilder::getNumSubTrajectories(mtc::Task& task)
 {
   if (task.numSolutions() == 0)
   {
+    RCLCPP_WARN(node_->get_logger(), "getNumSubTrajectories: No solutions in task");
     return 0;
   }
 
@@ -349,6 +364,8 @@ size_t MTCTaskBuilder::getNumSubTrajectories(mtc::Task& task)
   solution->toMsg(solution_msg, nullptr);
 
   size_t count = 0;
+  size_t total_sub_traj = solution_msg.sub_trajectory.size();
+
   for (const auto& sub_traj : solution_msg.sub_trajectory)
   {
     if (!sub_traj.trajectory.joint_trajectory.points.empty() ||
@@ -357,6 +374,9 @@ size_t MTCTaskBuilder::getNumSubTrajectories(mtc::Task& task)
       count++;
     }
   }
+
+  RCLCPP_INFO(node_->get_logger(), "Found %zu non-empty trajectories out of %zu total sub-trajectories",
+              count, total_sub_traj);
   return count;
 }
 
@@ -410,17 +430,21 @@ bool MTCTaskBuilder::executeSubTrajectory(mtc::Task& task, size_t index)
           return true;  // Skip empty trajectory
         }
 
-        RCLCPP_DEBUG(node_->get_logger(), "Executing traj %zu: %s (%zu pts)",
+        RCLCPP_INFO(node_->get_logger(), "Executing trajectory %zu: group=%s, points=%zu",
                     index, group_name.c_str(), sub_traj.trajectory.joint_trajectory.points.size());
 
         auto move_group = std::make_shared<moveit::planning_interface::MoveGroupInterface>(node_, group_name);
+
+        RCLCPP_INFO(node_->get_logger(), "Sending trajectory to move_group...");
         auto result = move_group->execute(sub_traj.trajectory);
 
         if (result != moveit::core::MoveItErrorCode::SUCCESS)
         {
-          RCLCPP_ERROR(node_->get_logger(), "Trajectory %zu failed: code=%d", index, result.val);
+          RCLCPP_ERROR(node_->get_logger(), "Trajectory %zu execution failed: code=%d", index, result.val);
           return false;
         }
+
+        RCLCPP_INFO(node_->get_logger(), "Trajectory %zu executed successfully", index);
         return true;
       }
       current_idx++;

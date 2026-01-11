@@ -5,7 +5,14 @@ int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
 
-  auto node = std::make_shared<rsy_mtc_planning::MotionSequenceServer>();
+  // Allow undeclared parameters so MoveIt2's OMPL interface can access
+  // planner configurations like ompl.planner_configs.RRTstarkConfigDefault.*
+  // Note: Don't use automatically_declare_parameters_from_overrides as it conflicts
+  // with explicit declare_parameter() calls in MotionSequenceServer
+  rclcpp::NodeOptions options;
+  options.allow_undeclared_parameters(true);
+
+  auto node = std::make_shared<rsy_mtc_planning::MotionSequenceServer>(options);
 
   rclcpp::spin(node);
   rclcpp::shutdown();

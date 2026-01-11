@@ -14,7 +14,9 @@
       "WebFetch(domain:automaticaddison.com)",
       "WebFetch(domain:moveit.picknik.ai)",
       "Bash(xargs cat:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

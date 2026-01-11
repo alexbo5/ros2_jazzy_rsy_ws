@@ -45,9 +45,6 @@ private:
   // Process motion sequence in separate thread
   void process_motion_sequence(const std::shared_ptr<GoalHandleExecuteMotionSequence> goal_handle);
 
-  // Execute individual motion step
-  bool execute_motion_step(const MotionStep& step);
-
   // Execute gripper action
   bool execute_gripper_action(const std::string& robot_name, bool open);
 
@@ -77,18 +74,20 @@ private:
   // Wait for robot_description to be received
   bool wait_for_robot_description(double timeout_sec = 30.0);
 
-  // Load planner configuration from parameters
-  PlannerConfig load_planner_config();
+  // Declare OMPL parameters on the node for MoveIt to find
+  void declareOmplParameters();
+
+  // Planner configuration (loaded once at startup)
+  PlannerConfig planner_config_;
 
   // Configurable parameters
   int max_ik_per_step_{16};
-  size_t max_pilz_combinations_{500};
-  size_t max_ompl_combinations_{1000};
+  size_t max_pilz_combinations_{1};
+  size_t max_ompl_combinations_{256};
   double robot_description_timeout_{30.0};
 
   // Planning logger for performance analysis
   std::unique_ptr<PlanningLogger> planning_logger_;
-  std::string log_file_path_;
 };
 
 }  // namespace rsy_mtc_planning
