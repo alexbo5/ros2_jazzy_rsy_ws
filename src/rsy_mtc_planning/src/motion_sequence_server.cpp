@@ -10,13 +10,13 @@ MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   // All values are hardcoded here - no YAML config files needed
 
   // IK and backtracking settings
-  max_ik_per_step_ = 16;               // Max IK solutions per MoveJ step
-  max_pilz_combinations_ = 64;          // Phase 1: Pilz PTP (0 = skip)
-  max_ompl_combinations_ = 256;        // Phase 2: OMPL combinations to try
+  max_ik_per_step_ = 32;               // Max IK solutions per MoveJ step
+  max_pilz_combinations_ = 4;           // Phase 1: Pilz PTP (0 = skip)
+  max_ompl_combinations_ = 1024;       // Phase 2: OMPL combinations to try
   robot_description_timeout_ = 30.0;   // Seconds to wait for robot_description
 
   // Planner configuration - all hardcoded
-  planner_config_.timeout_ompl = 10.0;          // OMPL planner timeout (seconds)
+  planner_config_.timeout_ompl = 5.0;           // OMPL planner timeout (seconds)
   planner_config_.timeout_pilz_ptp = 10.0;      // Pilz PTP timeout
   planner_config_.timeout_pilz_lin = 10.0;      // Pilz LIN timeout
   planner_config_.velocity_scaling_ptp = 1.0;   // PTP velocity (0.0-1.0)
@@ -25,7 +25,7 @@ MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   planner_config_.acceleration_scaling_lin = 1.0;
   // OMPL planner name (short name, looked up in planner_configs)
   // Options: RRTConnect, RRTstar, PRMstar
-  planner_config_.ompl_planner_id = "RRTstar";
+  planner_config_.ompl_planner_id = "RRTConnect";
 
   RCLCPP_INFO(get_logger(),
     "Hardcoded config: ik=%d, backtrack(pilz=%zu, ompl=%zu), "
@@ -556,8 +556,23 @@ void MotionSequenceServer::process_motion_sequence(
     return;
   }
 
+  // Cache solution message ONCE for efficient trajectory execution
+  // This avoids repeated toMsg() conversions inside the execution loop
+  if (!task_builder_->cacheSolutionMessage(successful_task))
+  {
+    RCLCPP_ERROR(get_logger(), "Failed to cache solution message");
+    planning_logger_->recordPlanningFailure("Failed to cache solution for execution");
+    planning_logger_->finalizeSession();
+
+    result->success = false;
+    result->message = "Failed to cache solution for execution";
+    result->failed_step_index = 0;
+    goal_handle->abort(result);
+    return;
+  }
+
   // Execute sub-trajectories one at a time, interleaving gripper operations
-  size_t num_trajectories = task_builder_->getNumSubTrajectories(successful_task);
+  size_t num_trajectories = task_builder_->getCachedNumSubTrajectories();
   size_t gripper_op_idx = 0;
 
   RCLCPP_INFO(get_logger(), "Executing: %zu trajectories, %zu gripper ops", num_trajectories, gripper_operations.size());
@@ -604,8 +619,8 @@ void MotionSequenceServer::process_motion_sequence(
       gripper_op_idx++;
     }
 
-    // Execute this sub-trajectory
-    bool traj_success = task_builder_->executeSubTrajectory(successful_task, traj_idx);
+    // Execute this sub-trajectory using cached solution (faster)
+    bool traj_success = task_builder_->executeCachedSubTrajectory(traj_idx);
     RCLCPP_DEBUG(get_logger(), "Trajectory %zu/%zu: %s", traj_idx + 1, num_trajectories, traj_success ? "OK" : "FAILED");
 
     if (!traj_success)
@@ -645,6 +660,9 @@ void MotionSequenceServer::process_motion_sequence(
     }
     gripper_op_idx++;
   }
+
+  // Clear cached solution to free memory
+  task_builder_->clearSolutionCache();
 
   // Log successful execution
   planning_logger_->endExecution(true);
@@ -752,14 +770,13 @@ void MotionSequenceServer::declareOmplParameters()
   }));
   declare_param("ompl.response_adapters", rclcpp::ParameterValue(std::vector<std::string>{
     "default_planning_response_adapters/AddTimeOptimalParameterization",
-    "default_planning_response_adapters/ValidateSolution",
-    "default_planning_response_adapters/DisplayMotionPath"
+    "default_planning_response_adapters/ValidateSolution"
   }));
 
   // Planner configurations under planner_configs.<name>.*
   // MoveIt looks up planners by name in this structure
   declare_param("ompl.planner_configs.RRTConnect.type", rclcpp::ParameterValue(std::string("geometric::RRTConnect")));
-  declare_param("ompl.planner_configs.RRTConnect.range", rclcpp::ParameterValue(0.0));
+  declare_param("ompl.planner_configs.RRTConnect.range", rclcpp::ParameterValue(0.2));
 
   declare_param("ompl.planner_configs.RRTstar.type", rclcpp::ParameterValue(std::string("geometric::RRTstar")));
   declare_param("ompl.planner_configs.RRTstar.goal_bias", rclcpp::ParameterValue(0.05));
@@ -771,8 +788,8 @@ void MotionSequenceServer::declareOmplParameters()
   declare_param("ompl.default_planning_time", rclcpp::ParameterValue(planner_config_.timeout_ompl));
   declare_param("ompl.robot1_ur_manipulator.planning_time", rclcpp::ParameterValue(planner_config_.timeout_ompl));
   declare_param("ompl.robot2_ur_manipulator.planning_time", rclcpp::ParameterValue(planner_config_.timeout_ompl));
-  declare_param("ompl.robot1_ur_manipulator.longest_valid_segment_fraction", rclcpp::ParameterValue(0.005));
-  declare_param("ompl.robot2_ur_manipulator.longest_valid_segment_fraction", rclcpp::ParameterValue(0.005));
+  declare_param("ompl.robot1_ur_manipulator.longest_valid_segment_fraction", rclcpp::ParameterValue(0.02));
+  declare_param("ompl.robot2_ur_manipulator.longest_valid_segment_fraction", rclcpp::ParameterValue(0.02));
 
   declare_param("ompl.planner_configs.PRMstar.type", rclcpp::ParameterValue(std::string("geometric::PRMstar")));
 

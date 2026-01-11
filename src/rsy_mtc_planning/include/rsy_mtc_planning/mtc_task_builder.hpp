@@ -17,6 +17,7 @@
 #include <map>
 #include <unordered_map>
 #include <optional>
+#include <moveit_task_constructor_msgs/msg/solution.hpp>
 
 namespace rsy_mtc_planning
 {
@@ -33,10 +34,10 @@ struct PlannerConfig
   double velocity_scaling_lin = 1.0;
   double acceleration_scaling_ptp = 1.0;
   double acceleration_scaling_lin = 1.0;
-  double timeout_ompl = 10.0;
+  double timeout_ompl = 5.0;
   double timeout_pilz_ptp = 10.0;
   double timeout_pilz_lin = 10.0;
-  std::string ompl_planner_id = "RRTstar";
+  std::string ompl_planner_id = "RRTConnect";
 };
 
 /**
@@ -183,6 +184,31 @@ public:
    */
   void updatePlanningScene();
 
+  /**
+   * @brief Cache solution message for a task (call before executeSubTrajectory loop)
+   * @param task The planned task
+   * @return true if caching succeeded
+   */
+  bool cacheSolutionMessage(moveit::task_constructor::Task& task);
+
+  /**
+   * @brief Clear cached solution message
+   */
+  void clearSolutionCache();
+
+  /**
+   * @brief Get number of sub-trajectories from cached solution (faster than getNumSubTrajectories)
+   * @return Number of non-empty sub-trajectories, or 0 if not cached
+   */
+  size_t getCachedNumSubTrajectories() const;
+
+  /**
+   * @brief Execute a sub-trajectory using cached solution (faster than executeSubTrajectory)
+   * @param index The sub-trajectory index to execute
+   * @return true if execution succeeded
+   */
+  bool executeCachedSubTrajectory(size_t index);
+
 private:
   // Add a MoveJ (PTP) stage to the task with pose goal
   void addMoveJStage(
@@ -233,12 +259,29 @@ private:
   std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> ptp_planner_;           // Pilz PTP (minimal joint motion)
   std::shared_ptr<moveit::task_constructor::solvers::PipelinePlanner> lin_planner_;           // Pilz LIN (Cartesian linear)
 
+  // Stored planner configuration (for stage timeouts)
+  PlannerConfig config_;
+
   // Robot configurations
   std::unordered_map<std::string, std::string> planning_groups_;
   std::unordered_map<std::string, std::string> ee_links_;
 
   // Planning scene monitor for trajectory execution
   planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor_;
+
+  // ===== CACHED OBJECTS FOR PERFORMANCE =====
+
+  // Cached MoveGroupInterface per planning group (created on first use, reused)
+  mutable std::unordered_map<std::string, std::shared_ptr<moveit::planning_interface::MoveGroupInterface>> move_group_cache_;
+
+  // Cached solution message for trajectory execution (avoids repeated toMsg() calls)
+  std::optional<moveit_task_constructor_msgs::msg::Solution> cached_solution_msg_;
+
+  // Cached non-empty trajectory indices for fast lookup
+  std::vector<size_t> cached_trajectory_indices_;
+
+  // Helper to get or create MoveGroupInterface for a planning group
+  std::shared_ptr<moveit::planning_interface::MoveGroupInterface> getMoveGroup(const std::string& group_name) const;
 };
 
 }  // namespace rsy_mtc_planning

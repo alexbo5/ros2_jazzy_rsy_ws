@@ -34,7 +34,7 @@ namespace rsy_mtc_planning
 namespace mtc = moveit::task_constructor;
 
 MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node, const PlannerConfig& config)
-  : node_(node)
+  : node_(node), config_(config)
 {
   // NOTE: OMPL parameters are declared in MotionSequenceServer::declareOmplParameters()
   // at node startup, before this constructor is called
@@ -54,7 +54,9 @@ MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node, const Planne
     node_, robot_model_loader_, "planning_scene_monitor");
 
   // Start monitoring robot state (requires /joint_states topic)
+  // Limit update frequency to reduce overhead during heavy planning loads
   planning_scene_monitor_->startStateMonitor("/joint_states");
+  planning_scene_monitor_->setStateUpdateFrequency(20.0);  // 20 Hz max (default can be much higher)
 
   // Start publishing the planning scene so MTC's CurrentState stage can access it
   // This publishes to /monitored_planning_scene topic
@@ -66,8 +68,10 @@ MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node, const Planne
   planning_scene_monitor_->startSceneMonitor("/planning_scene");
   planning_scene_monitor_->startWorldGeometryMonitor();
 
-  // Provide the planning scene service that MTC needs
-  planning_scene_monitor_->providePlanningSceneService("/get_planning_scene");
+  // Note: We intentionally do NOT call providePlanningSceneService() here.
+  // The service is not needed for MTC planning (it uses the monitor directly),
+  // and providing it can cause timeout warnings under heavy load during IK computation.
+  // If external tools need /get_planning_scene, enable it in a separate node.
 
   // Create planning scene
   planning_scene_ = std::make_shared<planning_scene::PlanningScene>(robot_model_);
@@ -101,6 +105,23 @@ MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node, const Planne
   planning_groups_["robot2"] = "robot2_ur_manipulator";
   ee_links_["robot1"] = "robot1_tcp";
   ee_links_["robot2"] = "robot2_tcp";
+}
+
+std::shared_ptr<moveit::planning_interface::MoveGroupInterface> MTCTaskBuilder::getMoveGroup(
+  const std::string& group_name) const
+{
+  // Check cache first
+  auto it = move_group_cache_.find(group_name);
+  if (it != move_group_cache_.end())
+  {
+    return it->second;
+  }
+
+  // Create and cache new MoveGroupInterface
+  RCLCPP_DEBUG(node_->get_logger(), "Creating MoveGroupInterface for group: %s", group_name.c_str());
+  auto move_group = std::make_shared<moveit::planning_interface::MoveGroupInterface>(node_, group_name);
+  move_group_cache_[group_name] = move_group;
+  return move_group;
 }
 
 mtc::Task MTCTaskBuilder::buildTask(
@@ -328,8 +349,8 @@ bool MTCTaskBuilder::executeTaskDirect(mtc::Task& task)
       RCLCPP_DEBUG(node_->get_logger(), "Executing sub-trajectory: %s (%zu pts)",
                   group_name.c_str(), sub_traj.trajectory.joint_trajectory.points.size());
 
-      // Create MoveGroupInterface for this group
-      auto move_group = std::make_shared<moveit::planning_interface::MoveGroupInterface>(node_, group_name);
+      // Get cached MoveGroupInterface for this group (avoids expensive recreation)
+      auto move_group = getMoveGroup(group_name);
 
       // Execute the trajectory directly using the message
       auto result = move_group->execute(sub_traj.trajectory);
@@ -433,7 +454,8 @@ bool MTCTaskBuilder::executeSubTrajectory(mtc::Task& task, size_t index)
         RCLCPP_INFO(node_->get_logger(), "Executing trajectory %zu: group=%s, points=%zu",
                     index, group_name.c_str(), sub_traj.trajectory.joint_trajectory.points.size());
 
-        auto move_group = std::make_shared<moveit::planning_interface::MoveGroupInterface>(node_, group_name);
+        // Get cached MoveGroupInterface (avoids expensive recreation per trajectory)
+        auto move_group = getMoveGroup(group_name);
 
         RCLCPP_INFO(node_->get_logger(), "Sending trajectory to move_group...");
         auto result = move_group->execute(sub_traj.trajectory);
@@ -460,6 +482,125 @@ bool MTCTaskBuilder::executeSubTrajectory(mtc::Task& task, size_t index)
   }
 }
 
+bool MTCTaskBuilder::cacheSolutionMessage(mtc::Task& task)
+{
+  if (task.numSolutions() == 0)
+  {
+    RCLCPP_WARN(node_->get_logger(), "cacheSolutionMessage: No solutions in task");
+    return false;
+  }
+
+  try
+  {
+    const auto& solution = task.solutions().front();
+    cached_solution_msg_ = moveit_task_constructor_msgs::msg::Solution();
+    solution->toMsg(*cached_solution_msg_, nullptr);
+
+    // Pre-compute indices of non-empty trajectories for fast lookup
+    cached_trajectory_indices_.clear();
+    for (size_t i = 0; i < cached_solution_msg_->sub_trajectory.size(); ++i)
+    {
+      const auto& sub_traj = cached_solution_msg_->sub_trajectory[i];
+      if (!sub_traj.trajectory.joint_trajectory.points.empty() ||
+          !sub_traj.trajectory.multi_dof_joint_trajectory.points.empty())
+      {
+        cached_trajectory_indices_.push_back(i);
+      }
+    }
+
+    RCLCPP_DEBUG(node_->get_logger(), "Cached solution: %zu non-empty trajectories out of %zu total",
+                cached_trajectory_indices_.size(), cached_solution_msg_->sub_trajectory.size());
+    return true;
+  }
+  catch (const std::exception& e)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Failed to cache solution: %s", e.what());
+    cached_solution_msg_.reset();
+    cached_trajectory_indices_.clear();
+    return false;
+  }
+}
+
+void MTCTaskBuilder::clearSolutionCache()
+{
+  cached_solution_msg_.reset();
+  cached_trajectory_indices_.clear();
+}
+
+size_t MTCTaskBuilder::getCachedNumSubTrajectories() const
+{
+  return cached_trajectory_indices_.size();
+}
+
+bool MTCTaskBuilder::executeCachedSubTrajectory(size_t index)
+{
+  if (!cached_solution_msg_)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "No cached solution - call cacheSolutionMessage first");
+    return false;
+  }
+
+  if (index >= cached_trajectory_indices_.size())
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Cached trajectory index %zu out of range (max %zu)",
+                index, cached_trajectory_indices_.size());
+    return false;
+  }
+
+  try
+  {
+    // Get the actual sub-trajectory using pre-computed index
+    size_t actual_idx = cached_trajectory_indices_[index];
+    const auto& sub_traj = cached_solution_msg_->sub_trajectory[actual_idx];
+
+    // Determine planning group from joint names
+    std::string group_name;
+    if (!sub_traj.trajectory.joint_trajectory.joint_names.empty())
+    {
+      const auto& first_joint = sub_traj.trajectory.joint_trajectory.joint_names[0];
+      if (first_joint.find("robot1") != std::string::npos)
+      {
+        group_name = "robot1_ur_manipulator";
+      }
+      else if (first_joint.find("robot2") != std::string::npos)
+      {
+        group_name = "robot2_ur_manipulator";
+      }
+      else
+      {
+        RCLCPP_ERROR(node_->get_logger(), "Unknown group for joint: %s", first_joint.c_str());
+        return false;
+      }
+    }
+    else
+    {
+      return true;  // Skip empty trajectory (shouldn't happen due to pre-filtering)
+    }
+
+    RCLCPP_INFO(node_->get_logger(), "Executing cached trajectory %zu: group=%s, points=%zu",
+                index, group_name.c_str(), sub_traj.trajectory.joint_trajectory.points.size());
+
+    // Get cached MoveGroupInterface
+    auto move_group = getMoveGroup(group_name);
+
+    auto result = move_group->execute(sub_traj.trajectory);
+
+    if (result != moveit::core::MoveItErrorCode::SUCCESS)
+    {
+      RCLCPP_ERROR(node_->get_logger(), "Cached trajectory %zu execution failed: code=%d", index, result.val);
+      return false;
+    }
+
+    RCLCPP_INFO(node_->get_logger(), "Cached trajectory %zu executed successfully", index);
+    return true;
+  }
+  catch (const std::exception& e)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Cached trajectory execution exception: %s", e.what());
+    return false;
+  }
+}
+
 void MTCTaskBuilder::addMoveJStage(
   mtc::Task& task,
   const rsy_mtc_planning::msg::MotionStep& step,
@@ -477,11 +618,13 @@ void MTCTaskBuilder::addMoveJStage(
   }
 
   auto& planner = use_ompl ? sampling_planner_ : ptp_planner_;
+  double timeout = use_ompl ? config_.timeout_ompl : config_.timeout_pilz_ptp;
 
   auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, planner);
   stage->setGroup(group);
   stage->setGoal(target);
   stage->setIKFrame(ee_link);
+  stage->setTimeout(timeout);
 
   task.add(std::move(stage));
 }
@@ -497,6 +640,7 @@ void MTCTaskBuilder::addMoveLStage(
 
   auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, lin_planner_);
   stage->setGroup(group);
+  stage->setTimeout(config_.timeout_pilz_lin);
 
   geometry_msgs::msg::PoseStamped target = step.target_pose;
   if (target.header.frame_id.empty())
@@ -556,14 +700,18 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
     return solutions;
   }
 
-  // Get current state from planning scene monitor
+  // Get current state and planning scene snapshot ONCE before the loop
+  // This avoids acquiring the lock 240+ times inside the loop
   planning_scene_monitor_->requestPlanningSceneState();
   moveit::core::RobotState robot_state(robot_model_);
   std::vector<double> current_joint_values;
+  planning_scene::PlanningScenePtr scene_snapshot;
   {
     planning_scene_monitor::LockedPlanningSceneRO locked_scene(planning_scene_monitor_);
     robot_state = locked_scene->getCurrentState();
     robot_state.copyJointGroupPositions(jmg, current_joint_values);
+    // Take a snapshot of the planning scene for collision checking
+    scene_snapshot = locked_scene->diff();
   }
 
   // Convert pose to Eigen
@@ -584,9 +732,8 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
     // Compute IK
     if (robot_state.setFromIK(jmg, target_eigen, ee_link, 0.05))  // 0.05s timeout (faster)
     {
-      // Check for collisions in current planning scene
-      planning_scene_monitor::LockedPlanningSceneRO locked_scene(planning_scene_monitor_);
-      if (locked_scene->isStateColliding(robot_state, group_name))
+      // Check for collisions using the snapshot (no locking needed)
+      if (scene_snapshot->isStateColliding(robot_state, group_name))
       {
         continue;  // Skip collision configurations
       }
@@ -597,6 +744,7 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
 
       // Discretize for duplicate detection (0.1 rad resolution)
       std::vector<int> discretized;
+      discretized.reserve(joint_values.size());
       for (double v : joint_values)
       {
         discretized.push_back(static_cast<int>(v * 10));
@@ -608,9 +756,9 @@ std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
         seen_configs.insert(discretized);
 
         IKSolution sol;
-        sol.joint_values = joint_values;
+        sol.joint_values = std::move(joint_values);
         sol.planning_group = group_name;
-        solutions.push_back(sol);
+        solutions.push_back(std::move(sol));
       }
     }
   }
@@ -666,10 +814,12 @@ void MTCTaskBuilder::addMoveJStageWithJoints(
 
   // Select planner
   auto& planner = use_sampling_planner ? sampling_planner_ : ptp_planner_;
+  double timeout = use_sampling_planner ? config_.timeout_ompl : config_.timeout_pilz_ptp;
 
   auto stage = std::make_unique<mtc::stages::MoveTo>(stage_name, planner);
   stage->setGroup(group);
   stage->setGoal(joint_goal);
+  stage->setTimeout(timeout);
 
   task.add(std::move(stage));
 }
@@ -685,7 +835,10 @@ mtc::Task MTCTaskBuilder::buildTaskWithIK(
   task.setName(task_name);
   task.stages()->setName(task_name);
   task.setRobotModel(robot_model_);
-  task.enableIntrospection();
+  // NOTE: Do NOT enable introspection here - this function is called up to 256 times
+  // during backtracking search. Enabling introspection registers publishers each time,
+  // causing "Publisher already registered" warnings and memory overhead.
+  // Introspection can be enabled on the successful task if debugging is needed.
 
   // Add current state as the starting point
   auto current_state = std::make_unique<mtc::stages::CurrentState>("current_state");
