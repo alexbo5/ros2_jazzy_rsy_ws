@@ -25,10 +25,26 @@ endif()
 
 find_package(rosidl_default_generators REQUIRED)
 
+# Generate action interfaces
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "action/CalibrateCube.action"
+)
+
 install(PROGRAMS
   rsy_cube_solver/cube_solver_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME cube_solver_node
+)
+
+install(PROGRAMS
+  rsy_cube_solver/calibrate_cube_action_server.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME calibrate_cube_action_server
+)
+
+# Install config directory
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
 )
 
 # Install launch files

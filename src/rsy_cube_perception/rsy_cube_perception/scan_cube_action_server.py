@@ -41,6 +41,14 @@ def get_calibration_file_path() -> Path:
     return Path.home() / ".ros" / "cube_perception_calibration.json"
 
 
+def get_color_calibration_file_path() -> Path:
+    """Get color calibration file path (created by CalibrateCube action)."""
+    package_config = Path("/home/robotik/rsy/ros2_jazzy_rsy_ws/src/rsy_cube_perception/config/cube_calibration.json")
+    if package_config.exists():
+        return package_config
+    return Path.home() / ".ros" / "cube_calibration.json"
+
+
 def _try_create_dir(path: Path) -> bool:
     """Try to create directory, return True if successful."""
     try:
@@ -50,16 +58,133 @@ def _try_create_dir(path: Path) -> bool:
         return False
 
 
+def load_color_ranges() -> Dict:
+    """
+    Load HSV color ranges from calibration file.
+    Falls back to hardcoded defaults if calibration file doesn't exist.
+    """
+    # Default hardcoded ranges
+    default_ranges = {
+        "white": ((0, 0, 180), (180, 60, 255)),
+        "yellow": ((20, 100, 100), (35, 255, 255)),
+        "red": ((0, 120, 70), (10, 255, 255)),
+        "red2": ((170, 120, 70), (180, 255, 255)),
+        "orange": ((10, 120, 100), (20, 255, 255)),
+        "green": ((40, 70, 70), (85, 255, 255)),
+        "blue": ((90, 70, 70), (130, 255, 255)),
+    }
+
+    cal_file = get_color_calibration_file_path()
+    if not cal_file.exists():
+        return default_ranges
+
+    try:
+        with open(cal_file, "r") as f:
+            data = json.load(f)
+
+        if "color_ranges" not in data:
+            return default_ranges
+
+        # Convert from JSON format to tuple format
+        loaded_ranges = {}
+        for color_name, ranges in data["color_ranges"].items():
+            lower = tuple(ranges["lower"])
+            upper = tuple(ranges["upper"])
+            loaded_ranges[color_name] = (lower, upper)
+
+        # Ensure all required colors are present
+        for color in default_ranges:
+            if color not in loaded_ranges:
+                loaded_ranges[color] = default_ranges[color]
+
+        return loaded_ranges
+
+    except Exception:
+        return default_ranges
+
+
+def load_color_centroids() -> Dict:
+    """
+    Load color centroids from calibration file for nearest-centroid classification.
+    Falls back to hardcoded defaults if calibration file doesn't exist.
+    """
+    # Default centroids (typical HSV values for cube colors)
+    default_centroids = {
+        "white": [0, 20, 220],
+        "yellow": [28, 180, 200],
+        "red": [5, 180, 180],
+        "orange": [15, 200, 200],
+        "green": [60, 150, 150],
+        "blue": [110, 180, 180],
+    }
+
+    cal_file = get_color_calibration_file_path()
+    if not cal_file.exists():
+        return default_centroids
+
+    try:
+        with open(cal_file, "r") as f:
+            data = json.load(f)
+
+        if "color_centroids" not in data:
+            return default_centroids
+
+        loaded_centroids = data["color_centroids"]
+
+        # Ensure all required colors are present
+        for color in default_centroids:
+            if color not in loaded_centroids:
+                loaded_centroids[color] = default_centroids[color]
+
+        return loaded_centroids
+
+    except Exception:
+        return default_centroids
+
+
+def hue_distance(h1: float, h2: float) -> float:
+    """
+    Calculate circular hue distance.
+    Hue in OpenCV HSV wraps at 180 (0 and 180 are adjacent).
+    """
+    diff = abs(h1 - h2)
+    return min(diff, 180 - diff)
+
+
+def hsv_distance(hsv1, hsv2, color_name: str = "") -> float:
+    """
+    Calculate weighted distance in HSV space.
+    - Hue uses circular distance to handle red wraparound
+    - White uses saturation-weighted distance (low S is key for white)
+    - Chromatic colors use balanced weighting
+    """
+    h1, s1, v1 = float(hsv1[0]), float(hsv1[1]), float(hsv1[2])
+    h2, s2, v2 = float(hsv2[0]), float(hsv2[1]), float(hsv2[2])
+
+    h_dist = hue_distance(h1, h2)
+    s_dist = abs(s1 - s2)
+    v_dist = abs(v1 - v2)
+
+    if color_name == "white":
+        # For white, saturation is the key distinguisher (white has very low S)
+        # Heavily weight saturation, less weight on hue (white can have any hue)
+        return h_dist * 0.1 + s_dist * 3.0 + v_dist * 0.5
+    else:
+        # For chromatic colors, hue is the primary distinguisher
+        # Normalize: H is 0-180, S and V are 0-255
+        return h_dist * 2.0 + s_dist * 0.5 + v_dist * 0.3
+
+
 FACE_ORDER = ["U", "R", "F", "D", "L", "B"]
 
 # Rotation angles for each face to match solver notation
 FACE_ROTATION_ANGLES = {
-    "U": 0,
-    "D": 180,
-    "F": 0,
-    "B": 270,
-    "L": 270,
-    "R": 90,
+    "U": 90,
+    "D": 270,
+    "F": 90,
+    "B": 0,
+    "L": 0,
+    "R": 180,
 }
 
 # Mock colors for each face (used in mock hardware mode)
@@ -72,16 +197,17 @@ MOCK_FACE_COLORS = {
     "R": ["red"] * 9,
 }
 
-# Color ranges (HSV)
-COLOR_RANGES = {
-    "white": ((0, 0, 180), (180, 60, 255)),
-    "yellow": ((20, 100, 100), (35, 255, 255)),
-    "red": ((0, 120, 70), (10, 255, 255)),
-    "red2": ((170, 120, 70), (180, 255, 255)),
-    "orange": ((10, 120, 100), (20, 255, 255)),
-    "green": ((40, 70, 70), (85, 255, 255)),
-    "blue": ((90, 70, 70), (130, 255, 255)),
-}
+# Color ranges (HSV) - loaded dynamically from calibration file
+# Falls back to hardcoded defaults if no calibration exists
+COLOR_RANGES = load_color_ranges()
+
+# Color centroids for nearest-centroid classification
+# Falls back to hardcoded defaults if no calibration exists
+COLOR_CENTROIDS = load_color_centroids()
+
+# Relative sample region size as fraction of cell size (0.0 to 1.0)
+# 0.6 means sample the central 60% of each cell, avoiding edges
+SAMPLE_REGION_RATIO = 0.6
 
 # Color to BGR mapping for visualization
 COLOR_BGR = {
@@ -127,16 +253,27 @@ def describe_solution(solution: str) -> str:
 
 
 def classify_color(hsv_value: np.ndarray) -> str:
-    """Classify color based on HSV value."""
-    h, s, v = int(hsv_value[0]), int(hsv_value[1]), int(hsv_value[2])
-    for name, (lower, upper) in COLOR_RANGES.items():
-        low = np.array(lower, dtype=np.uint8)
-        up = np.array(upper, dtype=np.uint8)
-        px = np.uint8([[[h, s, v]]])
-        mask = cv2.inRange(px, low, up)
-        if mask[0, 0] != 0:
-            return "red" if name == "red2" else name
-    return "unknown"
+    """
+    Classify color using nearest-centroid classification.
+
+    Computes weighted HSV distance to each calibrated color centroid
+    and returns the color with minimum distance.
+
+    Special handling:
+    - White: Uses saturation-weighted distance (low S is key)
+    - Red: Uses circular hue distance (handles 0/180 wraparound)
+    """
+    # Find nearest centroid
+    min_distance = float("inf")
+    best_color = "unknown"
+
+    for color_name, centroid in COLOR_CENTROIDS.items():
+        dist = hsv_distance(hsv_value, centroid, color_name)
+        if dist < min_distance:
+            min_distance = dist
+            best_color = color_name
+
+    return best_color
 
 
 def rotate_facelets_counterclockwise(colors: List[str], angle_degrees: int) -> List[str]:
@@ -346,7 +483,7 @@ class CubePerceptionServer(Node):
             goal_handle.abort()
             return result
 
-        max_wait_s = 200.0
+        max_wait_s = 20.0
         start_t = time.time()
         colors = None
 
@@ -845,23 +982,28 @@ class CubePerceptionServer(Node):
             colors = []
             ok = True
 
+            # Calculate sample region size based on cell size
+            sample_half = int(cell * SAMPLE_REGION_RATIO / 2)
+
             for row in range(3):
                 for col in range(3):
                     cx = x0 + col * cell + cell // 2
                     cy = y0 + row * cell + cell // 2
 
-                    x1 = max(cx - 5, 0)
-                    x2 = min(cx + 5, w - 1)
-                    y1 = max(cy - 5, 0)
-                    y2 = min(cy + 5, h - 1)
+                    # Use relative sample region based on cell size
+                    x1 = max(cx - sample_half, 0)
+                    x2 = min(cx + sample_half, w - 1)
+                    y1 = max(cy - sample_half, 0)
+                    y2 = min(cy + sample_half, h - 1)
 
                     sample = hsv[y1:y2+1, x1:x2+1]
                     if sample.size == 0:
                         ok = False
                         break
 
-                    mean = sample.reshape(-1, 3).mean(axis=0)
-                    color_name = classify_color(mean.astype(np.uint8))
+                    # Use median instead of mean for robustness against outliers
+                    median_hsv = np.median(sample.reshape(-1, 3), axis=0)
+                    color_name = classify_color(median_hsv.astype(np.uint8))
                     colors.append(color_name)
 
                 if not ok:

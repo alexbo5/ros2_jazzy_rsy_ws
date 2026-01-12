@@ -14,8 +14,8 @@ from geometry_msgs.msg import PoseStamped
 ROBOT_FACES = ["U", "F", "D"], ["L", "B", "R"]
 
 # distance (mm) from cube center to gripper contact point
-OFFSET_DIST_HOLD_CUBE = -40     # distance when holding the cube (grasps 2 rows of cube)
-OFFSET_DIST_SPIN_CUBE = -20    # distance when spinning the cube (grasps 1 row of cube)
+OFFSET_DIST_HOLD_CUBE = -42     # distance when holding the cube (grasps 2 rows of cube)
+OFFSET_DIST_SPIN_CUBE = -22    # distance when spinning the cube (grasps 1 row of cube)
 OFFSET_DIST_PRE_TARGET = 100   # distance when approaching the cube (pre-grasp position)
 OFFSET_DIST_TAKE_CUBE = 150    # distance when taking up the cube from rest position
 
@@ -44,7 +44,7 @@ HAND_OVER_POSE_DEF = {
 # Position where the cube rests (for taking up and putting down)
 # Robot 2 will always take up and put down from/to this position
 CUBE_REST_POSE_DEF = {
-    "position": [-0.12654 + (OFFSET_DIST_HOLD_CUBE / 1000) , 0.7334, 0.11339],  # Rest position
+    "position": [-0.11954 + (OFFSET_DIST_HOLD_CUBE / 1000) , 0.7334, 0.11039],  # Rest position
     "orientation_vector": [-1.0, 0.0, 0.0]  # approach axis
 }
 

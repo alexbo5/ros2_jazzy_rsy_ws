@@ -1,0 +1,20 @@
+# CalibrateCube Action
+# Calibrates cube color detection by presenting all 6 faces and sampling colors
+# User selects ROI on first face, then clicks center facelet on each face to sample
+
+# Goal (empty - no parameters needed)
+---
+# Result
+bool success
+string message
+int32 x          # ROI top-left x coordinate
+int32 y          # ROI top-left y coordinate
+int32 size       # ROI size (width/height)
+string[] colors_calibrated  # List of colors that were calibrated
+---
+# Feedback
+string status
+string current_face       # Face currently being presented (U, D, F, B, L, R)
+int32 faces_completed     # Number of faces calibrated so far
+int32 total_faces         # Total faces to calibrate (6)
+string window_title       # GUI window title

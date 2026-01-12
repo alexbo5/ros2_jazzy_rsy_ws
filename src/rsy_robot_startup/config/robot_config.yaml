@@ -7,9 +7,9 @@ robot2:
   robot_ip: "192.168.0.11"
   # Position relative to world frame
   position:
-    x: -0.77626
+    x: -0.76926
     y: 0.65264
-    z: 0.003
+    z: 0.0
   # Orientation in radians
   orientation:
     roll: 0.0

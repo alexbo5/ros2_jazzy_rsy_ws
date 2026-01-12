@@ -8,4 +8,4 @@ robot2:
   use_mock_hardware: false
 
 camera:
-  use_mock_hardware: true
+  use_mock_hardware: false
