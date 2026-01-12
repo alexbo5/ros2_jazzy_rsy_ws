@@ -175,6 +175,26 @@ public:
     bool use_sampling_planner = false);
 
   /**
+   * @brief Validate that an IK combination is collision-free for the entire sequence
+   *
+   * This function simulates the motion sequence step by step, checking for collisions
+   * at each endpoint. It considers the positions of ALL robots at each step, not just
+   * the current robot's position. This is critical for dual-arm setups where one robot's
+   * movement might collide with the other robot's planned position.
+   *
+   * @param steps Vector of motion steps
+   * @param ik_indices Map from step index to IK solution index (for MoveJ steps)
+   * @param movej_ik_data Pre-computed IK data for MoveJ steps
+   * @param collision_step_index Output: step index where collision was detected (-1 if none)
+   * @return true if the combination is collision-free, false if collision detected
+   */
+  bool validateIKCombinationCollisions(
+    const std::vector<rsy_mtc_planning::msg::MotionStep>& steps,
+    const std::map<size_t, size_t>& ik_indices,
+    const std::vector<MoveJIKData>& movej_ik_data,
+    int& collision_step_index);
+
+  /**
    * @brief Get the robot model for IK computation
    */
   moveit::core::RobotModelPtr getRobotModel() const { return robot_model_; }

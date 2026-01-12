@@ -904,4 +904,166 @@ mtc::Task MTCTaskBuilder::buildTaskWithIK(
   return task;
 }
 
+bool MTCTaskBuilder::validateIKCombinationCollisions(
+  const std::vector<rsy_mtc_planning::msg::MotionStep>& steps,
+  const std::map<size_t, size_t>& ik_indices,
+  const std::vector<MoveJIKData>& movej_ik_data,
+  int& collision_step_index)
+{
+  collision_step_index = -1;
+
+  // Number of intermediate points to check along each trajectory
+  const int NUM_TRAJECTORY_SAMPLES = 5;
+
+  // Get current planning scene
+  planning_scene_monitor_->requestPlanningSceneState();
+  planning_scene::PlanningScenePtr scene;
+  {
+    planning_scene_monitor::LockedPlanningSceneRO locked_scene(planning_scene_monitor_);
+    scene = locked_scene->diff();  // Create a modifiable copy
+  }
+
+  // Create robot state to simulate the sequence
+  // This state is updated after each step, so subsequent steps see previous robots' new positions
+  moveit::core::RobotState robot_state = scene->getCurrentState();
+
+  // Create a map from step index to MoveJIKData index
+  std::map<size_t, size_t> step_to_movej_data;
+  for (size_t i = 0; i < movej_ik_data.size(); ++i)
+  {
+    step_to_movej_data[movej_ik_data[i].step_index] = i;
+  }
+
+  // Simulate each step and check for collisions along the ENTIRE trajectory
+  for (size_t i = 0; i < steps.size(); ++i)
+  {
+    const auto& step = steps[i];
+    std::string group_name = getPlanningGroup(step.robot_name);
+    const moveit::core::JointModelGroup* jmg = robot_model_->getJointModelGroup(group_name);
+
+    if (!jmg)
+    {
+      RCLCPP_WARN(node_->get_logger(), "Unknown planning group for robot '%s'", step.robot_name.c_str());
+      continue;
+    }
+
+    if (step.motion_type == rsy_mtc_planning::msg::MotionStep::MOVE_J)
+    {
+      // Get the IK solution for this step
+      auto data_it = step_to_movej_data.find(i);
+      auto idx_it = ik_indices.find(i);
+
+      if (data_it != step_to_movej_data.end() && idx_it != ik_indices.end())
+      {
+        const auto& ik_data = movej_ik_data[data_it->second];
+        size_t ik_idx = idx_it->second;
+
+        if (ik_idx < ik_data.ik_solutions.size())
+        {
+          // Get start joint positions (current state of this robot)
+          std::vector<double> start_joints;
+          robot_state.copyJointGroupPositions(jmg, start_joints);
+
+          // Get end joint positions (target IK)
+          const auto& end_joints = ik_data.ik_solutions[ik_idx].joint_values;
+
+          // Check collision at multiple points along the joint-space trajectory
+          std::vector<double> interpolated_joints(start_joints.size());
+          for (int sample = 0; sample <= NUM_TRAJECTORY_SAMPLES; ++sample)
+          {
+            double t = static_cast<double>(sample) / NUM_TRAJECTORY_SAMPLES;
+
+            // Linear interpolation in joint space
+            for (size_t j = 0; j < start_joints.size() && j < end_joints.size(); ++j)
+            {
+              interpolated_joints[j] = start_joints[j] + t * (end_joints[j] - start_joints[j]);
+            }
+
+            robot_state.setJointGroupPositions(jmg, interpolated_joints);
+            robot_state.update();
+
+            // Check for collisions (self-collision AND collision with other robots)
+            if (scene->isStateColliding(robot_state, group_name))
+            {
+              collision_step_index = static_cast<int>(i);
+              RCLCPP_DEBUG(node_->get_logger(),
+                "Trajectory collision at step %zu (MoveJ, %s, IK[%zu], t=%.2f)",
+                i, step.robot_name.c_str(), ik_idx, t);
+              return false;
+            }
+          }
+
+          // Update robot_state to final position for subsequent steps
+          robot_state.setJointGroupPositions(jmg, end_joints);
+          robot_state.update();
+        }
+      }
+    }
+    else if (step.motion_type == rsy_mtc_planning::msg::MotionStep::MOVE_L)
+    {
+      // For MoveL, check collision along the Cartesian linear path
+      std::string ee_link = getEndEffectorLink(step.robot_name);
+
+      // Get current end-effector pose (start of linear motion)
+      robot_state.update();
+      const Eigen::Isometry3d start_pose = robot_state.getGlobalLinkTransform(ee_link);
+
+      // Get target pose
+      Eigen::Isometry3d end_pose;
+      tf2::fromMsg(step.target_pose.pose, end_pose);
+
+      // Check collision at multiple points along the Cartesian path
+      for (int sample = 0; sample <= NUM_TRAJECTORY_SAMPLES; ++sample)
+      {
+        double t = static_cast<double>(sample) / NUM_TRAJECTORY_SAMPLES;
+
+        // Interpolate position (linear)
+        Eigen::Vector3d interp_position = start_pose.translation() +
+                                          t * (end_pose.translation() - start_pose.translation());
+
+        // Interpolate orientation (spherical linear interpolation - slerp)
+        Eigen::Quaterniond start_quat(start_pose.rotation());
+        Eigen::Quaterniond end_quat(end_pose.rotation());
+        Eigen::Quaterniond interp_quat = start_quat.slerp(t, end_quat);
+
+        // Create interpolated pose
+        Eigen::Isometry3d interp_pose = Eigen::Isometry3d::Identity();
+        interp_pose.translation() = interp_position;
+        interp_pose.linear() = interp_quat.toRotationMatrix();
+
+        // Compute IK for this intermediate pose
+        if (robot_state.setFromIK(jmg, interp_pose, ee_link, 0.05))
+        {
+          robot_state.update();
+
+          // Check for collisions
+          if (scene->isStateColliding(robot_state, group_name))
+          {
+            collision_step_index = static_cast<int>(i);
+            RCLCPP_DEBUG(node_->get_logger(),
+              "Trajectory collision at step %zu (MoveL, %s, t=%.2f)",
+              i, step.robot_name.c_str(), t);
+            return false;
+          }
+        }
+        else if (sample > 0)  // IK failed for intermediate point (not start)
+        {
+          // MoveL path might be unreachable - let the planner handle this
+          RCLCPP_DEBUG(node_->get_logger(),
+            "MoveL IK failed at step %zu, t=%.2f - will be caught by planner",
+            i, t);
+        }
+      }
+
+      // Update robot_state to final position for subsequent steps
+      if (robot_state.setFromIK(jmg, end_pose, ee_link, 0.1))
+      {
+        robot_state.update();
+      }
+    }
+  }
+
+  return true;  // No collisions detected along any trajectory
+}
+
 }  // namespace rsy_mtc_planning
