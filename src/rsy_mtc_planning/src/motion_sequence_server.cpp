@@ -19,10 +19,10 @@ MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   planner_config_.timeout_ompl = 5.0;           // OMPL planner timeout (seconds)
   planner_config_.timeout_pilz_ptp = 10.0;      // Pilz PTP timeout
   planner_config_.timeout_pilz_lin = 10.0;      // Pilz LIN timeout
-  planner_config_.velocity_scaling_ptp = 1.0;   // PTP velocity (0.0-1.0)
-  planner_config_.velocity_scaling_lin = 1.0;   // LIN velocity
-  planner_config_.acceleration_scaling_ptp = 1.0;
-  planner_config_.acceleration_scaling_lin = 1.0;
+  planner_config_.velocity_scaling_ptp = 0.3;   // PTP velocity (0.0-1.0)
+  planner_config_.velocity_scaling_lin = 0.3;   // LIN velocity
+  planner_config_.acceleration_scaling_ptp = 0.3;
+  planner_config_.acceleration_scaling_lin = 0.3;
   // OMPL planner name (short name, looked up in planner_configs)
   // Options: RRTConnect, RRTstar, PRMstar
   planner_config_.ompl_planner_id = "RRTConnect";
