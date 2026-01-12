@@ -1,25 +1,5 @@
-# OMPL planning configuration (fallback planner)
-
 planning_plugins:
   - ompl_interface/OMPLPlanner
-
-robot1_ur_manipulator:
-  default_planner_config: RRTConnect
-  planner_configs:
-    - RRTConnect
-  longest_valid_segment_fraction: 0.005
-
-robot2_ur_manipulator:
-  default_planner_config: RRTConnect
-  planner_configs:
-    - RRTConnect
-  longest_valid_segment_fraction: 0.005
-
-RRTConnect:
-  type: geometric::RRTConnect
-  range: 0.0
-
-start_state_max_bounds_error: 0.1
 
 request_adapters:
   - default_planning_request_adapters/ResolveConstraintFrames
@@ -31,3 +11,34 @@ response_adapters:
   - default_planning_response_adapters/AddTimeOptimalParameterization
   - default_planning_response_adapters/ValidateSolution
   - default_planning_response_adapters/DisplayMotionPath
+
+start_state_max_bounds_error: 0.1
+
+robot1_ur_manipulator:
+  default_planner_config: RRTConnect
+  planner_configs:
+    - RRTConnect
+    - RRTstar
+    - PRMstar
+  projection_evaluator: joints(robot1_shoulder_pan_joint,robot1_shoulder_lift_joint)
+
+robot2_ur_manipulator:
+  default_planner_config: RRTConnect
+  planner_configs:
+    - RRTConnect
+    - RRTstar
+    - PRMstar
+  projection_evaluator: joints(robot2_shoulder_pan_joint,robot2_shoulder_lift_joint)
+
+RRTConnect:
+  type: geometric::RRTConnect
+  range: 0.0
+
+RRTstar:
+  type: geometric::RRTstar
+  range: 0.0
+  goal_bias: 0.1
+  delay_collision_checking: 1
+
+PRMstar:
+  type: geometric::PRMstar

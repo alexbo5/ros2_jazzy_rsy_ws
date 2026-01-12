@@ -1,0 +1,7 @@
+# Service to start/stop the preview window showing live camera feed with cube position overlay
+# The preview window displays the expected cube position from calibration data
+bool enable  # true to show preview window, false to close it
+---
+# Result
+bool success
+string message

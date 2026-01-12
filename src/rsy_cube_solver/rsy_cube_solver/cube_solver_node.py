@@ -5,14 +5,15 @@ from rclpy.action import ActionClient
 import time
 
 from rsy_cube_perception.action import ScanCubeFace, CalibrateCamera
-from rsy_cube_perception.srv import SolveCube
+from rsy_cube_perception.srv import SolveCube, ShowPreviewWindow
 from rsy_cube_motion.action import RotateFace, TakeUpCube, PutDownCube, PresentCubeFace
 
 class CubeSolver(Node):
     def __init__(self):
-        super().__init__('cube_solver')        
+        super().__init__('cube_solver')
         self.scan_cube_face_client = ActionClient(self, ScanCubeFace, 'scan_cube_face')
         self.solve_cube_client = self.create_client(SolveCube, 'solve_cube')
+        self.show_preview_window_client = self.create_client(ShowPreviewWindow, 'show_preview_window')
         self.face_rotation_client = ActionClient(self, RotateFace, 'rotate_face')
         self.take_up_cube_client = ActionClient(self, TakeUpCube, 'take_up_cube')
         self.put_down_cube_client = ActionClient(self, PutDownCube, 'put_down_cube')
@@ -20,7 +21,22 @@ class CubeSolver(Node):
 
     def run(self):
         self.get_logger().info("Main started...")
-        
+
+        # Show preview window at startup
+        self.get_logger().info("Starting preview window...")
+        if self.show_preview_window_client.wait_for_service(timeout_sec=10.0):
+            request = ShowPreviewWindow.Request()
+            request.enable = True
+            response_future = self.show_preview_window_client.call_async(request)
+            rclpy.spin_until_future_complete(self, response_future)
+            response = response_future.result()
+            if response and response.success:
+                self.get_logger().info("Preview window started successfully")
+            else:
+                self.get_logger().warn(f"Preview window start failed: {response.message if response else 'no response'}")
+        else:
+            self.get_logger().warn("Preview window service not available")
+
         # Take up the cube before scanning
         self.get_logger().info("Taking up the cube...")
         if not self.take_up_cube_client.wait_for_server(timeout_sec=10.0):

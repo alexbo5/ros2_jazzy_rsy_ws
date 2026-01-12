@@ -11,6 +11,8 @@
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
   <depend>rsy_gripper_controller</depend>
+  <depend>rsy_mtc_planning</depend>
+  <depend>geometry_msgs</depend>
 
   <member_of_group>rosidl_interface_packages</member_of_group>
 

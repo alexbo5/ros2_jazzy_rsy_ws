@@ -26,6 +26,10 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     ros-jazzy-trac-ik-kinematics-plugin \
     ros-jazzy-moveit-simple-controller-manager \
     ros-jazzy-moveit-configs-utils \
+    # MoveIt Task Constructor for motion sequence planning
+    ros-jazzy-moveit-task-constructor-core \
+    ros-jazzy-moveit-task-constructor-msgs \
+    ros-jazzy-moveit-task-constructor-capabilities \
     ros-jazzy-robotiq* \
     # Development tools
     git \

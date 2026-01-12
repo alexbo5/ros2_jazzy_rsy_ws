@@ -1,0 +1,41 @@
+# Goal: Execute a sequence of motion steps
+# All motions are planned first, then executed if all planning succeeds
+
+# Array of motion steps to execute in order
+rsy_mtc_planning/MotionStep[] motion_steps
+
+# Maximum planning attempts per step (default: 3)
+uint8 max_planning_attempts 3
+
+# If true, only plan and validate but don't execute
+bool validate_only false
+
+---
+# Result
+
+# True if all steps planned and executed successfully
+bool success
+
+# Human-readable result message
+string message
+
+# Index of failed step (-1 if all succeeded, or if failure was global)
+int32 failed_step_index
+
+# Per-step result messages
+string[] step_results
+
+---
+# Feedback
+
+# Current step being processed (0-indexed)
+int32 current_step
+
+# Total number of steps
+int32 total_steps
+
+# Current phase: "planning", "validating", "executing"
+string phase
+
+# Detailed status message
+string status

@@ -15,7 +15,7 @@
   <exec_depend>rviz2</exec_depend>
   <exec_depend>rsy_robot_startup</exec_depend>
   <exec_depend>rsy_moveit_startup</exec_depend>
-  <exec_depend>rsy_path_planning</exec_depend>
+  <exec_depend>rsy_mtc_planning</exec_depend>
   <exec_depend>rsy_cube_motion</exec_depend>
   <exec_depend>rsy_cube_perception</exec_depend>
   <exec_depend>rsy_gripper_controller</exec_depend>

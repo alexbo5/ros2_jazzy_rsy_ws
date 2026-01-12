@@ -77,8 +77,8 @@
 <xacro:arg name="robot2_tool_tcp_port" default="54322" />
 
 <!-- Robot2 position relative to world frame -->
-<xacro:arg name="robot2_x" default="-0.77" />
-<xacro:arg name="robot2_y" default="0.655" />
+<xacro:arg name="robot2_x" default="-0.76626" />
+<xacro:arg name="robot2_y" default="0.64864" />
 <xacro:arg name="robot2_z" default="0" />
 <xacro:arg name="robot2_roll" default="0" />
 <xacro:arg name="robot2_pitch" default="0" />
@@ -98,100 +98,246 @@
   <!-- create link fixed to the "world" -->
   <link name="world" />
 
-<link name="ground_plane">
-  <collision>
-    <geometry>
-      <box size="1.5 1.5 0.01"/>
-    </geometry>
-    <origin xyz="-0.385 0.3275 -0.005" rpy="0 0 0"/>
-  </collision>
-  <visual>
-    <geometry>
-      <box size="1.5 1.5 0.01"/>
-    </geometry>
-    <origin xyz="-0.385 0.3275 -0.005" rpy="0 0 0"/>
-    <material name="yellow">
-      <color rgba="1.0 1.0 0.0 1.0"/>
-    </material>
-  </visual>
-</link>
+  <link name="ground_plane">
+    <collision>
+      <geometry>
+        <box size="2.0 2.0 0.01"/>
+      </geometry>
+      <origin xyz="-0.38313 0.32432 -0.005" rpy="0 0 0"/>
+    </collision>
+    <visual>
+      <geometry>
+        <box size="2.0 2.0 0.01"/>
+      </geometry>
+      <origin xyz="-0.38313 0.32432 -0.005" rpy="0 0 0"/>
+      <material name="yellow">
+        <color rgba="1.0 1.0 0.0 0.1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="world_to_ground" type="fixed">
+    <parent link="world"/>
+    <child link="ground_plane"/>
+  </joint>
 
-<joint name="world_to_ground" type="fixed">
-  <parent link="world"/>
-  <child link="ground_plane"/>
-</joint>
+  <link name="wall_left">
+    <collision>
+      <geometry>
+        <box size="0.01 1.44864 1.0"/>
+      </geometry>
+      <origin xyz="0.405 0.32432 0.5" rpy="0 0 0"/>
+    </collision>
+    <visual>
+      <geometry>
+        <box size="0.01 1.44864 1.0"/>
+      </geometry>
+      <origin xyz="0.405 0.32432 0.5" rpy="0 0 0"/>
+      <material name="yellow">
+        <color rgba="1.0 1.0 0.0 0.1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="world_to_wall_left" type="fixed">
+    <parent link="world"/>
+    <child link="wall_left"/>
+  </joint>
 
-<link name="coneyor_belt">
-  <collision>
-    <geometry>
-      <box size="0.8 0.2 0.1"/>
-    </geometry>
-    <origin xyz="-0.385 0.3275 -0.05" rpy="0 0 0"/>
-  </collision>
-  <visual>
-    <geometry>
-      <box size="0.8 0.2 0.1"/>
-    </geometry>
-    <origin xyz="-0.385 0.3275 -0.05" rpy="0 0 0"/>
-    <material name="yellow">
-      <color rgba="1.0 1.0 0.0 1.0"/>
-    </material>
-  </visual>
-</link>
+  <link name="wall_right">
+    <collision>
+      <geometry>
+        <box size="0.01 1.44864 1.0"/>
+      </geometry>
+      <origin xyz="-1.17126 0.32432 0.5" rpy="0 0 0"/>
+    </collision>
+    <visual>
+      <geometry>
+        <box size="0.01 1.44864 1.0"/>
+      </geometry>
+      <origin xyz="-1.17126 0.32432 0.5" rpy="0 0 0"/>
+      <material name="yellow">
+        <color rgba="1.0 1.0 0.0 0.1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="world_to_wall_right" type="fixed">
+    <parent link="world"/>
+    <child link="wall_right"/>
+  </joint>
 
-<joint name="world_to_coneyor_belt" type="fixed">
-  <parent link="world"/>
-  <child link="coneyor_belt"/>
-</joint>
+  <link name="wall_back">
+    <collision>
+      <geometry>
+        <box size="1.56626 0.01 1.0"/>
+      </geometry>
+      <origin xyz="-0.38313 -0.405 0.5" rpy="0 0 0"/>
+    </collision>
+    <visual>
+      <geometry>
+        <box size="1.56626 0.01 1.0"/>
+      </geometry>
+      <origin xyz="-0.38313 -0.405 0.5" rpy="0 0 0"/>
+      <material name="yellow">
+        <color rgba="1.0 1.0 0.0 0.1"/>
+      </material>
+    </visual>
+  </link> 
+  <joint name="world_to_wall_back" type="fixed">
+    <parent link="world"/>
+    <child link="wall_back"/>
+  </joint>
 
-<!-- ITEM Profile 1 -->
+  <link name="wall_front">
+    <collision>
+      <geometry>
+        <box size="1.56626 0.01 1.0"/>
+      </geometry>
+      <origin xyz="-0.38313 1.05364 0.5" rpy="0 0 0"/>
+    </collision>
+    <visual>
+      <geometry>
+        <box size="1.56626 0.01 1.0"/>
+      </geometry>
+      <origin xyz="-0.38313 1.05364 0.5" rpy="0 0 0"/>
+      <material name="yellow">
+        <color rgba="1.0 1.0 0.0 0.1"/>
+      </material>
+    </visual>
+  </link> 
+  <joint name="world_to_wall_front" type="fixed">
+    <parent link="world"/>
+    <child link="wall_front"/>
+  </joint>
+
+  <link name="roof">
+    <collision>
+      <geometry>
+        <box size="2.0 2.0 0.01"/>
+      </geometry>
+      <origin xyz="-0.38313 0.32432 1.005" rpy="0 0 0"/>
+    </collision>
+    <visual>
+      <geometry>
+        <box size="2.0 2.0 0.01"/>
+      </geometry>
+      <origin xyz="-0.38313 0.32432 1.005" rpy="0 0 0"/>
+      <material name="yellow">
+        <color rgba="1.0 1.0 0.0 0.1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="world_to_roof" type="fixed">
+    <parent link="world"/>
+    <child link="roof"/>
+  </joint>
+
 <link name="item_profile_1">
   <collision>
     <geometry>
       <box size="0.20 0.20 1.0"/>
     </geometry>
-    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+  <origin xyz="0.30 -0.30 0.5" rpy="0 0 0"/>
   </collision>
   <visual>
     <geometry>
-      <box size="0.15 0.15 1.0"/>
+      <box size="0.20 0.20 1.0"/>
     </geometry>
-    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+    <origin xyz="0.30 -0.30 0.5" rpy="0 0 0"/>
     <material name="yellow">
-      <color rgba="1.0 1.0 0.0 1.0"/>
+      <color rgba="1.0 1.0 0.0 0.1"/>
     </material>
   </visual>
 </link>
-
 <joint name="world_to_item_profile_1" type="fixed">
   <parent link="world"/>
   <child link="item_profile_1"/>
-  <origin xyz="0.30 -0.30 0" rpy="0 0 0"/>
 </joint>
 
-<!-- ITEM Profile 2 -->
 <link name="item_profile_2">
   <collision>
     <geometry>
-      <box size="0.15 0.15 1.0"/>
+      <box size="0.20 0.20 1.0"/>
     </geometry>
-    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+    <origin xyz="-1.06626 0.94864 0.5" rpy="0 0 0"/>
   </collision>
   <visual>
     <geometry>
-      <box size="0.15 0.15 1.0"/>
+      <box size="0.20 0.20 1.0"/>
     </geometry>
-    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+    <origin xyz="-1.06626 0.94864 0.5" rpy="0 0 0"/>
     <material name="yellow">
-      <color rgba="1.0 1.0 0.0 1.0"/>
+      <color rgba="1.0 1.0 0.0 0.1"/>
     </material>
   </visual>
 </link>
-
 <joint name="world_to_item_profile_2" type="fixed">
   <parent link="world"/>
   <child link="item_profile_2"/>
-  <origin xyz="-1.07 0.955 0" rpy="0 0 0"/>
+</joint>
+
+<link name="cube_robot1">
+  <collision>
+    <geometry>
+      <box size="0.06 0.06 0.06"/>
+    </geometry>
+    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.06 0.06 0.06"/>
+    </geometry>
+    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
+    <material name="yellow">
+      <color rgba="1.0 1.0 0.0 0.1"/>
+    </material>
+  </visual>
+</link>
+<joint name="robot1_tcp_to_cube_robot1" type="fixed">
+  <parent link="robot1_tcp"/>
+  <child link="cube_robot1"/>
+</joint>
+
+<link name="cube_robot2">
+  <collision>
+    <geometry>
+      <box size="0.06 0.06 0.06"/>
+    </geometry>
+    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.06 0.06 0.06"/>
+    </geometry>
+    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
+    <material name="yellow">
+      <color rgba="1.0 1.0 0.0 0.1"/>
+    </material>
+  </visual>
+</link>
+<joint name="robot2_tcp_to_cube_robot2" type="fixed">
+  <parent link="robot2_tcp"/>
+  <child link="cube_robot2"/>
+</joint>
+
+<link name="cube_stand">
+  <collision>
+    <geometry>
+      <box size="0.07 0.07 0.12"/>
+    </geometry>
+    <origin xyz="-0.15654 0.7294 0.04039" rpy="0 0 0"/>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.07 0.07 0.12"/>
+    </geometry>
+    <origin xyz="-0.11954 0.7334 0.04039" rpy="0 0 0"/>
+    <material name="yellow">
+      <color rgba="1.0 1.0 0.0 0.1"/>
+    </material>
+  </visual>
+</link>
+<joint name="world_to_cube_stand" type="fixed">
+  <parent link="world"/>
+  <child link="cube_stand"/>
 </joint>
 
 <xacro:ur_robot
@@ -205,7 +351,7 @@
     safety_limits="$(arg robot1_safety_limits)"
     safety_pos_margin="$(arg robot1_safety_pos_margin)"
     safety_k_position="$(arg robot1_safety_k_position)">
-     <origin xyz="0 0 0" rpy="0 0 1.570796" />          <!-- position robot in the world -->
+     <origin xyz="0 0 0" rpy="0 0 1.570796" />
 </xacro:ur_robot>
 
 <xacro:ur_robot
@@ -236,14 +382,14 @@
 <joint name="robot1_tool0_to_tcp" type="fixed">
     <parent link="robot1_tool0" />
     <child link="robot1_tcp" />
-    <origin xyz="0 0 0.165" rpy="0 0 1.570796" />
+    <origin xyz="0 0 0.2078" rpy="0 0 1.570796" />
 </joint>
 
 <link name="robot2_tcp" />
 <joint name="robot2_tool0_to_tcp" type="fixed">
     <parent link="robot2_tool0" />
     <child link="robot2_tcp" />
-    <origin xyz="0 0 0.165" rpy="0 0 0" />
+    <origin xyz="0 0 0.2078" rpy="0 0 0" />
 </joint>
 
 <!-- ros2 control instance -->
