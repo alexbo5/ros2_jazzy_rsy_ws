@@ -49,6 +49,22 @@ void PlanningLogger::recordInput(
   current_metrics_.total_ik_combinations = total_ik_combinations;
 }
 
+void PlanningLogger::recordMoveJIKInfo(const std::vector<MoveJIKInfo>& movej_ik_info)
+{
+  current_metrics_.movej_ik_info = movej_ik_info;
+}
+
+void PlanningLogger::recordAttempt(const AttemptRecord& attempt)
+{
+  // Limit history size for memory efficiency
+  if (current_metrics_.attempt_history.size() >= PlanningMetrics::MAX_ATTEMPT_HISTORY)
+  {
+    // Remove oldest attempt
+    current_metrics_.attempt_history.erase(current_metrics_.attempt_history.begin());
+  }
+  current_metrics_.attempt_history.push_back(attempt);
+}
+
 void PlanningLogger::recordPlannerConfig(
   size_t max_pilz_combinations,
   size_t max_ompl_combinations,
@@ -280,6 +296,18 @@ std::string PlanningLogger::metricsToString(const PlanningMetrics& metrics)
   ss << "]\n";
   ss << "  Total IK combinations: " << metrics.total_ik_combinations << "\n";
 
+  // Detailed MoveJ IK information
+  if (!metrics.movej_ik_info.empty())
+  {
+    ss << "\n[MOVEJ IK DETAILS]\n";
+    for (const auto& ik_info : metrics.movej_ik_info)
+    {
+      ss << "  Step " << ik_info.step_index << " (" << ik_info.robot_name << "):\n";
+      ss << "    Total IK found:       " << ik_info.total_ik_found << "\n";
+      ss << "    Collision-free IK:    " << ik_info.collision_free_ik << "\n";
+    }
+  }
+
   // Planner configuration
   ss << "\n[CONFIG]\n";
   ss << "  Max Pilz combinations: " << metrics.max_pilz_combinations << "\n";
@@ -376,6 +404,123 @@ std::string PlanningLogger::metricsToString(const PlanningMetrics& metrics)
            << " IK " << evt.old_ik_index << "->" << evt.new_ik_index;
       }
       ss << "\n";
+    }
+  }
+
+  // Failure analysis summary (aggregated statistics from attempt history)
+  if (!metrics.attempt_history.empty() && !metrics.planning_succeeded)
+  {
+    ss << "\n[FAILURE ANALYSIS]\n";
+
+    // Count failures by type
+    size_t collision_failures = 0;
+    size_t planning_failures = 0;
+    std::map<int, size_t> failures_by_step;  // step_index -> count
+    std::map<std::string, size_t> failures_by_type;  // "MoveJ"/"MoveL" -> count
+
+    for (const auto& attempt : metrics.attempt_history)
+    {
+      if (attempt.planning_succeeded) continue;
+
+      if (!attempt.collision_precheck_passed)
+      {
+        collision_failures++;
+        if (attempt.collision_step >= 0)
+        {
+          failures_by_step[attempt.collision_step]++;
+        }
+      }
+      else if (attempt.planning_attempted)
+      {
+        planning_failures++;
+        if (attempt.failed_step_index >= 0)
+        {
+          failures_by_step[attempt.failed_step_index]++;
+        }
+        if (!attempt.failed_step_type.empty())
+        {
+          failures_by_type[attempt.failed_step_type]++;
+        }
+      }
+    }
+
+    ss << "  Collision pre-check failures: " << collision_failures << "\n";
+    ss << "  Planning failures:            " << planning_failures << "\n";
+
+    if (!failures_by_step.empty())
+    {
+      ss << "  Failures by step:\n";
+      for (const auto& [step, count] : failures_by_step)
+      {
+        ss << "    Step " << step << ": " << count << " failures\n";
+      }
+    }
+
+    if (!failures_by_type.empty())
+    {
+      ss << "  Failures by motion type:\n";
+      for (const auto& [type, count] : failures_by_type)
+      {
+        ss << "    " << type << ": " << count << " failures\n";
+      }
+    }
+  }
+
+  // Attempt history (detailed log of every tried solution)
+  if (!metrics.attempt_history.empty())
+  {
+    ss << "\n[ATTEMPT HISTORY] (" << metrics.attempt_history.size() << " attempts)\n";
+    ss << "  Format: #attempt [phase] IK=[indices] -> result\n";
+    ss << "  ---------------------------------------------------------------\n";
+
+    for (const auto& attempt : metrics.attempt_history)
+    {
+      ss << "  #" << std::setw(3) << attempt.attempt_number << " ";
+      ss << "[" << std::setw(8) << attempt.phase_name << "] ";
+
+      // IK indices used
+      ss << "IK=[";
+      for (size_t i = 0; i < attempt.ik_indices.size(); ++i)
+      {
+        if (i > 0) ss << ",";
+        ss << attempt.ik_indices[i];
+      }
+      ss << "] -> ";
+
+      // Result
+      if (attempt.planning_succeeded)
+      {
+        ss << "SUCCESS\n";
+      }
+      else
+      {
+        // Show failure details
+        if (!attempt.collision_precheck_passed)
+        {
+          ss << "COLLISION at step " << attempt.collision_step << "\n";
+        }
+        else if (!attempt.planning_attempted)
+        {
+          ss << "SKIPPED (precheck failed)\n";
+        }
+        else
+        {
+          ss << "FAILED: " << attempt.failed_step_type;
+          if (attempt.failed_step_index >= 0)
+          {
+            ss << " at step " << attempt.failed_step_index;
+          }
+          if (!attempt.failed_step_name.empty())
+          {
+            ss << " (" << attempt.failed_step_name << ")";
+          }
+          if (!attempt.failure_reason.empty())
+          {
+            ss << " - " << attempt.failure_reason;
+          }
+          ss << "\n";
+        }
+      }
     }
   }
 

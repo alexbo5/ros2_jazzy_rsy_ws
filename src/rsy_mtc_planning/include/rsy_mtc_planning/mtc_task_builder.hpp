@@ -34,10 +34,11 @@ struct PlannerConfig
   double velocity_scaling_lin = 1.0;
   double acceleration_scaling_ptp = 1.0;
   double acceleration_scaling_lin = 1.0;
-  double timeout_ompl = 5.0;
+  double timeout_ompl = 3.0;
   double timeout_pilz_ptp = 10.0;
   double timeout_pilz_lin = 10.0;
   std::string ompl_planner_id = "RRTConnect";
+  unsigned int ompl_planning_attempts = 3;  // Number of planning attempts for OMPL
 };
 
 /**
@@ -205,6 +206,14 @@ public:
   void updatePlanningScene();
 
   /**
+   * @brief Refresh cached planning scene snapshot for collision checking
+   *
+   * Call this ONCE before a batch of validateIKCombinationCollisions() calls
+   * to avoid repeated requestPlanningSceneState() calls (which are slow).
+   */
+  void refreshCollisionScene();
+
+  /**
    * @brief Cache solution message for a task (call before executeSubTrajectory loop)
    * @param task The planned task
    * @return true if caching succeeded
@@ -299,6 +308,9 @@ private:
 
   // Cached non-empty trajectory indices for fast lookup
   std::vector<size_t> cached_trajectory_indices_;
+
+  // Cached planning scene snapshot for batch collision checking
+  planning_scene::PlanningScenePtr cached_collision_scene_;
 
   // Helper to get or create MoveGroupInterface for a planning group
   std::shared_ptr<moveit::planning_interface::MoveGroupInterface> getMoveGroup(const std::string& group_name) const;
