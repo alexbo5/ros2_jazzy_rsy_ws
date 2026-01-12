@@ -17,16 +17,17 @@ import cv2
 import numpy as np
 import time
 import json
+import threading
 from typing import List, Dict
 from pathlib import Path
 
 try:
     from rsy_cube_perception.action import ScanCubeFace, CalibrateCamera
-    from rsy_cube_perception.srv import SolveCube
+    from rsy_cube_perception.srv import SolveCube, ShowPreviewWindow
 except Exception as e:
     raise RuntimeError(
         f"Failed to import action/service types: {e}. "
-        "Make sure ScanCubeFace.action, CalibrateCamera.action, and SolveCube.srv exist and package is built."
+        "Make sure ScanCubeFace.action, CalibrateCamera.action, SolveCube.srv, and ShowPreviewWindow.srv exist and package is built."
     )
 
 # Calibration data file location - prefer package config directory
@@ -195,14 +196,12 @@ class CubePerceptionServer(Node):
         # Declare parameters
         self.declare_parameter("use_mock_hardware", False)
         self.declare_parameter("camera_index", 0)
-        self.declare_parameter("show_preview", True)
         self.declare_parameter("mock_cube_solution", "R U R' U'")
         self.declare_parameter("mock_cube_description", "Mock cube solution for testing")
 
         # Get parameters
         self.use_mock_hardware = self.get_parameter("use_mock_hardware").get_parameter_value().bool_value
         self.camera_index = self.get_parameter("camera_index").get_parameter_value().integer_value
-        self.show_preview = self.get_parameter("show_preview").get_parameter_value().bool_value
         self.mock_cube_solution = self.get_parameter("mock_cube_solution").get_parameter_value().string_value
         self.mock_cube_description = self.get_parameter("mock_cube_description").get_parameter_value().string_value
 
@@ -230,14 +229,54 @@ class CubePerceptionServer(Node):
             execute_callback=self.execute_calibrate_camera
         )
 
-        # Create service
+        # Create services
         self._solve_cube_service = self.create_service(
             SolveCube,
             'solve_cube',
             self.execute_solve_cube
         )
 
+        self._show_preview_window_service = self.create_service(
+            ShowPreviewWindow,
+            'show_preview_window',
+            self.execute_show_preview_window
+        )
+
+        # Shared camera instance
+        self._camera = None
+        self._camera_lock = threading.Lock()
+
+        # Preview window thread control
+        self._preview_thread = None
+        self._preview_running = False
+        self._preview_lock = threading.Lock()
+
         self.get_logger().info("Cube Perception Server started.")
+
+    def _open_camera(self) -> bool:
+        """Open the shared camera if not already open. Returns True if camera is available."""
+        with self._camera_lock:
+            if self._camera is not None and self._camera.isOpened():
+                return True
+            self._camera = cv2.VideoCapture(self.camera_index)
+            if not self._camera.isOpened():
+                self._camera = None
+                return False
+            return True
+
+    def _close_camera(self):
+        """Close the shared camera."""
+        with self._camera_lock:
+            if self._camera is not None:
+                self._camera.release()
+                self._camera = None
+
+    def _read_frame(self):
+        """Read a frame from the shared camera. Returns (success, frame)."""
+        with self._camera_lock:
+            if self._camera is None or not self._camera.isOpened():
+                return False, None
+            return self._camera.read()
 
     def execute_scan_cube_face(self, goal_handle):
         """Execute ScanCubeFace action."""
@@ -299,82 +338,63 @@ class CubePerceptionServer(Node):
         return result
 
     def _execute_real_scan_face(self, goal_handle, face, camera_index, feedback_msg, result):
-        """Execute real face scan with camera."""
-        cap = cv2.VideoCapture(camera_index)
-        if not cap.isOpened():
+        """Execute real face scan with shared camera."""
+        # Ensure camera is open (may already be open from preview)
+        if not self._open_camera():
             result.success = False
             result.message = f"Camera index {camera_index} not available"
             goal_handle.abort()
             return result
 
-        show_preview = self.show_preview
-        preview_window = f"Scanning face {face}"
+        max_wait_s = 200.0
+        start_t = time.time()
+        colors = None
 
-        if show_preview:
-            try:
-                cv2.namedWindow(preview_window, cv2.WINDOW_NORMAL)
-            except Exception:
-                self.get_logger().warn("Preview window could not be created")
-                show_preview = False
-
-        try:
-            max_wait_s = 200.0
-            start_t = time.time()
-            colors = None
-
-            while time.time() - start_t < max_wait_s:
-                if goal_handle.is_cancel_requested:
-                    result.success = False
-                    result.message = "Goal cancelled by client"
-                    goal_handle.canceled()
-                    return result
-
-                feedback_msg.status = f"Scanning face {face}..."
-                feedback_msg.frames_sampled = int((time.time() - start_t) * 30)
-                goal_handle.publish_feedback(feedback_msg)
-
-                colors = self.capture_face_colors(cap, sample_frames=4, show_preview=show_preview, preview_window=preview_window)
-
-                if colors and len(colors) == 9 and all(c != "unknown" for c in colors):
-                    break
-
-                time.sleep(0.5)
-
-            if not colors or len(colors) != 9 or any(c == "unknown" for c in colors):
+        while time.time() - start_t < max_wait_s:
+            if goal_handle.is_cancel_requested:
                 result.success = False
-                result.message = f"Failed to capture complete face {face} within {max_wait_s}s"
-                goal_handle.abort()
+                result.message = "Goal cancelled by client"
+                goal_handle.canceled()
                 return result
 
-            # Apply rotation to match solver notation
-            rotation_angle = FACE_ROTATION_ANGLES.get(face, 0)
-            if rotation_angle != 0:
-                self.get_logger().info(f"Rotating face {face} by {rotation_angle}° counterclockwise")
-                colors = rotate_facelets_counterclockwise(colors, rotation_angle)
-
-            # Store colors internally
-            self.scanned_colors[face] = colors
-            center_color = colors[4]
-            self.color_to_face[center_color] = face
-
-            result.success = True
-            result.message = f"Face {face} scanned successfully"
-            result.colors = colors
-
-            feedback_msg.status = f"Face {face} captured successfully"
+            feedback_msg.status = f"Scanning face {face}..."
+            feedback_msg.frames_sampled = int((time.time() - start_t) * 30)
             goal_handle.publish_feedback(feedback_msg)
-            goal_handle.succeed()
 
-            self.get_logger().info(f"Face {face} scanned: {colors}")
+            colors = self.capture_face_colors(sample_frames=4)
+
+            if colors and len(colors) == 9 and all(c != "unknown" for c in colors):
+                break
+
+            time.sleep(0.5)
+
+        if not colors or len(colors) != 9 or any(c == "unknown" for c in colors):
+            result.success = False
+            result.message = f"Failed to capture complete face {face} within {max_wait_s}s"
+            goal_handle.abort()
             return result
 
-        finally:
-            cap.release()
-            try:
-                if show_preview:
-                    cv2.destroyAllWindows()
-            except Exception:
-                pass
+        # Apply rotation to match solver notation
+        rotation_angle = FACE_ROTATION_ANGLES.get(face, 0)
+        if rotation_angle != 0:
+            self.get_logger().info(f"Rotating face {face} by {rotation_angle}° counterclockwise")
+            colors = rotate_facelets_counterclockwise(colors, rotation_angle)
+
+        # Store colors internally
+        self.scanned_colors[face] = colors
+        center_color = colors[4]
+        self.color_to_face[center_color] = face
+
+        result.success = True
+        result.message = f"Face {face} scanned successfully"
+        result.colors = colors
+
+        feedback_msg.status = f"Face {face} captured successfully"
+        goal_handle.publish_feedback(feedback_msg)
+        goal_handle.succeed()
+
+        self.get_logger().info(f"Face {face} scanned: {colors}")
+        return result
 
     def execute_calibrate_camera(self, goal_handle):
         """Execute CalibrateCamera action with GUI."""
@@ -392,9 +412,8 @@ class CubePerceptionServer(Node):
             goal_handle.succeed()
             return result
 
-        cap = cv2.VideoCapture(self.camera_index)
-
-        if not cap.isOpened():
+        # Use shared camera
+        if not self._open_camera():
             result.success = False
             result.message = f"Camera index {self.camera_index} not available"
             goal_handle.abort()
@@ -403,7 +422,7 @@ class CubePerceptionServer(Node):
         window_title = "Calibrate Camera - Select Cube Region"
 
         try:
-            ret, frame = cap.read()
+            ret, frame = self._read_frame()
             if not ret:
                 result.success = False
                 result.message = "Failed to capture frame"
@@ -440,7 +459,6 @@ class CubePerceptionServer(Node):
             return result
 
         finally:
-            cap.release()
             try:
                 cv2.destroyAllWindows()
             except Exception:
@@ -649,9 +667,153 @@ class CubePerceptionServer(Node):
             response.missing_faces = []
             return response
 
-    def capture_face_colors(self, cap: cv2.VideoCapture, sample_frames: int = 6,
-                           show_preview: bool = False, preview_window: str = "Preview") -> List[str]:
-        """Capture 9 facelet colors for current face."""
+    def execute_show_preview_window(self, request, response):
+        """Execute ShowPreviewWindow service."""
+        enable = request.enable
+
+        if enable:
+            # Start preview window
+            with self._preview_lock:
+                if self._preview_running:
+                    response.success = True
+                    response.message = "Preview window already running"
+                    return response
+
+            if self.use_mock_hardware:
+                response.success = False
+                response.message = "Preview window not available in mock hardware mode"
+                return response
+
+            # Start the preview thread
+            self._preview_running = True
+            self._preview_thread = threading.Thread(target=self._run_preview_window, daemon=True)
+            self._preview_thread.start()
+
+            self.get_logger().info("Preview window started")
+            response.success = True
+            response.message = "Preview window started successfully"
+        else:
+            # Stop preview window
+            with self._preview_lock:
+                if not self._preview_running:
+                    response.success = True
+                    response.message = "Preview window already stopped"
+                    return response
+
+            self._preview_running = False
+
+            # Wait for thread to finish (with timeout)
+            if self._preview_thread is not None:
+                self._preview_thread.join(timeout=2.0)
+                self._preview_thread = None
+
+            self.get_logger().info("Preview window stopped")
+            response.success = True
+            response.message = "Preview window stopped successfully"
+
+        return response
+
+    def _run_preview_window(self):
+        """Background thread to show live preview window with cube position overlay."""
+        window_title = "Cube Preview - Expected Position"
+
+        # Open shared camera
+        if not self._open_camera():
+            self.get_logger().error(f"Preview: Camera index {self.camera_index} not available")
+            self._preview_running = False
+            return
+
+        try:
+            cv2.namedWindow(window_title, cv2.WINDOW_NORMAL)
+        except Exception as e:
+            self.get_logger().error(f"Preview: Failed to create window: {e}")
+            self._preview_running = False
+            return
+
+        try:
+            while self._preview_running:
+                ret, frame = self._read_frame()
+                if not ret:
+                    time.sleep(0.05)
+                    continue
+
+                h, w = frame.shape[:2]
+
+                # Load calibration data
+                calibration = load_calibration()
+                cal_data = calibration.get(str(self.camera_index))
+
+                if cal_data:
+                    x0, y0, face_size = cal_data['x'], cal_data['y'], cal_data['size']
+                    x0 = max(0, min(x0, w))
+                    y0 = max(0, min(y0, h))
+                    face_size = min(face_size, w - x0, h - y0)
+                else:
+                    # Default to center if no calibration
+                    face_size = min(h, w) // 2
+                    x0, y0 = (w - face_size) // 2, (h - face_size) // 2
+
+                cell = face_size // 3
+
+                # Draw overlay
+                overlay = frame.copy()
+
+                # Draw ROI rectangle (expected cube position)
+                cv2.rectangle(overlay, (x0, y0), (x0 + face_size, y0 + face_size), (0, 255, 0), 2)
+
+                # Draw 3x3 grid lines
+                for i in range(1, 3):
+                    x = x0 + i * cell
+                    cv2.line(overlay, (x, y0), (x, y0 + face_size), (0, 255, 0), 1)
+                    y = y0 + i * cell
+                    cv2.line(overlay, (x0, y), (x0 + face_size, y), (0, 255, 0), 1)
+
+                # Draw sample points (centers of each cell)
+                for row in range(3):
+                    for col in range(3):
+                        cx = x0 + col * cell + cell // 2
+                        cy = y0 + row * cell + cell // 2
+                        cv2.circle(overlay, (cx, cy), 4, (0, 255, 255), -1)
+
+                # Draw instructions
+                instructions = "Expected cube position - Press ESC to close"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.6
+                thickness = 1
+                text_size = cv2.getTextSize(instructions, font, font_scale, thickness)[0]
+                text_x, text_y = 10, 25
+                cv2.rectangle(overlay, (text_x - 5, text_y - text_size[1] - 5),
+                             (text_x + text_size[0] + 5, text_y + 5), (0, 0, 0), -1)
+                cv2.putText(overlay, instructions, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
+
+                # Show calibration status
+                if cal_data:
+                    status = f"Calibration: x={x0}, y={y0}, size={face_size}"
+                else:
+                    status = "No calibration - using default position"
+                text_size = cv2.getTextSize(status, font, font_scale, thickness)[0]
+                text_y2 = h - 10
+                cv2.rectangle(overlay, (text_x - 5, text_y2 - text_size[1] - 5),
+                             (text_x + text_size[0] + 5, text_y2 + 5), (0, 0, 0), -1)
+                cv2.putText(overlay, status, (text_x, text_y2), font, font_scale, (255, 255, 255), thickness)
+
+                cv2.imshow(window_title, overlay)
+
+                # Check for ESC key to allow manual close
+                key = cv2.waitKey(30) & 0xFF
+                if key == 27:  # ESC
+                    self._preview_running = False
+                    break
+
+        finally:
+            try:
+                cv2.destroyWindow(window_title)
+            except Exception:
+                pass
+            self._preview_running = False
+
+    def capture_face_colors(self, sample_frames: int = 6) -> List[str]:
+        """Capture 9 facelet colors for current face using shared camera."""
         calibration = load_calibration()
         cal_data = calibration.get(str(self.camera_index))
 
@@ -660,7 +822,7 @@ class CubePerceptionServer(Node):
         max_attempts = sample_frames * 2
 
         while len(collected) < sample_frames and attempts < max_attempts:
-            ret, frame = cap.read()
+            ret, frame = self._read_frame()
             attempts += 1
             if not ret:
                 time.sleep(0.05)
@@ -681,7 +843,6 @@ class CubePerceptionServer(Node):
             hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
             colors = []
-            color_positions = []  # Store positions for preview
             ok = True
 
             for row in range(3):
@@ -702,7 +863,6 @@ class CubePerceptionServer(Node):
                     mean = sample.reshape(-1, 3).mean(axis=0)
                     color_name = classify_color(mean.astype(np.uint8))
                     colors.append(color_name)
-                    color_positions.append((cx, cy, color_name))
 
                 if not ok:
                     break
@@ -711,49 +871,6 @@ class CubePerceptionServer(Node):
                 collected.append(colors)
             else:
                 time.sleep(0.05)
-
-            if show_preview:
-                try:
-                    overlay = frame.copy()
-                    cv2.rectangle(overlay, (x0, y0), (x0 + face_size, y0 + face_size), (0, 255, 0), 2)
-                    for i in range(1, 3):
-                        x = x0 + i * cell
-                        cv2.line(overlay, (x, y0), (x, y0 + face_size), (0, 255, 0), 1)
-                        y = y0 + i * cell
-                        cv2.line(overlay, (x0, y), (x0 + face_size, y), (0, 255, 0), 1)
-                    
-                    # Draw sample points with detected colors
-                    for cx, cy, color_name in color_positions:
-                        # Draw colored circle for the detected color
-                        bgr_color = COLOR_BGR.get(color_name, (128, 128, 128))
-                        cv2.circle(overlay, (cx, cy), 12, bgr_color, -1)
-                        cv2.circle(overlay, (cx, cy), 12, (0, 0, 0), 2)  # Black border
-                        
-                        # Draw color name label
-                        label = color_name[:3].upper()  # Shortened: WHI, YEL, RED, etc.
-                        font = cv2.FONT_HERSHEY_SIMPLEX
-                        font_scale = 0.4
-                        thickness = 1
-                        text_size = cv2.getTextSize(label, font, font_scale, thickness)[0]
-                        text_x = cx - text_size[0] // 2
-                        text_y = cy + cell // 2 - 5
-                        
-                        # Background for text
-                        cv2.rectangle(overlay, 
-                                     (text_x - 2, text_y - text_size[1] - 2),
-                                     (text_x + text_size[0] + 2, text_y + 2),
-                                     (0, 0, 0), -1)
-                        cv2.putText(overlay, label, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
-                    
-                    # Show progress info
-                    progress_text = f"Frames: {len(collected)}/{sample_frames}"
-                    cv2.rectangle(overlay, (5, 5), (150, 30), (0, 0, 0), -1)
-                    cv2.putText(overlay, progress_text, (10, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                    
-                    cv2.imshow(preview_window, overlay)
-                    cv2.waitKey(1)
-                except Exception:
-                    pass
 
         if not collected:
             return None

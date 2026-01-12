@@ -29,6 +29,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/ScanCubeFace.action"
   "action/CalibrateCamera.action"
   "srv/SolveCube.srv"
+  "srv/ShowPreviewWindow.srv"
 )
 
 # Install the Python action server script so ros2 launch can run it by package/executable name.

@@ -102,5 +102,6 @@
 
   <!-- CUBE exclusions -->
   <disable_collisions link1="cube_robot1" link2="cube_robot2" reason="Never"/>
+  <disable_collisions link1="cube_robot2" link2="cube_stand" reason="Never"/>
 
 </robot>

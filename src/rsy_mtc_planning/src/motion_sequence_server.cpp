@@ -11,7 +11,7 @@ MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
 
   // IK and backtracking settings
   max_ik_per_step_ = 32;               // Max IK solutions per MoveJ step
-  max_pilz_combinations_ = 4;           // Phase 1: Pilz PTP (0 = skip)
+  max_pilz_combinations_ = 64;           // Phase 1: Pilz PTP (0 = skip)
   max_ompl_combinations_ = 1024;       // Phase 2: OMPL combinations to try
   robot_description_timeout_ = 30.0;   // Seconds to wait for robot_description
 

@@ -279,13 +279,13 @@
     <geometry>
       <box size="0.06 0.06 0.06"/>
     </geometry>
-    <origin xyz="0.03 0.03 0.03" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
   </collision>
   <visual>
     <geometry>
       <box size="0.06 0.06 0.06"/>
     </geometry>
-    <origin xyz="0.03 0.03 0.03" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
     <material name="yellow">
       <color rgba="1.0 1.0 0.0 0.1"/>
     </material>
@@ -294,7 +294,6 @@
 <joint name="robot1_tcp_to_cube_robot1" type="fixed">
   <parent link="robot1_tcp"/>
   <child link="cube_robot1"/>
-  <origin xyz="-0.03 -0.03 -0.03" rpy="0 0 0"/>
 </joint>
 
 <link name="cube_robot2">
@@ -302,13 +301,13 @@
     <geometry>
       <box size="0.06 0.06 0.06"/>
     </geometry>
-    <origin xyz="0.03 0.03 0.03" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
   </collision>
   <visual>
     <geometry>
       <box size="0.06 0.06 0.06"/>
     </geometry>
-    <origin xyz="0.03 0.03 0.03" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
     <material name="yellow">
       <color rgba="1.0 1.0 0.0 0.1"/>
     </material>
@@ -317,7 +316,28 @@
 <joint name="robot2_tcp_to_cube_robot2" type="fixed">
   <parent link="robot2_tcp"/>
   <child link="cube_robot2"/>
-  <origin xyz="-0.03 -0.03 -0.03" rpy="0 0 0"/>
+</joint>
+
+<link name="cube_stand">
+  <collision>
+    <geometry>
+      <box size="0.07 0.07 0.12"/>
+    </geometry>
+    <origin xyz="-0.15654 0.7294 0.04039" rpy="0 0 0"/>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.07 0.07 0.12"/>
+    </geometry>
+    <origin xyz="-0.12654 0.7334 0.04039" rpy="0 0 0"/>
+    <material name="yellow">
+      <color rgba="1.0 1.0 0.0 0.1"/>
+    </material>
+  </visual>
+</link>
+<joint name="world_to_cube_stand" type="fixed">
+  <parent link="world"/>
+  <child link="cube_stand"/>
 </joint>
 
 <xacro:ur_robot
