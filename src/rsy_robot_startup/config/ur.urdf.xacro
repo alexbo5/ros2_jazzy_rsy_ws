@@ -279,13 +279,13 @@
     <geometry>
       <box size="0.06 0.06 0.06"/>
     </geometry>
-    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 -0.042" rpy="0 0 0"/>
   </collision>
   <visual>
     <geometry>
       <box size="0.06 0.06 0.06"/>
     </geometry>
-    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 -0.042" rpy="0 0 0"/>
     <material name="yellow">
       <color rgba="1.0 1.0 0.0 0.1"/>
     </material>
@@ -301,13 +301,13 @@
     <geometry>
       <box size="0.06 0.06 0.06"/>
     </geometry>
-    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 -0.042" rpy="0 0 0"/>
   </collision>
   <visual>
     <geometry>
       <box size="0.06 0.06 0.06"/>
     </geometry>
-    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 -0.042" rpy="0 0 0"/>
     <material name="yellow">
       <color rgba="1.0 1.0 0.0 0.1"/>
     </material>
@@ -318,26 +318,46 @@
   <child link="cube_robot2"/>
 </joint>
 
-<link name="cube_stand">
+<link name="cubestand">
   <collision>
     <geometry>
-      <box size="0.07 0.07 0.12"/>
+      <mesh filename="package://rsy_robot_startup/meshes/cube_stand.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <origin xyz="-0.15654 0.7294 0.04039" rpy="0 0 0"/>
   </collision>
   <visual>
     <geometry>
-      <box size="0.07 0.07 0.12"/>
+      <mesh filename="package://rsy_robot_startup/meshes/cube_stand.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <origin xyz="-0.11954 0.7334 0.04039" rpy="0 0 0"/>
+    <material name="grey">
+      <color rgba="0.5 0.5 0.5 1.0"/>
+    </material>
+  </visual>
+</link>
+<joint name="world_to_cubestand" type="fixed">
+  <parent link="world"/>
+  <child link="cubestand"/>
+  <origin xyz="-0.15654 0.7294 0.0" rpy="0 0 0"/>
+</joint>
+
+<link name="cube_cubestand">
+  <collision>
+    <geometry>
+      <box size="0.06 0.06 0.06"/>
+    </geometry>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.06 0.06 0.06"/>
+    </geometry>
     <material name="yellow">
       <color rgba="1.0 1.0 0.0 0.1"/>
     </material>
   </visual>
 </link>
-<joint name="world_to_cube_stand" type="fixed">
-  <parent link="world"/>
-  <child link="cube_stand"/>
+<joint name="cubestand_to_cube_cubestand" type="fixed">
+  <parent link="cubestand"/>
+  <child link="cube_cubestand"/>
+  <origin xyz="0 0 0.172" rpy="0 0 0"/>
 </joint>
 
 <xacro:ur_robot

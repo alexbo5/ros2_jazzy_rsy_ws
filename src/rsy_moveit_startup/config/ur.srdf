@@ -102,6 +102,15 @@
 
   <!-- CUBE exclusions -->
   <disable_collisions link1="cube_robot1" link2="cube_robot2" reason="Never"/>
-  <disable_collisions link1="cube_robot2" link2="cube_stand" reason="Never"/>
+  <disable_collisions link1="cube_robot2" link2="cubestand" reason="Never"/>
+  <disable_collisions link1="cube_robot2" link2="cube_cubestand" reason="Never"/>
+  <disable_collisions link1="cubestand" link2="cube_cubestand" reason="Adjacent"/>
+
+  <!-- Environment static object collisions (objects that touch by design) -->
+  <disable_collisions link1="cubestand" link2="ground_plane" reason="Adjacent"/>
+  <disable_collisions link1="item_profile_1" link2="roof" reason="Adjacent"/>
+  <disable_collisions link1="item_profile_2" link2="wall_front" reason="Adjacent"/>
+  <disable_collisions link1="item_profile_2" link2="wall_right" reason="Adjacent"/>
+  <disable_collisions link1="roof" link2="wall_left" reason="Adjacent"/>
 
 </robot>
