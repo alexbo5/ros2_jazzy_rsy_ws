@@ -461,10 +461,12 @@ void MotionSequenceServer::process_motion_sequence(
     bool use_ompl = (phase == 2);
     std::string planner_name = use_ompl ? "OMPL" : "Pilz-PTP";
 
-    // Max attempts is limited by valid combinations count
-    const size_t phase_max = valid_combinations.size();
+    // Max attempts is limited by configured limit per phase
+    const size_t phase_limit = use_ompl ? max_ompl_combinations_ : max_pilz_combinations_;
+    const size_t phase_max = std::min(valid_combinations.size(), phase_limit);
 
-    RCLCPP_INFO(get_logger(), "Phase %d: %s (%zu valid combinations)", phase, planner_name.c_str(), phase_max);
+    RCLCPP_INFO(get_logger(), "Phase %d: %s (max %zu of %zu valid combinations)",
+                phase, planner_name.c_str(), phase_max, valid_combinations.size());
 
     planning_logger_->startPhase(planner_name, phase_max);
 
