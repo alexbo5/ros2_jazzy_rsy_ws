@@ -336,7 +336,7 @@
 <joint name="world_to_cubestand" type="fixed">
   <parent link="world"/>
   <child link="cubestand"/>
-  <origin xyz="-0.15654 0.7294 0.0" rpy="0 0 0"/>
+  <origin xyz="-0.11854 0.7334 0.0" rpy="0 0 0"/>
 </joint>
 
 <link name="cube_cubestand">
@@ -358,6 +358,90 @@
   <parent link="cubestand"/>
   <child link="cube_cubestand"/>
   <origin xyz="0 0 0.172" rpy="0 0 0"/>
+</joint>
+
+<link name="finger_1_robot1">
+  <collision>
+    <geometry>
+      <box size="0.022 0.015 0.05"/>
+    </geometry>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.022 0.015 0.05"/>
+    </geometry>
+    <material name="red">
+      <color rgba="1.0 0.0 0.0 0.1"/>
+    </material>
+  </visual>
+</link>
+<joint name="robot1_tcp_to_finger_1_robot1" type="fixed">
+  <parent link="robot1_tcp"/>
+  <child link="finger_1_robot1"/>
+  <origin xyz="0.0535 0 -0.065" rpy="0 0 0"/>
+</joint>
+
+<link name="finger_2_robot1">
+  <collision>
+    <geometry>
+      <box size="0.022 0.015 0.05"/>
+    </geometry>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.022 0.015 0.05"/>
+    </geometry>
+    <material name="red">
+      <color rgba="1.0 0.0 0.0 0.1"/>
+    </material>
+  </visual>
+</link>
+<joint name="robot1_tcp_to_finger_2_robot1" type="fixed">
+  <parent link="robot1_tcp"/>
+  <child link="finger_2_robot1"/>
+  <origin xyz="-0.0535 0 -0.065" rpy="0 0 0"/>
+</joint>
+
+<link name="finger_1_robot2">
+  <collision>
+    <geometry>
+      <box size="0.022 0.015 0.05"/>
+    </geometry>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.022 0.015 0.05"/>
+    </geometry>
+    <material name="red">
+      <color rgba="1.0 0.0 0.0 0.1"/>
+    </material>
+  </visual>
+</link>
+<joint name="robot2_tcp_to_finger_1_robot2" type="fixed">
+  <parent link="robot2_tcp"/>
+  <child link="finger_1_robot2"/>
+  <origin xyz="0.0535 0 -0.065" rpy="0 0 0"/>
+</joint>
+
+<link name="finger_2_robot2">
+  <collision>
+    <geometry>
+      <box size="0.022 0.015 0.05"/>
+    </geometry>
+  </collision>
+  <visual>
+    <geometry>
+      <box size="0.022 0.015 0.05"/>
+    </geometry>
+    <material name="red">
+      <color rgba="1.0 0.0 0.0 0.1"/>
+    </material>
+  </visual>
+</link>
+<joint name="robot2_tcp_to_finger_2_robot2" type="fixed">
+  <parent link="robot2_tcp"/>
+  <child link="finger_2_robot2"/>
+  <origin xyz="-0.0535 0 -0.065" rpy="0 0 0"/>
 </joint>
 
 <xacro:ur_robot

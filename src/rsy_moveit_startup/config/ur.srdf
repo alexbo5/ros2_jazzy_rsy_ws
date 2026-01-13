@@ -81,6 +81,10 @@
   <disable_collisions link1="robot1_robotiq_85_right_finger_link" link2="robot1_robotiq_85_right_finger_tip_link" reason="Adjacent"/>
   <disable_collisions link1="robot1_robotiq_85_right_finger_link" link2="robot1_robotiq_85_right_inner_knuckle_link" reason="Never"/>
   <disable_collisions link1="robot1_robotiq_85_right_finger_tip_link" link2="robot1_robotiq_85_right_inner_knuckle_link" reason="Adjacent"/>
+  <disable_collisions link1="robot1_robotiq_85_left_finger_tip_link" link2="finger_1_robot1" reason="Never"/>
+  <disable_collisions link1="robot1_robotiq_85_right_finger_tip_link" link2="finger_1_robot1" reason="Never"/>
+  <disable_collisions link1="robot1_robotiq_85_left_finger_tip_link" link2="finger_2_robot1" reason="Never"/>
+  <disable_collisions link1="robot1_robotiq_85_right_finger_tip_link" link2="finger_2_robot1" reason="Never"/>
 
   <!-- Robot2 gripper collision exclusions -->
   <disable_collisions link1="robot2_robotiq_85_base_link" link2="robot2_wrist_3_link" reason="Adjacent"/>
@@ -99,6 +103,11 @@
   <disable_collisions link1="robot2_robotiq_85_right_finger_link" link2="robot2_robotiq_85_right_finger_tip_link" reason="Adjacent"/>
   <disable_collisions link1="robot2_robotiq_85_right_finger_link" link2="robot2_robotiq_85_right_inner_knuckle_link" reason="Never"/>
   <disable_collisions link1="robot2_robotiq_85_right_finger_tip_link" link2="robot2_robotiq_85_right_inner_knuckle_link" reason="Adjacent"/>
+  <disable_collisions link1="robot2_robotiq_85_left_finger_tip_link" link2="finger_1_robot2" reason="Never"/>
+  <disable_collisions link1="robot2_robotiq_85_right_finger_tip_link" link2="finger_1_robot2" reason="Never"/>
+  <disable_collisions link1="robot2_robotiq_85_left_finger_tip_link" link2="finger_2_robot2" reason="Never"/>
+  <disable_collisions link1="robot2_robotiq_85_right_finger_tip_link" link2="finger_2_robot2" reason="Never"/>
+
 
   <!-- CUBE exclusions -->
   <disable_collisions link1="cube_robot1" link2="cube_robot2" reason="Never"/>
@@ -111,6 +120,30 @@
   <disable_collisions link1="item_profile_1" link2="roof" reason="Adjacent"/>
   <disable_collisions link1="item_profile_2" link2="wall_front" reason="Adjacent"/>
   <disable_collisions link1="item_profile_2" link2="wall_right" reason="Adjacent"/>
+  <disable_collisions link1="item_profile_2" link2="roof" reason="Adjacent"/>
+  <disable_collisions link1="ground_plane" link2="item_profile_2" reason="Adjacent"/>
+  <disable_collisions link1="item_profile_1" link2="wall_back" reason="Adjacent"/>
+  <disable_collisions link1="item_profile_1" link2="wall_left " reason="Adjacent"/>
+
+  <disable_collisions link1="ground_plane" link2="wall_front" reason="Adjacent"/>
+  <disable_collisions link1="ground_plane" link2="wall_left" reason="Adjacent"/>
+  <disable_collisions link1="ground_plane" link2="wall_right" reason="Adjacent"/>
+  <disable_collisions link1="ground_plane" link2="wall_back" reason="Adjacent"/>
+  <disable_collisions link1="ground_plane" link2="item_profile_1" reason="Adjacent"/>
+  <disable_collisions link1="ground_plane" link2="item_profile_2" reason="Adjacent"/>
+
+
+
+  <disable_collisions link1="roof" link2="wall_front" reason="Adjacent"/>
   <disable_collisions link1="roof" link2="wall_left" reason="Adjacent"/>
+  <disable_collisions link1="roof" link2="wall_right" reason="Adjacent"/>
+  <disable_collisions link1="roof" link2="wall_back" reason="Adjacent"/>
+
+  <disable_collisions link1="wall_front" link2="wall_left" reason="Adjacent"/>
+  <disable_collisions link1="wall_front" link2="wall_right" reason="Adjacent"/>
+
+  <disable_collisions link1="wall_back" link2="wall_left" reason="Adjacent"/>
+  <disable_collisions link1="wall_back" link2="wall_right" reason="Adjacent"/>
+
 
 </robot>

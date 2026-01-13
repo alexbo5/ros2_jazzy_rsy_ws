@@ -1,0 +1,7 @@
+# Goal: Move robots to startup position
+# Opens both grippers and moves robot 1 to cube pretarget position
+---
+# Result
+bool success
+---
+# Feedback

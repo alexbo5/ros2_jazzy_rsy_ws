@@ -24,7 +24,7 @@ MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   planner_config_.timeout_ompl = 3.0;            // OMPL planner timeout per attempt (seconds)
   planner_config_.timeout_pilz_ptp = 10.0;       // Pilz PTP timeout
   planner_config_.timeout_pilz_lin = 10.0;       // Pilz LIN timeout
-  planner_config_.ompl_planning_attempts = 3;    // OMPL attempts per IK combination
+  planner_config_.ompl_planning_attempts = 16;    // OMPL attempts per IK combination
   planner_config_.velocity_scaling_ptp = 0.3;   // PTP velocity (0.0-1.0)
   planner_config_.velocity_scaling_lin = 0.3;   // LIN velocity
   planner_config_.acceleration_scaling_ptp = 0.3; // PTP acceleration (0.0-1.0)

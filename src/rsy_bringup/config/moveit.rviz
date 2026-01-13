@@ -79,6 +79,10 @@ Visualization Manager:
           Value: false
         robot1_wrist_3_link:
           Value: false
+        finger_1_robot1:
+          Value: false
+        finger_2_robot1:
+          Value: false
         robot2_base:
           Value: false
         robot2_base_link:
@@ -110,6 +114,10 @@ Visualization Manager:
         robot2_robotiq_85_right_knuckle_link:
           Value: false
         robot2_shoulder_link:
+          Value: false
+        finger_1_robot2:
+          Value: false
+        finger_2_robot2:
           Value: false
         robot2_tcp:
           Value: true

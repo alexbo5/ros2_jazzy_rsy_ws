@@ -1,0 +1,862 @@
+
+================================================================================
+PLANNING SESSION: 413b4747
+Timestamp: 2026-01-13T08:46:07.947
+================================================================================
+
+[INPUT]
+  Total motion steps:    3
+  MoveJ steps:           1
+  MoveL steps:           2
+  Gripper operations:    1
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         58.61 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  267.07 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    3
+  Duration:        9708.17 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:46:07.947 | PLAN_OK | EXEC_OK | Steps:3 | IK:32 | Pilz-PTP@1 | Plan:267.07ms | Exec:9708.17ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: c8f4505e
+Timestamp: 2026-01-13T08:46:17.933
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         144.96 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  182.06 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        3276.89 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:46:17.933 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@1 | Plan:182.06ms | Exec:3276.89ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: c24e519d
+Timestamp: 2026-01-13T08:46:21.913
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         137.13 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  253.78 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        3781.57 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:46:21.913 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@1 | Plan:253.78ms | Exec:3781.57ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 7f16c01f
+Timestamp: 2026-01-13T08:46:26.466
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         131.46 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  158.93 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        2840.93 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:46:26.466 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@1 | Plan:158.93ms | Exec:2840.93ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: a6f82d70
+Timestamp: 2026-01-13T08:46:29.987
+================================================================================
+
+[INPUT]
+  Total motion steps:    6
+  MoveJ steps:           2
+  MoveL steps:           4
+  Gripper operations:    2
+  IK solutions/step:     [32, 32]
+  Total IK combinations: 1024
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+  Step 1 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         16 / 16
+    Duration:         694.68 ms
+    Result:           FAILED
+    [Backtracking]
+      Smart backtracks:   16
+      Standard advances:  0
+      Stage failures:     {step0:8, step2:8}
+      MoveJ IK changes:   {step0:16}
+  Phase 2: OMPL
+    Attempts:         5 / 1024
+    Duration:         724.96 ms
+    Result:           SUCCESS
+    [Backtracking]
+      Smart backtracks:   4
+      Standard advances:  0
+      Stage failures:     {step0:1, step2:3}
+      MoveJ IK changes:   {step0:4}
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: OMPL
+  Success attempt: 5
+  Success IK idx:  [4, 0]
+  Total duration:  3026.94 ms
+
+[BACKTRACK HISTORY] (last 20 events)
+  #11 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 10->11
+  #12 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 11->12
+  #13 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 12->13
+  #14 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 13->14
+  #15 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 14->15
+  #16 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 15->16
+  #1 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 0->1
+  #2 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 1->2
+  #3 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 2->3
+  #4 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 3->4
+
+[ATTEMPT HISTORY] (21 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  2 [Pilz-PTP] IK=[1,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  3 [Pilz-PTP] IK=[2,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  4 [Pilz-PTP] IK=[3,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  5 [Pilz-PTP] IK=[4,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  6 [Pilz-PTP] IK=[5,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  7 [Pilz-PTP] IK=[6,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  8 [Pilz-PTP] IK=[7,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  9 [Pilz-PTP] IK=[8,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  # 10 [Pilz-PTP] IK=[9,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  # 11 [Pilz-PTP] IK=[10,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  # 12 [Pilz-PTP] IK=[11,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  # 13 [Pilz-PTP] IK=[12,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  # 14 [Pilz-PTP] IK=[13,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  # 15 [Pilz-PTP] IK=[14,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  # 16 [Pilz-PTP] IK=[15,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  1 [    OMPL] IK=[0,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  2 [    OMPL] IK=[1,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  3 [    OMPL] IK=[2,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  4 [    OMPL] IK=[3,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  5 [    OMPL] IK=[4,0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    6
+  Duration:        26546.18 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:46:29.987 | PLAN_OK | EXEC_OK | Steps:6 | IK:1024 | OMPL@5 | BT:20/0 | Plan:3026.94ms | Exec:26546.18ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 127a7656
+Timestamp: 2026-01-13T08:46:59.574
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         2 / 16
+    Duration:         166.14 ms
+    Result:           SUCCESS
+    [Backtracking]
+      Smart backtracks:   1
+      Standard advances:  0
+      Stage failures:     {step0:1}
+      MoveJ IK changes:   {step0:1}
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 2
+  Success IK idx:  [1]
+  Total duration:  201.13 ms
+
+[BACKTRACK HISTORY] (last 1 events)
+  #1 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 0->1
+
+[ATTEMPT HISTORY] (2 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  2 [Pilz-PTP] IK=[1] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        3486.30 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:46:59.574 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@2 | BT:1/0 | Plan:201.13ms | Exec:3486.30ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 6106701e
+Timestamp: 2026-01-13T08:47:03.776
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         134.35 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  180.84 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        4939.06 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:47:03.776 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@1 | Plan:180.84ms | Exec:4939.06ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 56ed2462
+Timestamp: 2026-01-13T08:47:09.412
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         132.87 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  174.78 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        3791.68 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:47:09.412 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@1 | Plan:174.78ms | Exec:3791.68ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 240c92fb
+Timestamp: 2026-01-13T08:47:13.902
+================================================================================
+
+[INPUT]
+  Total motion steps:    5
+  MoveJ steps:           2
+  MoveL steps:           3
+  Gripper operations:    2
+  IK solutions/step:     [32, 32]
+  Total IK combinations: 1024
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+  Step 1 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         3 / 16
+    Duration:         234.65 ms
+    Result:           SUCCESS
+    [Backtracking]
+      Smart backtracks:   2
+      Standard advances:  0
+      Stage failures:     {step1:2}
+      MoveJ IK changes:   {step1:2}
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 3
+  Success IK idx:  [0, 2]
+  Total duration:  1401.59 ms
+
+[BACKTRACK HISTORY] (last 2 events)
+  #1 smart_backtrack: MoveL@1 failed -> changed MoveJ@1 IK 0->1
+  #2 smart_backtrack: MoveL@1 failed -> changed MoveJ@1 IK 1->2
+
+[ATTEMPT HISTORY] (3 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0,0] -> FAILED: MoveJ at step 1 (move_j_1) - Stage 'move_j_1' failed to find solution
+  #  2 [Pilz-PTP] IK=[0,1] -> FAILED: MoveJ at step 1 (move_j_1) - Stage 'move_j_1' failed to find solution
+  #  3 [Pilz-PTP] IK=[0,2] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    5
+  Duration:        17896.90 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:47:13.902 | PLAN_OK | EXEC_OK | Steps:5 | IK:1024 | Pilz-PTP@3 | BT:2/0 | Plan:1401.59ms | Exec:17896.90ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: c0ef1efd
+Timestamp: 2026-01-13T08:47:33.213
+================================================================================
+
+[INPUT]
+  Total motion steps:    5
+  MoveJ steps:           2
+  MoveL steps:           3
+  Gripper operations:    2
+  IK solutions/step:     [32, 32]
+  Total IK combinations: 1024
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+  Step 1 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         158.23 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0, 0]
+  Total duration:  1260.43 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0,0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    5
+  Duration:        16397.68 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:47:33.213 | PLAN_OK | EXEC_OK | Steps:5 | IK:1024 | Pilz-PTP@1 | Plan:1260.43ms | Exec:16397.68ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 64896989
+Timestamp: 2026-01-13T08:47:50.883
+================================================================================
+
+[INPUT]
+  Total motion steps:    6
+  MoveJ steps:           2
+  MoveL steps:           4
+  Gripper operations:    2
+  IK solutions/step:     [32, 32]
+  Total IK combinations: 1024
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+  Step 1 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         3 / 16
+    Duration:         235.67 ms
+    Result:           SUCCESS
+    [Backtracking]
+      Smart backtracks:   2
+      Standard advances:  0
+      Stage failures:     {step2:1, step3:1}
+      MoveJ IK changes:   {step0:1, step1:1}
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 3
+  Success IK idx:  [1, 1]
+  Total duration:  1743.46 ms
+
+[BACKTRACK HISTORY] (last 2 events)
+  #1 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 0->1
+  #2 smart_backtrack: MoveL@3 failed -> changed MoveJ@1 IK 0->1
+
+[ATTEMPT HISTORY] (3 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  2 [Pilz-PTP] IK=[1,0] -> FAILED: MoveL at step 3 (move_l_3) - Stage 'move_l_3' failed to find solution
+  #  3 [Pilz-PTP] IK=[1,1] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    6
+  Duration:        17984.90 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:47:50.883 | PLAN_OK | EXEC_OK | Steps:6 | IK:1024 | Pilz-PTP@3 | BT:2/0 | Plan:1743.46ms | Exec:17984.90ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 7250d42d
+Timestamp: 2026-01-13T08:48:10.623
+================================================================================
+
+[INPUT]
+  Total motion steps:    5
+  MoveJ steps:           2
+  MoveL steps:           3
+  Gripper operations:    2
+  IK solutions/step:     [32, 32]
+  Total IK combinations: 1024
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+  Step 1 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         4 / 16
+    Duration:         276.48 ms
+    Result:           SUCCESS
+    [Backtracking]
+      Smart backtracks:   3
+      Standard advances:  0
+      Stage failures:     {step0:2, step3:1}
+      MoveJ IK changes:   {step0:2, step1:1}
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 4
+  Success IK idx:  [2, 1]
+  Total duration:  1567.98 ms
+
+[BACKTRACK HISTORY] (last 3 events)
+  #1 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 0->1
+  #2 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 1->2
+  #3 smart_backtrack: MoveL@3 failed -> changed MoveJ@1 IK 0->1
+
+[ATTEMPT HISTORY] (4 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  2 [Pilz-PTP] IK=[1,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  3 [Pilz-PTP] IK=[2,0] -> FAILED: MoveL at step 3 (move_l_3) - Stage 'move_l_3' failed to find solution
+  #  4 [Pilz-PTP] IK=[2,1] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    5
+  Duration:        22355.91 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:48:10.623 | PLAN_OK | EXEC_OK | Steps:5 | IK:1024 | Pilz-PTP@4 | BT:3/0 | Plan:1567.98ms | Exec:22355.91ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 03bafc85
+Timestamp: 2026-01-13T08:48:34.563
+================================================================================
+
+[INPUT]
+  Total motion steps:    5
+  MoveJ steps:           2
+  MoveL steps:           3
+  Gripper operations:    2
+  IK solutions/step:     [32, 32]
+  Total IK combinations: 1024
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+  Step 1 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         164.18 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0, 0]
+  Total duration:  1677.30 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0,0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    5
+  Duration:        15100.16 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:48:34.563 | PLAN_OK | EXEC_OK | Steps:5 | IK:1024 | Pilz-PTP@1 | Plan:1677.30ms | Exec:15100.16ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 5a130360
+Timestamp: 2026-01-13T08:48:51.353
+================================================================================
+
+[INPUT]
+  Total motion steps:    6
+  MoveJ steps:           2
+  MoveL steps:           4
+  Gripper operations:    2
+  IK solutions/step:     [32, 32]
+  Total IK combinations: 1024
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+  Step 1 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         2 / 16
+    Duration:         210.13 ms
+    Result:           SUCCESS
+    [Backtracking]
+      Smart backtracks:   1
+      Standard advances:  0
+      Stage failures:     {step3:1}
+      MoveJ IK changes:   {step1:1}
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 2
+  Success IK idx:  [0, 1]
+  Total duration:  1792.78 ms
+
+[BACKTRACK HISTORY] (last 1 events)
+  #1 smart_backtrack: MoveL@3 failed -> changed MoveJ@1 IK 0->1
+
+[ATTEMPT HISTORY] (2 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0,0] -> FAILED: MoveL at step 3 (move_l_3) - Stage 'move_l_3' failed to find solution
+  #  2 [Pilz-PTP] IK=[0,1] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    6
+  Duration:        20286.34 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:48:51.353 | PLAN_OK | EXEC_OK | Steps:6 | IK:1024 | Pilz-PTP@2 | BT:1/0 | Plan:1792.78ms | Exec:20286.34ms
+================================================================================
+
