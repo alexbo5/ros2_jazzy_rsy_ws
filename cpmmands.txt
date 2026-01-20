@@ -1,0 +1,4 @@
+1- startup
+2- ros2 run rsy_cube_solver calibrate_cube_action_server
+3- ros2 action send_goal /calibrate_cube rsy_cube_solver/action/CalibrateCube "{}"
+4- ros2 launch rsy_cube_solver cube_solver.launch.py 

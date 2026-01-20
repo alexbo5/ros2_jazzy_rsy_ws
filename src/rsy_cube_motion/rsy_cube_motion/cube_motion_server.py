@@ -18,7 +18,7 @@ OFFSET_DIST_HOLD_CUBE = -42     # distance when holding the cube (grasps 2 rows 
 OFFSET_DIST_SPIN_CUBE = -22    # distance when spinning the cube (grasps 1 row of cube)
 OFFSET_DIST_PRE_TARGET = 100   # distance when approaching the cube (pre-grasp position)
 OFFSET_DIST_TAKE_CUBE = 150    # distance when taking up the cube from rest position
-OFFSET_DIST_DROP_CUBE = 30    # distance when taking up the cube from rest position
+OFFSET_DIST_DROP_CUBE = 15    # distance when taking up the cube from rest position
 
 # Compact, editable definition of cube-access poses.
 # CUBE_POSE_DEFS format:

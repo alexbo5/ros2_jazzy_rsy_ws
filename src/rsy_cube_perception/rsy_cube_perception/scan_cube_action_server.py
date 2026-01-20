@@ -31,24 +31,6 @@ except Exception as e:
     )
 
 # Calibration data file location - prefer package config directory
-def get_calibration_file_path() -> Path:
-    """Get calibration file path, preferring package config directory."""
-    # Try package config directory first
-    package_config = Path("/root/ros2_ws/src/rsy_cube_perception/config/cube_perception_calibration.json")
-    if package_config.parent.exists() or _try_create_dir(package_config.parent):
-        return package_config
-    # Fallback to home .ros directory
-    return Path.home() / ".ros" / "cube_perception_calibration.json"
-
-
-def get_color_calibration_file_path() -> Path:
-    """Get color calibration file path (created by CalibrateCube action)."""
-    package_config = Path("/home/robotik/rsy/ros2_jazzy_rsy_ws/src/rsy_cube_perception/config/cube_calibration.json")
-    if package_config.exists():
-        return package_config
-    return Path.home() / ".ros" / "cube_calibration.json"
-
-
 def _try_create_dir(path: Path) -> bool:
     """Try to create directory, return True if successful."""
     try:
@@ -58,49 +40,12 @@ def _try_create_dir(path: Path) -> bool:
         return False
 
 
-def load_color_ranges() -> Dict:
-    """
-    Load HSV color ranges from calibration file.
-    Falls back to hardcoded defaults if calibration file doesn't exist.
-    """
-    # Default hardcoded ranges
-    default_ranges = {
-        "white": ((0, 0, 180), (180, 60, 255)),
-        "yellow": ((20, 100, 100), (35, 255, 255)),
-        "red": ((0, 120, 70), (10, 255, 255)),
-        "red2": ((170, 120, 70), (180, 255, 255)),
-        "orange": ((10, 120, 100), (20, 255, 255)),
-        "green": ((40, 70, 70), (85, 255, 255)),
-        "blue": ((90, 70, 70), (130, 255, 255)),
-    }
-
-    cal_file = get_color_calibration_file_path()
-    if not cal_file.exists():
-        return default_ranges
-
-    try:
-        with open(cal_file, "r") as f:
-            data = json.load(f)
-
-        if "color_ranges" not in data:
-            return default_ranges
-
-        # Convert from JSON format to tuple format
-        loaded_ranges = {}
-        for color_name, ranges in data["color_ranges"].items():
-            lower = tuple(ranges["lower"])
-            upper = tuple(ranges["upper"])
-            loaded_ranges[color_name] = (lower, upper)
-
-        # Ensure all required colors are present
-        for color in default_ranges:
-            if color not in loaded_ranges:
-                loaded_ranges[color] = default_ranges[color]
-
-        return loaded_ranges
-
-    except Exception:
-        return default_ranges
+def get_calibration_file_path() -> Path:
+    """Get calibration file path, preferring package config directory."""
+    package_config = Path("/root/ros2_ws/src/rsy_cube_perception/config/cube_calibration.json")
+    if package_config.parent.exists() or _try_create_dir(package_config.parent):
+        return package_config
+    return Path.home() / ".ros" / "cube_calibration.json"
 
 
 def load_color_centroids() -> Dict:
@@ -118,7 +63,7 @@ def load_color_centroids() -> Dict:
         "blue": [110, 180, 180],
     }
 
-    cal_file = get_color_calibration_file_path()
+    cal_file = get_calibration_file_path()
     if not cal_file.exists():
         return default_centroids
 
@@ -196,10 +141,6 @@ MOCK_FACE_COLORS = {
     "L": ["orange"] * 9,
     "R": ["red"] * 9,
 }
-
-# Color ranges (HSV) - loaded dynamically from calibration file
-# Falls back to hardcoded defaults if no calibration exists
-COLOR_RANGES = load_color_ranges()
 
 # Color centroids for nearest-centroid classification
 # Falls back to hardcoded defaults if no calibration exists
@@ -579,7 +520,8 @@ class CubePerceptionServer(Node):
                 return result
 
             cal = load_calibration()
-            cal[str(self.camera_index)] = calibration_data
+            cal["roi"] = calibration_data
+            cal["camera_index"] = self.camera_index
             save_calibration(cal)
 
             result.success = True
@@ -878,7 +820,7 @@ class CubePerceptionServer(Node):
 
                 # Load calibration data
                 calibration = load_calibration()
-                cal_data = calibration.get(str(self.camera_index))
+                cal_data = calibration.get("roi")
 
                 if cal_data:
                     x0, y0, face_size = cal_data['x'], cal_data['y'], cal_data['size']
@@ -952,7 +894,7 @@ class CubePerceptionServer(Node):
     def capture_face_colors(self, sample_frames: int = 6) -> List[str]:
         """Capture 9 facelet colors for current face using shared camera."""
         calibration = load_calibration()
-        cal_data = calibration.get(str(self.camera_index))
+        cal_data = calibration.get("roi")
 
         collected = []
         attempts = 0
