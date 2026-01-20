@@ -39,24 +39,21 @@ FACE_CENTER_COLORS = {
     "R": "red",
 }
 
-# HSV range computation parameters
-HSV_STD_H = 10   # Estimated standard deviation for Hue
-HSV_STD_S = 30   # Estimated standard deviation for Saturation
-HSV_STD_V = 30   # Estimated standard deviation for Value
-HSV_RANGE_K = 2.5  # Number of standard deviations for range
+def _try_create_dir(path: Path) -> bool:
+    """Try to create directory, return True if successful."""
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        return True
+    except Exception:
+        return False
 
 
 def get_calibration_file_path() -> Path:
     """Get calibration file path (shared with cube_perception)."""
-    package_config = Path("/root/ros2_ws/cube_calibration.json")
-    if package_config.parent.exists():
+    package_config = Path("/root/ros2_ws/src/rsy_cube_perception/config/cube_calibration.json")
+    if package_config.parent.exists() or _try_create_dir(package_config.parent):
         return package_config
     return Path.home() / ".ros" / "cube_calibration.json"
-
-
-def get_roi_calibration_file_path() -> Path:
-    """Get ROI calibration file path for backward compatibility."""
-    return Path("/root/ros2_ws/cube_perception_calibration.json")
 
 
 class CalibrateCubeServer(Node):
@@ -381,192 +378,15 @@ class CalibrateCubeServer(Node):
         cv2.destroyWindow(window_title)
         return sampled_hsv[0]
 
-    def _compute_hsv_ranges(self, color_samples: Dict[str, np.ndarray]) -> Dict:
-        """
-        Compute HSV ranges from collected samples using midpoint boundaries.
-
-        This ensures no overlap between adjacent colors by setting boundaries
-        at the midpoint between sampled hue values.
-
-        Special handling:
-        - White: Distinguished by saturation (low S), not hue
-        - Red: Wraps around hue 0/180, needs two ranges (red, red2)
-        """
-        hsv_ranges = {}
-        k = HSV_RANGE_K
-
-        # Extract hue values for chromatic colors (excluding white)
-        chromatic_colors = ["red", "orange", "yellow", "green", "blue"]
-        hue_samples = {}
-
-        for color in chromatic_colors:
-            if color in color_samples:
-                h = float(color_samples[color][0])
-                # Normalize red hue to handle wraparound
-                # Shift red (near 0 or 180) to be "after" blue for sorting
-                if color == "red":
-                    # Store original hue and a normalized version for sorting
-                    hue_samples[color] = {"original": h, "normalized": h if h > 90 else h + 180}
-                else:
-                    hue_samples[color] = {"original": h, "normalized": h}
-
-        # Sort chromatic colors by normalized hue
-        sorted_colors = sorted(hue_samples.keys(), key=lambda c: hue_samples[c]["normalized"])
-
-        self.get_logger().info(f"Sorted colors by hue: {sorted_colors}")
-        for c in sorted_colors:
-            self.get_logger().info(f"  {c}: H={hue_samples[c]['original']:.1f} (normalized={hue_samples[c]['normalized']:.1f})")
-
-        # Compute midpoint boundaries between adjacent colors
-        hue_boundaries = {}
-        for i, color in enumerate(sorted_colors):
-            h = hue_samples[color]["original"]
-            h_norm = hue_samples[color]["normalized"]
-
-            # Get previous and next colors (circular)
-            prev_color = sorted_colors[i - 1]
-            next_color = sorted_colors[(i + 1) % len(sorted_colors)]
-
-            prev_h_norm = hue_samples[prev_color]["normalized"]
-            next_h_norm = hue_samples[next_color]["normalized"]
-
-            # Compute midpoints in normalized space
-            # Lower boundary: midpoint to previous color
-            lower_mid_norm = (prev_h_norm + h_norm) / 2
-            # Upper boundary: midpoint to next color
-            upper_mid_norm = (h_norm + next_h_norm) / 2
-
-            # Handle wraparound for the last color (which wraps to first)
-            if i == len(sorted_colors) - 1:
-                # Next color wraps around, add 180 to its normalized value
-                next_h_norm_wrapped = hue_samples[next_color]["normalized"] + 180
-                upper_mid_norm = (h_norm + next_h_norm_wrapped) / 2
-
-            hue_boundaries[color] = {
-                "lower_norm": lower_mid_norm,
-                "upper_norm": upper_mid_norm,
-                "center": h,
-            }
-
-        # Convert normalized boundaries back to actual hue values and build ranges
-        for color in chromatic_colors:
-            if color not in color_samples:
-                continue
-
-            hsv_sample = color_samples[color]
-            s, v = float(hsv_sample[1]), float(hsv_sample[2])
-
-            bounds = hue_boundaries[color]
-            lower_norm = bounds["lower_norm"]
-            upper_norm = bounds["upper_norm"]
-
-            # Convert normalized hue back to actual (0-180 range)
-            def denormalize_hue(h_norm):
-                if h_norm >= 180:
-                    return h_norm - 180
-                elif h_norm < 0:
-                    return h_norm + 180
-                return h_norm
-
-            if color == "red":
-                # Red needs two ranges due to hue wraparound
-                original_h = bounds["center"]
-
-                if original_h < 90:
-                    # Red sampled near 0
-                    # red range: 0 to midpoint with orange
-                    # red2 range: midpoint with blue to 180
-                    red_upper = denormalize_hue(upper_norm)
-                    red2_lower = denormalize_hue(lower_norm)
-
-                    hsv_ranges["red"] = {
-                        "lower": [0, int(max(0, s - k * HSV_STD_S)), int(max(0, v - k * HSV_STD_V))],
-                        "upper": [int(min(180, red_upper)), int(min(255, s + k * HSV_STD_S)), int(min(255, v + k * HSV_STD_V))],
-                    }
-                    hsv_ranges["red2"] = {
-                        "lower": [int(max(0, red2_lower)), int(max(0, s - k * HSV_STD_S)), int(max(0, v - k * HSV_STD_V))],
-                        "upper": [180, int(min(255, s + k * HSV_STD_S)), int(min(255, v + k * HSV_STD_V))],
-                    }
-                else:
-                    # Red sampled near 180
-                    red_upper = denormalize_hue(upper_norm) if upper_norm < 180 else 180
-                    red2_lower = denormalize_hue(lower_norm)
-
-                    hsv_ranges["red"] = {
-                        "lower": [0, int(max(0, s - k * HSV_STD_S)), int(max(0, v - k * HSV_STD_V))],
-                        "upper": [int(min(180, red_upper)) if red_upper < 90 else 15, int(min(255, s + k * HSV_STD_S)), int(min(255, v + k * HSV_STD_V))],
-                    }
-                    hsv_ranges["red2"] = {
-                        "lower": [int(max(0, red2_lower)), int(max(0, s - k * HSV_STD_S)), int(max(0, v - k * HSV_STD_V))],
-                        "upper": [180, int(min(255, s + k * HSV_STD_S)), int(min(255, v + k * HSV_STD_V))],
-                    }
-            else:
-                # Standard chromatic color
-                h_lower = denormalize_hue(lower_norm)
-                h_upper = denormalize_hue(upper_norm)
-
-                # Ensure lower < upper
-                if h_lower > h_upper:
-                    h_lower, h_upper = h_upper, h_lower
-
-                hsv_ranges[color] = {
-                    "lower": [int(max(0, h_lower)), int(max(0, s - k * HSV_STD_S)), int(max(0, v - k * HSV_STD_V))],
-                    "upper": [int(min(180, h_upper)), int(min(255, s + k * HSV_STD_S)), int(min(255, v + k * HSV_STD_V))],
-                }
-
-        # Handle white separately - distinguished by low saturation, not hue
-        if "white" in color_samples:
-            hsv_sample = color_samples["white"]
-            s, v = float(hsv_sample[1]), float(hsv_sample[2])
-
-            # Find the maximum saturation among chromatic colors to set white's upper S bound
-            max_chromatic_s = 0
-            for color in chromatic_colors:
-                if color in color_samples:
-                    max_chromatic_s = max(max_chromatic_s, float(color_samples[color][1]))
-
-            # White's saturation upper bound is midpoint between white's S and lowest chromatic S
-            white_s_upper = int((s + max_chromatic_s) / 2) if max_chromatic_s > s else int(s + k * HSV_STD_S)
-            white_s_upper = min(white_s_upper, 100)  # Cap at reasonable value
-
-            hsv_ranges["white"] = {
-                "lower": [0, 0, int(max(150, v - k * HSV_STD_V))],
-                "upper": [180, white_s_upper, 255],
-            }
-
-        # Log computed ranges
-        self.get_logger().info("Computed HSV ranges with midpoint boundaries:")
-        for color, ranges in hsv_ranges.items():
-            self.get_logger().info(f"  {color}: H=[{ranges['lower'][0]}, {ranges['upper'][0]}], "
-                                   f"S=[{ranges['lower'][1]}, {ranges['upper'][1]}], "
-                                   f"V=[{ranges['lower'][2]}, {ranges['upper'][2]}]")
-
-        return hsv_ranges
-
     def _save_calibration(self, data: Dict):
-        """Save calibration data to JSON files."""
+        """Save calibration data to JSON file."""
         cal_file = get_calibration_file_path()
         cal_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Save full calibration
         with open(cal_file, "w") as f:
             json.dump(data, f, indent=2)
 
         self.get_logger().info(f"Calibration saved to {cal_file}")
-
-        # Also update ROI in perception calibration file (backward compatibility)
-        try:
-            roi_file = get_roi_calibration_file_path()
-            roi_cal = {}
-            if roi_file.exists():
-                with open(roi_file, "r") as f:
-                    roi_cal = json.load(f)
-            roi_cal[str(self.camera_index)] = data["roi"]
-            with open(roi_file, "w") as f:
-                json.dump(roi_cal, f, indent=2)
-            self.get_logger().info(f"ROI calibration updated in {roi_file}")
-        except Exception as e:
-            self.get_logger().warn(f"Could not update perception ROI calibration: {e}")
 
     def execute_calibrate_cube(self, goal_handle):
         """Main calibration procedure."""
@@ -649,15 +469,10 @@ class CalibrateCubeServer(Node):
                 color_samples[expected_color] = hsv_sample
                 self.get_logger().info(f"Face {face} ({expected_color}): HSV = {hsv_sample}")
 
-            # Step 5: Compute HSV ranges
-            feedback.status = "Computing HSV color ranges..."
+            # Step 5: Save calibration
+            feedback.status = "Saving calibration..."
             feedback.faces_completed = 6
             goal_handle.publish_feedback(feedback)
-
-            hsv_ranges = self._compute_hsv_ranges(color_samples)
-            self.get_logger().info(f"Computed HSV ranges: {hsv_ranges}")
-
-            # Step 6: Save calibration
             # Convert color samples to JSON-serializable format for centroid-based classification
             color_centroids = {}
             for color_name, hsv_sample in color_samples.items():
@@ -665,8 +480,7 @@ class CalibrateCubeServer(Node):
 
             calibration_data = {
                 "roi": roi_data,
-                "color_ranges": hsv_ranges,  # Keep for backward compatibility
-                "color_centroids": color_centroids,  # Used for nearest-centroid classification
+                "color_centroids": color_centroids,
                 "camera_index": self.camera_index,
             }
             self._save_calibration(calibration_data)
