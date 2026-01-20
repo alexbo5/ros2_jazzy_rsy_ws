@@ -34,10 +34,11 @@ struct PlannerConfig
   double velocity_scaling_lin = 1.0;
   double acceleration_scaling_ptp = 1.0;
   double acceleration_scaling_lin = 1.0;
-  double timeout_ompl = 5.0;
+  double timeout_ompl = 3.0;
   double timeout_pilz_ptp = 10.0;
   double timeout_pilz_lin = 10.0;
   std::string ompl_planner_id = "RRTConnect";
+  unsigned int ompl_planning_attempts = 3;  // Number of planning attempts for OMPL
 };
 
 /**
@@ -175,6 +176,26 @@ public:
     bool use_sampling_planner = false);
 
   /**
+   * @brief Validate that an IK combination is collision-free for the entire sequence
+   *
+   * This function simulates the motion sequence step by step, checking for collisions
+   * at each endpoint. It considers the positions of ALL robots at each step, not just
+   * the current robot's position. This is critical for dual-arm setups where one robot's
+   * movement might collide with the other robot's planned position.
+   *
+   * @param steps Vector of motion steps
+   * @param ik_indices Map from step index to IK solution index (for MoveJ steps)
+   * @param movej_ik_data Pre-computed IK data for MoveJ steps
+   * @param collision_step_index Output: step index where collision was detected (-1 if none)
+   * @return true if the combination is collision-free, false if collision detected
+   */
+  bool validateIKCombinationCollisions(
+    const std::vector<rsy_mtc_planning::msg::MotionStep>& steps,
+    const std::map<size_t, size_t>& ik_indices,
+    const std::vector<MoveJIKData>& movej_ik_data,
+    int& collision_step_index);
+
+  /**
    * @brief Get the robot model for IK computation
    */
   moveit::core::RobotModelPtr getRobotModel() const { return robot_model_; }
@@ -183,6 +204,14 @@ public:
    * @brief Update planning scene from current state
    */
   void updatePlanningScene();
+
+  /**
+   * @brief Refresh cached planning scene snapshot for collision checking
+   *
+   * Call this ONCE before a batch of validateIKCombinationCollisions() calls
+   * to avoid repeated requestPlanningSceneState() calls (which are slow).
+   */
+  void refreshCollisionScene();
 
   /**
    * @brief Cache solution message for a task (call before executeSubTrajectory loop)
@@ -279,6 +308,9 @@ private:
 
   // Cached non-empty trajectory indices for fast lookup
   std::vector<size_t> cached_trajectory_indices_;
+
+  // Cached planning scene snapshot for batch collision checking
+  planning_scene::PlanningScenePtr cached_collision_scene_;
 
   // Helper to get or create MoveGroupInterface for a planning group
   std::shared_ptr<moveit::planning_interface::MoveGroupInterface> getMoveGroup(const std::string& group_name) const;

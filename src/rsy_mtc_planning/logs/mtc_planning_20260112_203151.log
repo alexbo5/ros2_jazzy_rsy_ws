@@ -1,0 +1,148 @@
+
+================================================================================
+PLANNING SESSION: 96ba1e08
+Timestamp: 2026-01-12T20:31:53.423
+================================================================================
+
+[INPUT]
+  Total motion steps:    3
+  MoveJ steps:           1
+  MoveL steps:           2
+  Gripper operations:    1
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 1024
+  Max OMPL combinations: 2048
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          20.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         32 / 32
+    Duration:         342.36 ms
+    Result:           FAILED
+    [Backtracking]
+      Smart backtracks:   31
+      Standard advances:  1
+      Stage failures:     {step0:32}
+      MoveJ IK changes:   {step0:31}
+  Phase 2: OMPL
+    Attempts:         32 / 32
+    Duration:         347.50 ms
+    Result:           FAILED
+    [Backtracking]
+      Smart backtracks:   31
+      Standard advances:  1
+      Stage failures:     {step0:32}
+      MoveJ IK changes:   {step0:31}
+
+[PLANNING RESULT]
+  Status:          FAILED
+  Total duration:  801.53 ms
+
+[BACKTRACK HISTORY] (last 64 events)
+  #23 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 22->23
+  #24 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 23->24
+  #25 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 24->25
+  #26 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 25->26
+  #27 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 26->27
+  #28 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 27->28
+  #29 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 28->29
+  #30 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 29->30
+  #31 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 30->31
+  #32 standard_advance
+
+[FAILURE ANALYSIS]
+  Collision pre-check failures: 64
+  Planning failures:            0
+  Failures by step:
+    Step 0: 64 failures
+
+[ATTEMPT HISTORY] (64 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> COLLISION at step 0
+  #  2 [Pilz-PTP] IK=[1] -> COLLISION at step 0
+  #  3 [Pilz-PTP] IK=[2] -> COLLISION at step 0
+  #  4 [Pilz-PTP] IK=[3] -> COLLISION at step 0
+  #  5 [Pilz-PTP] IK=[4] -> COLLISION at step 0
+  #  6 [Pilz-PTP] IK=[5] -> COLLISION at step 0
+  #  7 [Pilz-PTP] IK=[6] -> COLLISION at step 0
+  #  8 [Pilz-PTP] IK=[7] -> COLLISION at step 0
+  #  9 [Pilz-PTP] IK=[8] -> COLLISION at step 0
+  # 10 [Pilz-PTP] IK=[9] -> COLLISION at step 0
+  # 11 [Pilz-PTP] IK=[10] -> COLLISION at step 0
+  # 12 [Pilz-PTP] IK=[11] -> COLLISION at step 0
+  # 13 [Pilz-PTP] IK=[12] -> COLLISION at step 0
+  # 14 [Pilz-PTP] IK=[13] -> COLLISION at step 0
+  # 15 [Pilz-PTP] IK=[14] -> COLLISION at step 0
+  # 16 [Pilz-PTP] IK=[15] -> COLLISION at step 0
+  # 17 [Pilz-PTP] IK=[16] -> COLLISION at step 0
+  # 18 [Pilz-PTP] IK=[17] -> COLLISION at step 0
+  # 19 [Pilz-PTP] IK=[18] -> COLLISION at step 0
+  # 20 [Pilz-PTP] IK=[19] -> COLLISION at step 0
+  # 21 [Pilz-PTP] IK=[20] -> COLLISION at step 0
+  # 22 [Pilz-PTP] IK=[21] -> COLLISION at step 0
+  # 23 [Pilz-PTP] IK=[22] -> COLLISION at step 0
+  # 24 [Pilz-PTP] IK=[23] -> COLLISION at step 0
+  # 25 [Pilz-PTP] IK=[24] -> COLLISION at step 0
+  # 26 [Pilz-PTP] IK=[25] -> COLLISION at step 0
+  # 27 [Pilz-PTP] IK=[26] -> COLLISION at step 0
+  # 28 [Pilz-PTP] IK=[27] -> COLLISION at step 0
+  # 29 [Pilz-PTP] IK=[28] -> COLLISION at step 0
+  # 30 [Pilz-PTP] IK=[29] -> COLLISION at step 0
+  # 31 [Pilz-PTP] IK=[30] -> COLLISION at step 0
+  # 32 [Pilz-PTP] IK=[31] -> COLLISION at step 0
+  #  1 [    OMPL] IK=[0] -> COLLISION at step 0
+  #  2 [    OMPL] IK=[1] -> COLLISION at step 0
+  #  3 [    OMPL] IK=[2] -> COLLISION at step 0
+  #  4 [    OMPL] IK=[3] -> COLLISION at step 0
+  #  5 [    OMPL] IK=[4] -> COLLISION at step 0
+  #  6 [    OMPL] IK=[5] -> COLLISION at step 0
+  #  7 [    OMPL] IK=[6] -> COLLISION at step 0
+  #  8 [    OMPL] IK=[7] -> COLLISION at step 0
+  #  9 [    OMPL] IK=[8] -> COLLISION at step 0
+  # 10 [    OMPL] IK=[9] -> COLLISION at step 0
+  # 11 [    OMPL] IK=[10] -> COLLISION at step 0
+  # 12 [    OMPL] IK=[11] -> COLLISION at step 0
+  # 13 [    OMPL] IK=[12] -> COLLISION at step 0
+  # 14 [    OMPL] IK=[13] -> COLLISION at step 0
+  # 15 [    OMPL] IK=[14] -> COLLISION at step 0
+  # 16 [    OMPL] IK=[15] -> COLLISION at step 0
+  # 17 [    OMPL] IK=[16] -> COLLISION at step 0
+  # 18 [    OMPL] IK=[17] -> COLLISION at step 0
+  # 19 [    OMPL] IK=[18] -> COLLISION at step 0
+  # 20 [    OMPL] IK=[19] -> COLLISION at step 0
+  # 21 [    OMPL] IK=[20] -> COLLISION at step 0
+  # 22 [    OMPL] IK=[21] -> COLLISION at step 0
+  # 23 [    OMPL] IK=[22] -> COLLISION at step 0
+  # 24 [    OMPL] IK=[23] -> COLLISION at step 0
+  # 25 [    OMPL] IK=[24] -> COLLISION at step 0
+  # 26 [    OMPL] IK=[25] -> COLLISION at step 0
+  # 27 [    OMPL] IK=[26] -> COLLISION at step 0
+  # 28 [    OMPL] IK=[27] -> COLLISION at step 0
+  # 29 [    OMPL] IK=[28] -> COLLISION at step 0
+  # 30 [    OMPL] IK=[29] -> COLLISION at step 0
+  # 31 [    OMPL] IK=[30] -> COLLISION at step 0
+  # 32 [    OMPL] IK=[31] -> COLLISION at step 0
+
+[EXECUTION]
+  Trajectories:    0
+  Duration:        0.00 ms
+  Status:          FAILED
+
+[FAILURE]
+  Reason: No IK combination allows feasible paths
+
+[SUMMARY]
+  2026-01-12T20:31:53.423 | PLAN_FAIL | EXEC_FAIL | Steps:3 | IK:32 | BT:62/2 | Plan:801.53ms | Exec:0.00ms
+================================================================================
+

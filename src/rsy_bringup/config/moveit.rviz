@@ -21,15 +21,31 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        coneyor_belt:
+        cube_robot1:
+          Value: false
+        cube_robot2:
+          Value: false
+        cubestand:
+          Value: false
+        cube_cubestand:
           Value: false
         ground_plane:
           Value: false
+        item_profile_1:
+          Value: false
+        item_profile_2:
+          Value: false
+        robot1_base:
+          Value: false
         robot1_base_link:
-          Value: true
+          Value: false
         robot1_base_link_inertia:
           Value: false
+        robot1_flange:
+          Value: false
         robot1_forearm_link:
+          Value: false
+        robot1_ft_frame:
           Value: false
         robot1_robotiq_85_base_link:
           Value: false
@@ -49,10 +65,6 @@ Visualization Manager:
           Value: false
         robot1_robotiq_85_right_knuckle_link:
           Value: false
-        robot1_flange:
-          Value: false
-        robot1_ft_frame:
-          Value: false
         robot1_shoulder_link:
           Value: false
         robot1_tcp:
@@ -67,11 +79,21 @@ Visualization Manager:
           Value: false
         robot1_wrist_3_link:
           Value: false
+        finger_1_robot1:
+          Value: false
+        finger_2_robot1:
+          Value: false
+        robot2_base:
+          Value: false
         robot2_base_link:
-          Value: true
+          Value: false
         robot2_base_link_inertia:
           Value: false
+        robot2_flange:
+          Value: false
         robot2_forearm_link:
+          Value: false
+        robot2_ft_frame:
           Value: false
         robot2_robotiq_85_base_link:
           Value: false
@@ -91,11 +113,11 @@ Visualization Manager:
           Value: false
         robot2_robotiq_85_right_knuckle_link:
           Value: false
-        robot2_flange:
-          Value: false
-        robot2_ft_frame:
-          Value: false
         robot2_shoulder_link:
+          Value: false
+        finger_1_robot2:
+          Value: false
+        finger_2_robot2:
           Value: false
         robot2_tcp:
           Value: true
@@ -108,6 +130,16 @@ Visualization Manager:
         robot2_wrist_2_link:
           Value: false
         robot2_wrist_3_link:
+          Value: false
+        roof:
+          Value: false
+        wall_back:
+          Value: false
+        wall_front:
+          Value: false
+        wall_left:
+          Value: false
+        wall_right:
           Value: false
         world:
           Value: true

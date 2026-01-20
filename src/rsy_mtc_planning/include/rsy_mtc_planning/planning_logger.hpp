@@ -42,6 +42,39 @@ struct BacktrackingStats
 };
 
 /**
+ * @brief Information about IK solutions for a single MoveJ step
+ */
+struct MoveJIKInfo
+{
+  size_t step_index = 0;
+  std::string robot_name;
+  size_t total_ik_found = 0;
+  size_t collision_free_ik = 0;  // After trajectory collision pre-check
+};
+
+/**
+ * @brief Record of a single planning attempt
+ */
+struct AttemptRecord
+{
+  size_t attempt_number = 0;
+  std::string phase_name;  // "Pilz-PTP" or "OMPL"
+  std::vector<size_t> ik_indices;  // IK index used for each MoveJ
+
+  // Pre-check result
+  bool collision_precheck_passed = true;
+  int collision_step = -1;  // Step where collision was detected (-1 if none)
+
+  // Planning result
+  bool planning_attempted = false;  // False if skipped due to collision precheck
+  bool planning_succeeded = false;
+  int failed_step_index = -1;
+  std::string failed_step_name;
+  std::string failed_step_type;  // "MoveJ", "MoveL", "collision_precheck"
+  std::string failure_reason;
+};
+
+/**
  * @brief Metrics collected during a single planning session
  */
 struct PlanningMetrics
@@ -57,6 +90,9 @@ struct PlanningMetrics
   size_t gripper_operations = 0;
   std::vector<size_t> ik_solutions_per_step;
   size_t total_ik_combinations = 0;
+
+  // Detailed IK information per MoveJ step
+  std::vector<MoveJIKInfo> movej_ik_info;
 
   // Planner configuration
   size_t max_pilz_combinations = 0;
@@ -82,6 +118,10 @@ struct PlanningMetrics
   // Backtracking event history (limited to most recent events for memory efficiency)
   std::vector<BacktrackEvent> backtrack_history;
   static constexpr size_t MAX_BACKTRACK_HISTORY = 100;
+
+  // Detailed attempt history (for debugging, limited size)
+  std::vector<AttemptRecord> attempt_history;
+  static constexpr size_t MAX_ATTEMPT_HISTORY = 200;
 
   // Overall planning result
   bool planning_succeeded = false;
@@ -131,6 +171,17 @@ public:
     size_t gripper_operations,
     const std::vector<size_t>& ik_solutions_per_step,
     size_t total_ik_combinations);
+
+  /**
+   * @brief Record detailed IK information for each MoveJ step
+   * @param movej_ik_info Vector of IK info for each MoveJ
+   */
+  void recordMoveJIKInfo(const std::vector<MoveJIKInfo>& movej_ik_info);
+
+  /**
+   * @brief Record a single planning attempt
+   */
+  void recordAttempt(const AttemptRecord& attempt);
 
   /**
    * @brief Record planner configuration

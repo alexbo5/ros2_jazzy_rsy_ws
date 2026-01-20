@@ -80,10 +80,10 @@ private:
   // Planner configuration (loaded once at startup)
   PlannerConfig planner_config_;
 
-  // Configurable parameters
-  int max_ik_per_step_{16};
-  size_t max_pilz_combinations_{1};
-  size_t max_ompl_combinations_{256};
+  // Configurable parameters (actual values set in constructor)
+  int max_ik_per_step_{32};
+  size_t max_pilz_combinations_{1024};
+  size_t max_ompl_combinations_{1024};
   double robot_description_timeout_{30.0};
 
   // Planning logger for performance analysis

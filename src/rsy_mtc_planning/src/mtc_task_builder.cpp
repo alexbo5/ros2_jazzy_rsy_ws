@@ -22,7 +22,6 @@
 
 #include <moveit/task_constructor/stages/current_state.h>
 #include <moveit/task_constructor/stages/move_to.h>
-#include <moveit/task_constructor/stages/move_relative.h>
 #include <moveit_task_constructor_msgs/msg/solution.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <set>
@@ -81,9 +80,10 @@ MTCTaskBuilder::MTCTaskBuilder(const rclcpp::Node::SharedPtr& node, const Planne
   sampling_planner_->setTimeout(config.timeout_ompl);
   sampling_planner_->setMaxVelocityScalingFactor(config.velocity_scaling_ptp);
   sampling_planner_->setMaxAccelerationScalingFactor(config.acceleration_scaling_ptp);
+  sampling_planner_->setProperty("num_planning_attempts", config.ompl_planning_attempts);
 
-  RCLCPP_INFO(node_->get_logger(), "OMPL planner created: id=%s, timeout=%.1fs",
-              config.ompl_planner_id.c_str(), config.timeout_ompl);
+  RCLCPP_INFO(node_->get_logger(), "OMPL planner created: id=%s, timeout=%.1fs, attempts=%u",
+              config.ompl_planner_id.c_str(), config.timeout_ompl, config.ompl_planning_attempts);
 
   // Create Pilz PTP planner for point-to-point motions
   ptp_planner_ = std::make_shared<mtc::solvers::PipelinePlanner>(node_, "pilz_industrial_motion_planner", "PTP");
@@ -683,6 +683,18 @@ void MTCTaskBuilder::updatePlanningScene()
   planning_scene_ = locked_scene->diff();
 }
 
+void MTCTaskBuilder::refreshCollisionScene()
+{
+  // Request latest state from planning scene service (one synchronous call)
+  planning_scene_monitor_->requestPlanningSceneState();
+
+  // Create a modifiable copy for collision checking
+  planning_scene_monitor::LockedPlanningSceneRO locked_scene(planning_scene_monitor_);
+  cached_collision_scene_ = locked_scene->diff();
+
+  RCLCPP_DEBUG(node_->get_logger(), "Refreshed collision scene snapshot");
+}
+
 std::vector<IKSolution> MTCTaskBuilder::computeIKSolutions(
   const std::string& robot_name,
   const geometry_msgs::msg::PoseStamped& target_pose,
@@ -902,6 +914,165 @@ mtc::Task MTCTaskBuilder::buildTaskWithIK(
   }
 
   return task;
+}
+
+bool MTCTaskBuilder::validateIKCombinationCollisions(
+  const std::vector<rsy_mtc_planning::msg::MotionStep>& steps,
+  const std::map<size_t, size_t>& ik_indices,
+  const std::vector<MoveJIKData>& movej_ik_data,
+  int& collision_step_index)
+{
+  collision_step_index = -1;
+
+  // Number of intermediate points to check along each trajectory
+  // Reduced to just endpoints to avoid false positives - actual trajectory planning
+  // does more thorough collision checking with proper path planning
+  const int NUM_TRAJECTORY_SAMPLES = 1;  // Just start and end
+
+  // Use cached collision scene if available (refreshCollisionScene() should be called beforehand)
+  // This avoids expensive requestPlanningSceneState() calls when checking many combinations
+  planning_scene::PlanningScenePtr scene;
+  if (cached_collision_scene_)
+  {
+    // Create a diff from cached scene to preserve original state for next check
+    scene = cached_collision_scene_->diff();
+  }
+  else
+  {
+    // Fallback: fetch scene if not cached (slower path for backward compatibility)
+    planning_scene_monitor_->requestPlanningSceneState();
+    planning_scene_monitor::LockedPlanningSceneRO locked_scene(planning_scene_monitor_);
+    scene = locked_scene->diff();
+  }
+
+  // Create robot state to simulate the sequence
+  // This state is updated after each step, so subsequent steps see previous robots' new positions
+  moveit::core::RobotState robot_state = scene->getCurrentState();
+
+  // Create a map from step index to MoveJIKData index
+  std::map<size_t, size_t> step_to_movej_data;
+  for (size_t i = 0; i < movej_ik_data.size(); ++i)
+  {
+    step_to_movej_data[movej_ik_data[i].step_index] = i;
+  }
+
+  // Helper to get collision details for logging
+  auto getCollisionDetails = [&scene, &robot_state]() -> std::string {
+    collision_detection::CollisionRequest req;
+    req.contacts = true;
+    req.max_contacts = 5;
+    collision_detection::CollisionResult res;
+    scene->checkCollision(req, res, robot_state);
+
+    if (res.contacts.empty()) return "unknown";
+
+    std::string details;
+    for (const auto& contact_pair : res.contacts)
+    {
+      if (!details.empty()) details += ", ";
+      details += contact_pair.first.first + "<->" + contact_pair.first.second;
+    }
+    return details;
+  };
+
+  // Simulate each step and check for collisions at endpoints
+  for (size_t i = 0; i < steps.size(); ++i)
+  {
+    const auto& step = steps[i];
+    std::string group_name = getPlanningGroup(step.robot_name);
+    const moveit::core::JointModelGroup* jmg = robot_model_->getJointModelGroup(group_name);
+
+    if (!jmg)
+    {
+      RCLCPP_WARN(node_->get_logger(), "Unknown planning group for robot '%s'", step.robot_name.c_str());
+      continue;
+    }
+
+    if (step.motion_type == rsy_mtc_planning::msg::MotionStep::MOVE_J)
+    {
+      // Get the IK solution for this step
+      auto data_it = step_to_movej_data.find(i);
+      auto idx_it = ik_indices.find(i);
+
+      if (data_it != step_to_movej_data.end() && idx_it != ik_indices.end())
+      {
+        const auto& ik_data = movej_ik_data[data_it->second];
+        size_t ik_idx = idx_it->second;
+
+        if (ik_idx < ik_data.ik_solutions.size())
+        {
+          // Get start joint positions (current state of this robot)
+          std::vector<double> start_joints;
+          robot_state.copyJointGroupPositions(jmg, start_joints);
+
+          // Get end joint positions (target IK)
+          const auto& end_joints = ik_data.ik_solutions[ik_idx].joint_values;
+
+          // Check collision at endpoints only (start and end)
+          std::vector<double> interpolated_joints(start_joints.size());
+          for (int sample = 0; sample <= NUM_TRAJECTORY_SAMPLES; ++sample)
+          {
+            double t = static_cast<double>(sample) / NUM_TRAJECTORY_SAMPLES;
+
+            // Linear interpolation in joint space
+            for (size_t j = 0; j < start_joints.size() && j < end_joints.size(); ++j)
+            {
+              interpolated_joints[j] = start_joints[j] + t * (end_joints[j] - start_joints[j]);
+            }
+
+            robot_state.setJointGroupPositions(jmg, interpolated_joints);
+            robot_state.update();
+
+            // Check for collisions (uses ACM from SRDF to filter allowed collisions)
+            if (scene->isStateColliding(robot_state, group_name))
+            {
+              collision_step_index = static_cast<int>(i);
+              std::string collision_info = getCollisionDetails();
+              RCLCPP_INFO(node_->get_logger(),
+                "Collision at step %zu (MoveJ, %s, IK[%zu], t=%.2f): %s",
+                i, step.robot_name.c_str(), ik_idx, t, collision_info.c_str());
+              return false;
+            }
+          }
+
+          // Update robot_state to final position for subsequent steps
+          robot_state.setJointGroupPositions(jmg, end_joints);
+          robot_state.update();
+        }
+      }
+    }
+    else if (step.motion_type == rsy_mtc_planning::msg::MotionStep::MOVE_L)
+    {
+      // For MoveL, just check the endpoint - intermediate collision checking
+      // is done by the actual trajectory planner (Pilz LIN)
+      std::string ee_link = getEndEffectorLink(step.robot_name);
+
+      // Get target pose
+      Eigen::Isometry3d end_pose;
+      tf2::fromMsg(step.target_pose.pose, end_pose);
+
+      // Compute IK for the target pose
+      if (robot_state.setFromIK(jmg, end_pose, ee_link, 0.1))
+      {
+        robot_state.update();
+
+        // Check for collisions at the endpoint (uses ACM from SRDF)
+        if (scene->isStateColliding(robot_state, group_name))
+        {
+          collision_step_index = static_cast<int>(i);
+          std::string collision_info = getCollisionDetails();
+          RCLCPP_INFO(node_->get_logger(),
+            "Collision at step %zu (MoveL endpoint, %s): %s",
+            i, step.robot_name.c_str(), collision_info.c_str());
+          return false;
+        }
+      }
+      // Note: If IK fails for MoveL endpoint, let the planner catch it
+      // This pre-check is just for obvious collisions
+    }
+  }
+
+  return true;  // No collisions detected at endpoints
 }
 
 }  // namespace rsy_mtc_planning

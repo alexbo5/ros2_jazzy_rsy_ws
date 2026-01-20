@@ -5,7 +5,7 @@ from rclpy.action import ActionServer, ActionClient
 import numpy as np
 from dataclasses import dataclass
 
-from rsy_cube_motion.action import RotateFace, HandOver, TakeUpCube, PutDownCube, PresentCubeFace
+from rsy_cube_motion.action import RotateFace, HandOver, TakeUpCube, PutDownCube, PresentCubeFace, StartupPosition
 from rsy_mtc_planning.action import ExecuteMotionSequence
 from rsy_mtc_planning.msg import MotionStep
 from geometry_msgs.msg import PoseStamped
@@ -18,6 +18,7 @@ OFFSET_DIST_HOLD_CUBE = -42     # distance when holding the cube (grasps 2 rows 
 OFFSET_DIST_SPIN_CUBE = -22    # distance when spinning the cube (grasps 1 row of cube)
 OFFSET_DIST_PRE_TARGET = 100   # distance when approaching the cube (pre-grasp position)
 OFFSET_DIST_TAKE_CUBE = 150    # distance when taking up the cube from rest position
+OFFSET_DIST_DROP_CUBE = 30    # distance when taking up the cube from rest position
 
 # Compact, editable definition of cube-access poses.
 # CUBE_POSE_DEFS format:
@@ -44,7 +45,7 @@ HAND_OVER_POSE_DEF = {
 # Position where the cube rests (for taking up and putting down)
 # Robot 2 will always take up and put down from/to this position
 CUBE_REST_POSE_DEF = {
-    "position": [-0.11954 + (OFFSET_DIST_HOLD_CUBE / 1000) , 0.7334, 0.11039],  # Rest position
+    "position": [-0.11854 + (OFFSET_DIST_HOLD_CUBE / 1000) , 0.7334, 0.11039],  # Rest position
     "orientation_vector": [-1.0, 0.0, 0.0]  # approach axis
 }
 
@@ -269,6 +270,14 @@ class CubeMotionServer(Node):
             PresentCubeFace,
             'present_cube_face',
             self.execute_present_cube_face
+        )
+
+        # ActionServer: Startup position (open grippers, move robot 1 to pretarget)
+        self.startup_position_server = ActionServer(
+            self,
+            StartupPosition,
+            'startup_position',
+            self.execute_startup_position
         )
 
         # interner Client: RotateFace kann HandOver aufrufen
@@ -825,9 +834,15 @@ class CubeMotionServer(Node):
         )
         steps.append(self._move_j_step(robot2_name, pre_pos))
 
+        # Create drop pose
+        drop_pose = CubePose(
+            position=self.rest_pose.position + np.array([0.0, 0.0, OFFSET_DIST_DROP_CUBE/1000.0]),
+            face_normal_orientation=self.rest_pose.face_normal_orientation
+        )
+
         # Robot 2 moves linearly to put down position
         put_down = self.get_gripper_pose(
-            self.rest_pose,
+            drop_pose,
             approach_direction=0.0,
             offset_dist=OFFSET_DIST_HOLD_CUBE
         )
@@ -930,6 +945,49 @@ class CubeMotionServer(Node):
         result.success = success
 
         self.get_logger().info(f"[PresentCubeFace] {'OK' if success else 'FAILED'}: {face}")
+        if result.success:
+            goal_handle.succeed()
+        else:
+            goal_handle.abort()
+
+        return result
+
+    # -------------------------------
+    # STARTUP POSITION ACTION (MTC-based)
+    # -------------------------------
+    async def execute_startup_position(self, goal_handle):
+        """
+        Move robots to startup position:
+        1. Open both grippers
+        2. Move robot 1 to cube pretarget position
+        """
+        self.get_logger().info("[StartupPosition] Started")
+
+        robot1_name = self._get_robot_name(1)
+        robot2_name = self._get_robot_name(2)
+
+        # Build motion sequence
+        steps = []
+
+        # Open both grippers
+        steps.append(self._gripper_open_step(robot1_name))
+        steps.append(self._gripper_open_step(robot2_name))
+
+        # Move robot 1 to cube pretarget position (using handover pose as reference)
+        robot1_pretarget = self.get_gripper_pose(
+            self.handover_pose,
+            approach_direction=0.0,
+            offset_dist=OFFSET_DIST_PRE_TARGET
+        )
+        steps.append(self._move_j_step(robot1_name, robot1_pretarget))
+
+        # Execute the sequence
+        success = await self._execute_mtc_sequence(steps)
+
+        result = StartupPosition.Result()
+        result.success = success
+
+        self.get_logger().info(f"[StartupPosition] {'OK' if success else 'FAILED'}")
         if result.success:
             goal_handle.succeed()
         else:

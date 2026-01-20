@@ -1,0 +1,770 @@
+
+================================================================================
+PLANNING SESSION: a12243c5
+Timestamp: 2026-01-13T08:18:18.086
+================================================================================
+
+[INPUT]
+  Total motion steps:    3
+  MoveJ steps:           1
+  MoveL steps:           2
+  Gripper operations:    1
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         56.83 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  157.71 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    3
+  Duration:        9756.68 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:18:18.086 | PLAN_OK | EXEC_OK | Steps:3 | IK:32 | Pilz-PTP@1 | Plan:157.71ms | Exec:9756.68ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: e88f0fc4
+Timestamp: 2026-01-13T08:18:28.010
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         145.08 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  184.73 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        3285.18 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:18:28.010 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@1 | Plan:184.73ms | Exec:3285.18ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: f104c146
+Timestamp: 2026-01-13T08:18:31.994
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         133.30 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  171.31 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        3783.25 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:18:31.994 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@1 | Plan:171.31ms | Exec:3783.25ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: f5fd5b49
+Timestamp: 2026-01-13T08:18:36.464
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         140.85 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  182.46 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        2833.08 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:18:36.464 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@1 | Plan:182.46ms | Exec:2833.08ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 99268e76
+Timestamp: 2026-01-13T08:18:39.997
+================================================================================
+
+[INPUT]
+  Total motion steps:    6
+  MoveJ steps:           2
+  MoveL steps:           4
+  Gripper operations:    2
+  IK solutions/step:     [32, 32]
+  Total IK combinations: 1024
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+  Step 1 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         16 / 16
+    Duration:         695.29 ms
+    Result:           FAILED
+    [Backtracking]
+      Smart backtracks:   16
+      Standard advances:  0
+      Stage failures:     {step0:10, step2:6}
+      MoveJ IK changes:   {step0:16}
+  Phase 2: OMPL
+    Attempts:         6 / 1024
+    Duration:         889.37 ms
+    Result:           SUCCESS
+    [Backtracking]
+      Smart backtracks:   5
+      Standard advances:  0
+      Stage failures:     {step0:2, step2:3}
+      MoveJ IK changes:   {step0:5}
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: OMPL
+  Success attempt: 6
+  Success IK idx:  [5, 0]
+  Total duration:  3221.13 ms
+
+[BACKTRACK HISTORY] (last 21 events)
+  #12 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 11->12
+  #13 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 12->13
+  #14 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 13->14
+  #15 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 14->15
+  #16 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 15->16
+  #1 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 0->1
+  #2 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 1->2
+  #3 smart_backtrack: MoveL@2 failed -> changed MoveJ@0 IK 2->3
+  #4 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 3->4
+  #5 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 4->5
+
+[ATTEMPT HISTORY] (22 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  2 [Pilz-PTP] IK=[1,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  3 [Pilz-PTP] IK=[2,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  4 [Pilz-PTP] IK=[3,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  5 [Pilz-PTP] IK=[4,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  6 [Pilz-PTP] IK=[5,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  7 [Pilz-PTP] IK=[6,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  8 [Pilz-PTP] IK=[7,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  9 [Pilz-PTP] IK=[8,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  # 10 [Pilz-PTP] IK=[9,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  # 11 [Pilz-PTP] IK=[10,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  # 12 [Pilz-PTP] IK=[11,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  # 13 [Pilz-PTP] IK=[12,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  # 14 [Pilz-PTP] IK=[13,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  # 15 [Pilz-PTP] IK=[14,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  # 16 [Pilz-PTP] IK=[15,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  1 [    OMPL] IK=[0,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  2 [    OMPL] IK=[1,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  3 [    OMPL] IK=[2,0] -> FAILED: MoveL at step 2 (move_l_2) - Stage 'move_l_2' failed to find solution
+  #  4 [    OMPL] IK=[3,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  5 [    OMPL] IK=[4,0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  6 [    OMPL] IK=[5,0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    6
+  Duration:        17441.82 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:18:39.997 | PLAN_OK | EXEC_OK | Steps:6 | IK:1024 | OMPL@6 | BT:21/0 | Plan:3221.13ms | Exec:17441.82ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 088fb720
+Timestamp: 2026-01-13T08:19:00.671
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         2 / 16
+    Duration:         174.64 ms
+    Result:           SUCCESS
+    [Backtracking]
+      Smart backtracks:   1
+      Standard advances:  0
+      Stage failures:     {step0:1}
+      MoveJ IK changes:   {step0:1}
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 2
+  Success IK idx:  [1]
+  Total duration:  213.27 ms
+
+[BACKTRACK HISTORY] (last 1 events)
+  #1 smart_backtrack: MoveL@0 failed -> changed MoveJ@0 IK 0->1
+
+[ATTEMPT HISTORY] (2 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> FAILED: MoveJ at step 0 (move_j_0) - Stage 'move_j_0' failed to find solution
+  #  2 [Pilz-PTP] IK=[1] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        3436.95 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:19:00.671 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@2 | BT:1/0 | Plan:213.27ms | Exec:3436.95ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 9098b106
+Timestamp: 2026-01-13T08:19:04.837
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         138.52 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  184.69 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        2687.11 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:19:04.837 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@1 | Plan:184.69ms | Exec:2687.11ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: a1671f01
+Timestamp: 2026-01-13T08:19:08.228
+================================================================================
+
+[INPUT]
+  Total motion steps:    1
+  MoveJ steps:           1
+  MoveL steps:           0
+  Gripper operations:    0
+  IK solutions/step:     [32]
+  Total IK combinations: 32
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         1 / 16
+    Duration:         134.18 ms
+    Result:           SUCCESS
+
+[PLANNING RESULT]
+  Status:          SUCCESS
+  Success planner: Pilz-PTP
+  Success attempt: 1
+  Success IK idx:  [0]
+  Total duration:  167.60 ms
+
+[ATTEMPT HISTORY] (1 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #  1 [Pilz-PTP] IK=[0] -> SUCCESS
+
+[EXECUTION]
+  Trajectories:    1
+  Duration:        3784.30 ms
+  Status:          SUCCESS
+
+[SUMMARY]
+  2026-01-13T08:19:08.228 | PLAN_OK | EXEC_OK | Steps:1 | IK:32 | Pilz-PTP@1 | Plan:167.60ms | Exec:3784.30ms
+================================================================================
+
+
+================================================================================
+PLANNING SESSION: 4c1812bc
+Timestamp: 2026-01-13T08:19:12.700
+================================================================================
+
+[INPUT]
+  Total motion steps:    5
+  MoveJ steps:           2
+  MoveL steps:           3
+  Gripper operations:    2
+  IK solutions/step:     [32, 32]
+  Total IK combinations: 1024
+
+[MOVEJ IK DETAILS]
+  Step 0 (robot1):
+    Total IK found:       32
+    Collision-free IK:    32
+  Step 1 (robot2):
+    Total IK found:       32
+    Collision-free IK:    32
+
+[CONFIG]
+  Max Pilz combinations: 16
+  Max OMPL combinations: 1024
+  Pilz PTP timeout:      10.00 s
+  OMPL timeout:          3.00 s
+  OMPL planner:          RRTConnect
+
+[PLANNING PHASES]
+  Phase 1: Pilz-PTP
+    Attempts:         16 / 16
+    Duration:         852.07 ms
+    Result:           FAILED
+    [Backtracking]
+      Smart backtracks:   16
+      Standard advances:  0
+      Stage failures:     {step1:12, step3:4}
+      MoveJ IK changes:   {step1:16}
+  Phase 2: OMPL
+    Attempts:         1024 / 1024
+    Duration:         51523.75 ms
+    Result:           FAILED
+    [Backtracking]
+      Smart backtracks:   35
+      Standard advances:  0
+      Stage failures:     {step-1:989, step1:27, step3:8}
+      MoveJ IK changes:   {step0:4, step1:31}
+
+[PLANNING RESULT]
+  Status:          FAILED
+  Total duration:  53582.61 ms
+
+[BACKTRACK HISTORY] (last 51 events)
+  #26 smart_backtrack: MoveL@1 failed -> changed MoveJ@1 IK 25->26
+  #27 smart_backtrack: MoveL@1 failed -> changed MoveJ@1 IK 26->27
+  #28 smart_backtrack: MoveL@1 failed -> changed MoveJ@1 IK 27->28
+  #29 smart_backtrack: MoveL@1 failed -> changed MoveJ@1 IK 28->29
+  #30 smart_backtrack: MoveL@1 failed -> changed MoveJ@1 IK 29->30
+  #31 smart_backtrack: MoveL@1 failed -> changed MoveJ@1 IK 30->31
+  #32 smart_backtrack: MoveL@1 failed -> changed MoveJ@0 IK 0->1
+  #33 smart_backtrack: MoveL@1 failed -> changed MoveJ@0 IK 1->2
+  #34 smart_backtrack: MoveL@1 failed -> changed MoveJ@0 IK 2->3
+  #35 smart_backtrack: MoveL@1 failed -> changed MoveJ@0 IK 3->4
+
+[FAILURE ANALYSIS]
+  Collision pre-check failures: 0
+  Planning failures:            200
+  Failures by motion type:
+    MoveJ: 200 failures
+
+[ATTEMPT HISTORY] (200 attempts)
+  Format: #attempt [phase] IK=[indices] -> result
+  ---------------------------------------------------------------
+  #825 [    OMPL] IK=[25,24] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #826 [    OMPL] IK=[25,25] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #827 [    OMPL] IK=[25,26] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #828 [    OMPL] IK=[25,27] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #829 [    OMPL] IK=[25,28] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #830 [    OMPL] IK=[25,29] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #831 [    OMPL] IK=[25,30] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #832 [    OMPL] IK=[25,31] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #833 [    OMPL] IK=[26,0] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #834 [    OMPL] IK=[26,1] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #835 [    OMPL] IK=[26,2] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #836 [    OMPL] IK=[26,3] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #837 [    OMPL] IK=[26,4] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #838 [    OMPL] IK=[26,5] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #839 [    OMPL] IK=[26,6] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #840 [    OMPL] IK=[26,7] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #841 [    OMPL] IK=[26,8] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #842 [    OMPL] IK=[26,9] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #843 [    OMPL] IK=[26,10] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #844 [    OMPL] IK=[26,11] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #845 [    OMPL] IK=[26,12] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #846 [    OMPL] IK=[26,13] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #847 [    OMPL] IK=[26,14] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #848 [    OMPL] IK=[26,15] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #849 [    OMPL] IK=[26,16] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #850 [    OMPL] IK=[26,17] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #851 [    OMPL] IK=[26,18] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #852 [    OMPL] IK=[26,19] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #853 [    OMPL] IK=[26,20] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #854 [    OMPL] IK=[26,21] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #855 [    OMPL] IK=[26,22] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #856 [    OMPL] IK=[26,23] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #857 [    OMPL] IK=[26,24] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #858 [    OMPL] IK=[26,25] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #859 [    OMPL] IK=[26,26] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #860 [    OMPL] IK=[26,27] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #861 [    OMPL] IK=[26,28] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #862 [    OMPL] IK=[26,29] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #863 [    OMPL] IK=[26,30] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #864 [    OMPL] IK=[26,31] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #865 [    OMPL] IK=[27,0] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #866 [    OMPL] IK=[27,1] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #867 [    OMPL] IK=[27,2] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #868 [    OMPL] IK=[27,3] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #869 [    OMPL] IK=[27,4] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #870 [    OMPL] IK=[27,5] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #871 [    OMPL] IK=[27,6] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #872 [    OMPL] IK=[27,7] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #873 [    OMPL] IK=[27,8] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #874 [    OMPL] IK=[27,9] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #875 [    OMPL] IK=[27,10] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #876 [    OMPL] IK=[27,11] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #877 [    OMPL] IK=[27,12] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #878 [    OMPL] IK=[27,13] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #879 [    OMPL] IK=[27,14] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #880 [    OMPL] IK=[27,15] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #881 [    OMPL] IK=[27,16] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #882 [    OMPL] IK=[27,17] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #883 [    OMPL] IK=[27,18] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #884 [    OMPL] IK=[27,19] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #885 [    OMPL] IK=[27,20] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #886 [    OMPL] IK=[27,21] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #887 [    OMPL] IK=[27,22] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #888 [    OMPL] IK=[27,23] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #889 [    OMPL] IK=[27,24] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #890 [    OMPL] IK=[27,25] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #891 [    OMPL] IK=[27,26] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #892 [    OMPL] IK=[27,27] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #893 [    OMPL] IK=[27,28] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #894 [    OMPL] IK=[27,29] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #895 [    OMPL] IK=[27,30] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #896 [    OMPL] IK=[27,31] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #897 [    OMPL] IK=[28,0] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #898 [    OMPL] IK=[28,1] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #899 [    OMPL] IK=[28,2] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #900 [    OMPL] IK=[28,3] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #901 [    OMPL] IK=[28,4] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #902 [    OMPL] IK=[28,5] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #903 [    OMPL] IK=[28,6] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #904 [    OMPL] IK=[28,7] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #905 [    OMPL] IK=[28,8] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #906 [    OMPL] IK=[28,9] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #907 [    OMPL] IK=[28,10] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #908 [    OMPL] IK=[28,11] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #909 [    OMPL] IK=[28,12] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #910 [    OMPL] IK=[28,13] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #911 [    OMPL] IK=[28,14] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #912 [    OMPL] IK=[28,15] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #913 [    OMPL] IK=[28,16] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #914 [    OMPL] IK=[28,17] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #915 [    OMPL] IK=[28,18] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #916 [    OMPL] IK=[28,19] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #917 [    OMPL] IK=[28,20] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #918 [    OMPL] IK=[28,21] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #919 [    OMPL] IK=[28,22] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #920 [    OMPL] IK=[28,23] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #921 [    OMPL] IK=[28,24] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #922 [    OMPL] IK=[28,25] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #923 [    OMPL] IK=[28,26] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #924 [    OMPL] IK=[28,27] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #925 [    OMPL] IK=[28,28] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #926 [    OMPL] IK=[28,29] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #927 [    OMPL] IK=[28,30] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #928 [    OMPL] IK=[28,31] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #929 [    OMPL] IK=[29,0] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #930 [    OMPL] IK=[29,1] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #931 [    OMPL] IK=[29,2] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #932 [    OMPL] IK=[29,3] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #933 [    OMPL] IK=[29,4] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #934 [    OMPL] IK=[29,5] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #935 [    OMPL] IK=[29,6] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #936 [    OMPL] IK=[29,7] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #937 [    OMPL] IK=[29,8] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #938 [    OMPL] IK=[29,9] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #939 [    OMPL] IK=[29,10] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #940 [    OMPL] IK=[29,11] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #941 [    OMPL] IK=[29,12] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #942 [    OMPL] IK=[29,13] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #943 [    OMPL] IK=[29,14] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #944 [    OMPL] IK=[29,15] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #945 [    OMPL] IK=[29,16] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #946 [    OMPL] IK=[29,17] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #947 [    OMPL] IK=[29,18] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #948 [    OMPL] IK=[29,19] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #949 [    OMPL] IK=[29,20] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #950 [    OMPL] IK=[29,21] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #951 [    OMPL] IK=[29,22] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #952 [    OMPL] IK=[29,23] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #953 [    OMPL] IK=[29,24] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #954 [    OMPL] IK=[29,25] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #955 [    OMPL] IK=[29,26] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #956 [    OMPL] IK=[29,27] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #957 [    OMPL] IK=[29,28] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #958 [    OMPL] IK=[29,29] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #959 [    OMPL] IK=[29,30] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #960 [    OMPL] IK=[29,31] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #961 [    OMPL] IK=[30,0] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #962 [    OMPL] IK=[30,1] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #963 [    OMPL] IK=[30,2] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #964 [    OMPL] IK=[30,3] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #965 [    OMPL] IK=[30,4] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #966 [    OMPL] IK=[30,5] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #967 [    OMPL] IK=[30,6] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #968 [    OMPL] IK=[30,7] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #969 [    OMPL] IK=[30,8] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #970 [    OMPL] IK=[30,9] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #971 [    OMPL] IK=[30,10] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #972 [    OMPL] IK=[30,11] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #973 [    OMPL] IK=[30,12] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #974 [    OMPL] IK=[30,13] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #975 [    OMPL] IK=[30,14] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #976 [    OMPL] IK=[30,15] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #977 [    OMPL] IK=[30,16] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #978 [    OMPL] IK=[30,17] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #979 [    OMPL] IK=[30,18] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #980 [    OMPL] IK=[30,19] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #981 [    OMPL] IK=[30,20] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #982 [    OMPL] IK=[30,21] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #983 [    OMPL] IK=[30,22] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #984 [    OMPL] IK=[30,23] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #985 [    OMPL] IK=[30,24] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #986 [    OMPL] IK=[30,25] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #987 [    OMPL] IK=[30,26] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #988 [    OMPL] IK=[30,27] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #989 [    OMPL] IK=[30,28] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #990 [    OMPL] IK=[30,29] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #991 [    OMPL] IK=[30,30] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #992 [    OMPL] IK=[30,31] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #993 [    OMPL] IK=[31,0] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #994 [    OMPL] IK=[31,1] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #995 [    OMPL] IK=[31,2] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #996 [    OMPL] IK=[31,3] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #997 [    OMPL] IK=[31,4] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #998 [    OMPL] IK=[31,5] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #999 [    OMPL] IK=[31,6] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1000 [    OMPL] IK=[31,7] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1001 [    OMPL] IK=[31,8] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1002 [    OMPL] IK=[31,9] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1003 [    OMPL] IK=[31,10] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1004 [    OMPL] IK=[31,11] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1005 [    OMPL] IK=[31,12] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1006 [    OMPL] IK=[31,13] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1007 [    OMPL] IK=[31,14] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1008 [    OMPL] IK=[31,15] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1009 [    OMPL] IK=[31,16] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1010 [    OMPL] IK=[31,17] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1011 [    OMPL] IK=[31,18] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1012 [    OMPL] IK=[31,19] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1013 [    OMPL] IK=[31,20] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1014 [    OMPL] IK=[31,21] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1015 [    OMPL] IK=[31,22] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1016 [    OMPL] IK=[31,23] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1017 [    OMPL] IK=[31,24] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1018 [    OMPL] IK=[31,25] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1019 [    OMPL] IK=[31,26] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1020 [    OMPL] IK=[31,27] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1021 [    OMPL] IK=[31,28] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1022 [    OMPL] IK=[31,29] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1023 [    OMPL] IK=[31,30] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+  #1024 [    OMPL] IK=[31,31] -> FAILED: MoveJ - failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+
+[EXECUTION]
+  Trajectories:    0
+  Duration:        0.00 ms
+  Status:          FAILED
+
+[FAILURE]
+  Reason: No IK combination allows feasible paths
+
+[SUMMARY]
+  2026-01-13T08:19:12.700 | PLAN_FAIL | EXEC_FAIL | Steps:5 | IK:1024 | BT:51/0 | Plan:53582.61ms | Exec:0.00ms
+================================================================================
+

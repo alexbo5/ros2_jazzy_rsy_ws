@@ -1,5 +1,10 @@
 #include "rsy_mtc_planning/motion_sequence_server.hpp"
 
+#include <chrono>
+#include <iomanip>
+#include <set>
+#include <sstream>
+
 namespace rsy_mtc_planning
 {
 
@@ -11,18 +16,19 @@ MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
 
   // IK and backtracking settings
   max_ik_per_step_ = 32;               // Max IK solutions per MoveJ step
-  max_pilz_combinations_ = 64;           // Phase 1: Pilz PTP (0 = skip)
-  max_ompl_combinations_ = 1024;       // Phase 2: OMPL combinations to try
+  max_pilz_combinations_ = 16;         // Phase 1: Pilz PTP (0 = skip)
+  max_ompl_combinations_ = 1024;       // Phase 2: OMPL combinations to try (32x32=1024 max)
   robot_description_timeout_ = 30.0;   // Seconds to wait for robot_description
 
   // Planner configuration - all hardcoded
-  planner_config_.timeout_ompl = 5.0;           // OMPL planner timeout (seconds)
-  planner_config_.timeout_pilz_ptp = 10.0;      // Pilz PTP timeout
-  planner_config_.timeout_pilz_lin = 10.0;      // Pilz LIN timeout
+  planner_config_.timeout_ompl = 3.0;            // OMPL planner timeout per attempt (seconds)
+  planner_config_.timeout_pilz_ptp = 10.0;       // Pilz PTP timeout
+  planner_config_.timeout_pilz_lin = 10.0;       // Pilz LIN timeout
+  planner_config_.ompl_planning_attempts = 16;    // OMPL attempts per IK combination
   planner_config_.velocity_scaling_ptp = 0.3;   // PTP velocity (0.0-1.0)
   planner_config_.velocity_scaling_lin = 0.3;   // LIN velocity
-  planner_config_.acceleration_scaling_ptp = 0.3;
-  planner_config_.acceleration_scaling_lin = 0.3;
+  planner_config_.acceleration_scaling_ptp = 0.3; // PTP acceleration (0.0-1.0)
+  planner_config_.acceleration_scaling_lin = 0.3; // LIN acceleration (0.0-1.0)
   // OMPL planner name (short name, looked up in planner_configs)
   // Options: RRTConnect, RRTstar, PRMstar
   planner_config_.ompl_planner_id = "RRTConnect";
@@ -38,8 +44,15 @@ MotionSequenceServer::MotionSequenceServer(const rclcpp::NodeOptions& options)
   // MoveIt needs these parameters to configure the OMPL planner
   declareOmplParameters();
 
-  // Initialize planning logger
-  planning_logger_ = std::make_unique<PlanningLogger>("/tmp/mtc_planning.log");
+  // Initialize planning logger with timestamped filename
+  auto now = std::chrono::system_clock::now();
+  auto time_t_now = std::chrono::system_clock::to_time_t(now);
+  std::ostringstream log_filename;
+  log_filename << "/root/ros2_ws/src/rsy_mtc_planning/logs/mtc_planning_"
+               << std::put_time(std::localtime(&time_t_now), "%Y%m%d_%H%M%S")
+               << ".log";
+  planning_logger_ = std::make_unique<PlanningLogger>(log_filename.str());
+  RCLCPP_INFO(get_logger(), "Planning log: %s", log_filename.str().c_str());
 
   // Check if robot_description is already available as a parameter
   if (this->has_parameter("robot_description"))
@@ -219,13 +232,9 @@ void MotionSequenceServer::process_motion_sequence(
   // Collect MoveJ steps and compute IK solutions
   std::vector<MoveJIKData> movej_ik_data;
 
-  // Also build a map from step index to robot name for quick lookup
-  std::map<size_t, std::string> step_to_robot;
-
   for (size_t i = 0; i < all_motion_steps.size(); ++i)
   {
     const auto& step = all_motion_steps[i];
-    step_to_robot[i] = step.robot_name;
 
     if (step.motion_type == MotionStep::MOVE_J)
     {
@@ -317,6 +326,19 @@ void MotionSequenceServer::process_motion_sequence(
   // Log IK computation summary
   RCLCPP_DEBUG(get_logger(), "IK: %zu MoveJ steps, %zu combinations", movej_ik_data.size(), total_combinations);
 
+  // Record detailed MoveJ IK info for logging
+  std::vector<MoveJIKInfo> movej_ik_info;
+  for (const auto& ik_data : movej_ik_data)
+  {
+    MoveJIKInfo info;
+    info.step_index = ik_data.step_index;
+    info.robot_name = ik_data.robot_name;
+    info.total_ik_found = ik_data.ik_solutions.size();
+    info.collision_free_ik = ik_data.ik_solutions.size();  // Will be updated after collision checking
+    movej_ik_info.push_back(info);
+  }
+  planning_logger_->recordMoveJIKInfo(movej_ik_info);
+
   // Record input metrics for logging
   size_t movel_count = all_motion_steps.size() - movej_ik_data.size();
   planning_logger_->recordInput(
@@ -336,72 +358,155 @@ void MotionSequenceServer::process_motion_sequence(
     planner_config_.ompl_planner_id);
 
   // Update feedback
+  feedback->status = "Pre-filtering IK combinations for collisions";
+  goal_handle->publish_feedback(feedback);
+
+  // ===== PRE-FILTER ALL IK COMBINATIONS FOR COLLISION =====
+  // Check all combinations upfront and only keep collision-free ones
+  // This avoids wasting planning time on combinations that will definitely fail
+
+  // Refresh collision scene ONCE before checking all combinations
+  // This avoids 1024 synchronous requestPlanningSceneState() calls
+  task_builder_->refreshCollisionScene();
+
+  std::vector<std::vector<size_t>> valid_combinations;  // Collision-free IK combinations
+  size_t collision_filtered_count = 0;
+
+  {
+    std::vector<size_t> current_indices(movej_ik_data.size(), 0);
+    bool has_more = true;
+
+    while (has_more)
+    {
+      // Build ik_indices map for collision check
+      std::map<size_t, size_t> ik_indices;
+      for (size_t i = 0; i < movej_ik_data.size(); ++i)
+      {
+        if (!movej_ik_data[i].ik_solutions.empty())
+        {
+          ik_indices[movej_ik_data[i].step_index] = current_indices[i];
+        }
+      }
+
+      // Check collision for this combination
+      int collision_step = -1;
+      if (task_builder_->validateIKCombinationCollisions(all_motion_steps, ik_indices, movej_ik_data, collision_step))
+      {
+        // No collision - add to valid combinations
+        valid_combinations.push_back(current_indices);
+      }
+      else
+      {
+        collision_filtered_count++;
+      }
+
+      // Advance to next combination (mixed-radix counting)
+      bool carry = true;
+      for (size_t i = movej_ik_data.size(); i > 0 && carry; --i)
+      {
+        size_t idx = i - 1;
+        size_t max_idx = movej_ik_data[idx].ik_solutions.empty() ? 1 : movej_ik_data[idx].ik_solutions.size();
+        current_indices[idx]++;
+        if (current_indices[idx] >= max_idx)
+        {
+          current_indices[idx] = 0;
+        }
+        else
+        {
+          carry = false;
+        }
+      }
+      has_more = !carry;
+    }
+  }
+
+  RCLCPP_INFO(get_logger(), "IK pre-filter: %zu valid, %zu filtered (collision), %zu total",
+              valid_combinations.size(), collision_filtered_count, total_combinations);
+
+  if (valid_combinations.empty())
+  {
+    RCLCPP_ERROR(get_logger(), "No collision-free IK combinations found");
+    planning_logger_->recordPlanningFailure("All IK combinations have collisions");
+    planning_logger_->finalizeSession();
+
+    result->success = false;
+    result->message = "Planning failed: all IK combinations have collisions";
+    result->failed_step_index = 0;
+    goal_handle->abort(result);
+    return;
+  }
+
+  // Update feedback
   feedback->status = "Exploring IK combinations with backtracking";
   goal_handle->publish_feedback(feedback);
 
   // ===== SMART TWO-PHASE BACKTRACKING SEARCH =====
   // Phase 1: Try with Pilz PTP (fast, minimal joint motion)
   // Phase 2: If phase 1 fails, try with OMPL (can avoid obstacles, but more joint motion)
-  // Smart backtracking: When MoveL fails, prioritize changing the preceding MoveJ's IK
+  // Smart backtracking with fallback: ensures every valid combination is tried exactly once
 
   bool planning_succeeded = false;
   moveit::task_constructor::Task successful_task;
   std::vector<size_t> success_ik_indices;
 
-  // Helper lambda to advance IK index for a specific MoveJ
-  auto advance_specific_ik = [&](size_t movej_idx, std::vector<size_t>& indices) -> bool {
-    if (movej_idx >= movej_ik_data.size()) return false;
-    size_t max_idx = movej_ik_data[movej_idx].ik_solutions.empty() ? 1 : movej_ik_data[movej_idx].ik_solutions.size();
-    indices[movej_idx]++;
-    if (indices[movej_idx] >= max_idx)
-    {
-      indices[movej_idx] = 0;
-      return false;  // Wrapped around
-    }
-    return true;  // Successfully advanced
-  };
-
-  // Helper lambda to advance to next combination (standard mixed-radix counting)
-  auto advance_combination = [&](std::vector<size_t>& indices) -> bool {
-    bool carry = true;
-    for (size_t i = movej_ik_data.size(); i > 0 && carry; --i)
-    {
-      size_t idx = i - 1;
-      size_t max_idx = movej_ik_data[idx].ik_solutions.empty() ? 1 : movej_ik_data[idx].ik_solutions.size();
-      indices[idx]++;
-      if (indices[idx] >= max_idx)
-      {
-        indices[idx] = 0;
-      }
-      else
-      {
-        carry = false;
-      }
-    }
-    return !carry;  // Return true if we haven't wrapped around completely
-  };
+  // Create index of valid combinations for fast lookup (combination -> index in valid_combinations)
+  std::map<std::vector<size_t>, size_t> valid_combo_index;
+  for (size_t i = 0; i < valid_combinations.size(); ++i)
+  {
+    valid_combo_index[valid_combinations[i]] = i;
+  }
 
   for (int phase = 1; phase <= 2 && !planning_succeeded; ++phase)
   {
     bool use_ompl = (phase == 2);
     std::string planner_name = use_ompl ? "OMPL" : "Pilz-PTP";
 
-    const size_t phase_max = use_ompl ?
-      std::min(total_combinations, max_ompl_combinations_) :
-      std::min(total_combinations, max_pilz_combinations_);
+    // Max attempts is limited by configured limit per phase
+    const size_t phase_limit = use_ompl ? max_ompl_combinations_ : max_pilz_combinations_;
+    const size_t phase_max = std::min(valid_combinations.size(), phase_limit);
 
-    RCLCPP_DEBUG(get_logger(), "Phase %d: %s (max %zu)", phase, planner_name.c_str(), phase_max);
+    RCLCPP_INFO(get_logger(), "Phase %d: %s (max %zu of %zu valid combinations)",
+                phase, planner_name.c_str(), phase_max, valid_combinations.size());
 
     planning_logger_->startPhase(planner_name, phase_max);
 
-    std::vector<size_t> current_ik_indices(movej_ik_data.size(), 0);
+    // Track which combinations have been tried in this phase (by index in valid_combinations)
+    std::set<size_t> tried_combo_indices;
+
+    std::vector<size_t> current_ik_indices = valid_combinations[0];  // Start with first valid combination
     size_t combinations_tried = 0;
+    bool phase_ended = false;
 
-    // Track failed MoveL steps to prioritize their preceding MoveJ
-    int last_failed_movel_step = -1;
-    size_t smart_backtrack_attempts = 0;
-    const size_t max_smart_backtrack = 8;  // Max attempts to fix a specific MoveL failure
+    // Track smart backtracking state
+    int last_failed_step = -1;
+    std::set<size_t> exhausted_movej_indices;
+    size_t current_backtrack_movej = SIZE_MAX;
 
+    // Helper to check if current combination is valid and not yet tried
+    auto is_valid_untried = [&](const std::vector<size_t>& indices) -> bool {
+      auto it = valid_combo_index.find(indices);
+      if (it == valid_combo_index.end()) return false;  // Not collision-free
+      return tried_combo_indices.find(it->second) == tried_combo_indices.end();  // Not yet tried
+    };
+
+    // Helper to find next valid untried combination via smart backtracking
+    auto find_next_valid_smart = [&](size_t movej_idx, std::vector<size_t>& indices) -> bool {
+      size_t max_idx = movej_ik_data[movej_idx].ik_solutions.empty() ? 1 : movej_ik_data[movej_idx].ik_solutions.size();
+      size_t original = indices[movej_idx];
+
+      for (size_t attempt = 1; attempt < max_idx; ++attempt)
+      {
+        indices[movej_idx] = (original + attempt) % max_idx;
+        if (is_valid_untried(indices))
+        {
+          return true;
+        }
+      }
+      indices[movej_idx] = original;  // Restore
+      return false;
+    };
+
+    // ===== SMART BACKTRACKING PHASE =====
     while (!planning_succeeded && combinations_tried < phase_max)
     {
       if (goal_handle->is_canceling())
@@ -413,6 +518,27 @@ void MotionSequenceServer::process_motion_sequence(
         return;
       }
 
+      // Skip if already tried or not valid
+      auto combo_it = valid_combo_index.find(current_ik_indices);
+      if (combo_it == valid_combo_index.end() || tried_combo_indices.count(combo_it->second))
+      {
+        // Find next untried valid combination (simple linear search as fallback)
+        bool found = false;
+        for (size_t i = 0; i < valid_combinations.size(); ++i)
+        {
+          if (tried_combo_indices.find(i) == tried_combo_indices.end())
+          {
+            current_ik_indices = valid_combinations[i];
+            found = true;
+            break;
+          }
+        }
+        if (!found) break;  // All tried
+        continue;
+      }
+
+      // Mark as tried
+      tried_combo_indices.insert(combo_it->second);
       combinations_tried++;
 
       // Build ik_indices map for buildTaskWithIK
@@ -425,17 +551,26 @@ void MotionSequenceServer::process_motion_sequence(
         }
       }
 
-      if (combinations_tried == 1 || combinations_tried % 100 == 0)
+      if (combinations_tried == 1 || combinations_tried % 50 == 0)
       {
-        RCLCPP_DEBUG(get_logger(), "[%s] %zu/%zu", planner_name.c_str(), combinations_tried, total_combinations);
+        RCLCPP_DEBUG(get_logger(), "[%s] %zu/%zu", planner_name.c_str(), combinations_tried, phase_max);
       }
 
       try
       {
+        // Create attempt record for logging
+        AttemptRecord attempt_record;
+        attempt_record.attempt_number = combinations_tried;
+        attempt_record.phase_name = planner_name;
+        attempt_record.ik_indices = current_ik_indices;
+        attempt_record.collision_precheck_passed = true;  // Pre-filtered
+        attempt_record.planning_attempted = true;
+
+        // Build and plan task (collision already pre-checked)
         auto task = task_builder_->buildTaskWithIK(all_motion_steps, ik_indices, movej_ik_data,
                                                     "full_motion_sequence", use_ompl);
 
-        auto plan_result = task_builder_->planTaskWithResult(task, 1);
+        PlanningResult plan_result = task_builder_->planTaskWithResult(task, 1);
 
         if (plan_result.success)
         {
@@ -444,101 +579,150 @@ void MotionSequenceServer::process_motion_sequence(
           success_ik_indices = current_ik_indices;
           RCLCPP_INFO(get_logger(), "SUCCESS: %s @ #%zu", planner_name.c_str(), combinations_tried);
 
+          attempt_record.planning_succeeded = true;
+          planning_logger_->recordAttempt(attempt_record);
+
+          phase_ended = true;
           planning_logger_->endPhase(combinations_tried, true);
           planning_logger_->recordPlanningSuccess(planner_name, combinations_tried, current_ik_indices);
         }
         else
         {
+          // Record planning failure
+          attempt_record.planning_succeeded = false;
+          attempt_record.failed_step_index = plan_result.failed_stage_index;
+          attempt_record.failed_step_name = plan_result.failed_stage_name;
+          attempt_record.failed_step_type = plan_result.is_movel ? "MoveL" : "MoveJ";
+          attempt_record.failure_reason = plan_result.error_message;
+          planning_logger_->recordAttempt(attempt_record);
+
           // Record stage failure for statistics
           planning_logger_->recordStageFailure(
             plan_result.failed_stage_index,
             plan_result.failed_stage_name,
             plan_result.is_movel);
 
-          // Smart backtracking: if MoveL failed, try changing the preceding MoveJ first
+          // ===== SMART BACKTRACKING =====
           bool used_smart_backtrack = false;
 
-          if (plan_result.is_movel && plan_result.failed_stage_index >= 0)
+          if (plan_result.failed_stage_index >= 0)
           {
             size_t failed_step = static_cast<size_t>(plan_result.failed_stage_index);
 
-            // Check if this is a new MoveL failure or continuing from previous
-            if (last_failed_movel_step != plan_result.failed_stage_index)
+            // Reset state if new failure location
+            if (last_failed_step != plan_result.failed_stage_index)
             {
-              last_failed_movel_step = plan_result.failed_stage_index;
-              smart_backtrack_attempts = 0;
+              last_failed_step = plan_result.failed_stage_index;
+              exhausted_movej_indices.clear();
+              current_backtrack_movej = SIZE_MAX;
             }
 
-            // Find the preceding MoveJ for this MoveL's robot
-            auto prec_it = step_to_preceding_movej.find(failed_step);
-            if (prec_it != step_to_preceding_movej.end() && smart_backtrack_attempts < max_smart_backtrack)
+            // Determine primary MoveJ to try
+            size_t primary_movej = SIZE_MAX;
+            std::string failed_robot_name;
+
+            auto failed_movej_it = step_to_movej_idx.find(failed_step);
+            if (!plan_result.is_movel && failed_movej_it != step_to_movej_idx.end())
             {
-              size_t movej_idx = prec_it->second;
-              size_t old_ik_idx = current_ik_indices[movej_idx];
+              primary_movej = failed_movej_it->second;
+              failed_robot_name = movej_ik_data[primary_movej].robot_name;
+            }
+            else if (plan_result.is_movel)
+            {
+              auto prec_it = step_to_preceding_movej.find(failed_step);
+              if (prec_it != step_to_preceding_movej.end())
+              {
+                primary_movej = prec_it->second;
+                failed_robot_name = movej_ik_data[primary_movej].robot_name;
+              }
+            }
+
+            // Collect candidate MoveJs
+            std::vector<size_t> candidate_movejs;
+            for (size_t i = 0; i < movej_ik_data.size(); ++i)
+            {
+              bool is_candidate = plan_result.is_movel ?
+                (movej_ik_data[i].step_index < failed_step) :
+                (movej_ik_data[i].step_index <= failed_step);
+
+              if (is_candidate &&
+                  !movej_ik_data[i].ik_solutions.empty() &&
+                  exhausted_movej_indices.find(i) == exhausted_movej_indices.end())
+              {
+                candidate_movejs.push_back(i);
+              }
+            }
+
+            // Sort: primary first, then same robot, then closer to failure
+            std::sort(candidate_movejs.begin(), candidate_movejs.end(),
+              [&](size_t a, size_t b) {
+                if ((a == primary_movej) != (b == primary_movej)) return a == primary_movej;
+                bool a_same = (movej_ik_data[a].robot_name == failed_robot_name);
+                bool b_same = (movej_ik_data[b].robot_name == failed_robot_name);
+                if (a_same != b_same) return a_same;
+                return movej_ik_data[a].step_index > movej_ik_data[b].step_index;
+              });
+
+            // Pick current backtrack target if not set
+            if (current_backtrack_movej == SIZE_MAX && !candidate_movejs.empty())
+            {
+              current_backtrack_movej = candidate_movejs[0];
+            }
+
+            // Try to find next valid untried combination via smart backtracking
+            while (current_backtrack_movej != SIZE_MAX && !used_smart_backtrack)
+            {
+              size_t movej_idx = current_backtrack_movej;
               std::vector<size_t> indices_before = current_ik_indices;
 
-              if (advance_specific_ik(movej_idx, current_ik_indices))
+              if (find_next_valid_smart(movej_idx, current_ik_indices))
               {
                 used_smart_backtrack = true;
-                smart_backtrack_attempts++;
-
-                // Log smart backtrack event
                 planning_logger_->recordSmartBacktrack(
-                  combinations_tried,
-                  plan_result.failed_stage_index,
-                  plan_result.failed_stage_name,
-                  movej_idx,
-                  movej_ik_data[movej_idx].step_index,
-                  old_ik_idx,
-                  current_ik_indices[movej_idx],
-                  indices_before,
-                  current_ik_indices);
-
-                RCLCPP_DEBUG(get_logger(), "MoveL %d failed, trying different IK for MoveJ %zu (attempt %zu)",
-                            plan_result.failed_stage_index, movej_ik_data[movej_idx].step_index, smart_backtrack_attempts);
+                  combinations_tried, plan_result.failed_stage_index, plan_result.failed_stage_name,
+                  movej_idx, movej_ik_data[movej_idx].step_index,
+                  indices_before[movej_idx], current_ik_indices[movej_idx],
+                  indices_before, current_ik_indices);
+              }
+              else
+              {
+                // This MoveJ exhausted, try next candidate
+                exhausted_movej_indices.insert(movej_idx);
+                current_backtrack_movej = SIZE_MAX;
+                for (size_t cand : candidate_movejs)
+                {
+                  if (exhausted_movej_indices.find(cand) == exhausted_movej_indices.end())
+                  {
+                    current_backtrack_movej = cand;
+                    break;
+                  }
+                }
               }
             }
           }
 
-          // If smart backtracking didn't apply or exhausted, use standard advancement
+          // If smart backtracking didn't find anything, we'll pick next untried in next iteration
           if (!used_smart_backtrack)
           {
-            last_failed_movel_step = -1;
-            smart_backtrack_attempts = 0;
-
-            std::vector<size_t> indices_before = current_ik_indices;
-            if (!advance_combination(current_ik_indices))
-            {
-              RCLCPP_DEBUG(get_logger(), "Phase %d exhausted after %zu attempts", phase, combinations_tried);
-              planning_logger_->endPhase(combinations_tried, false);
-              break;
-            }
-            // Log standard advance
-            planning_logger_->recordStandardAdvance(combinations_tried, indices_before, current_ik_indices);
+            last_failed_step = -1;
+            exhausted_movej_indices.clear();
+            current_backtrack_movej = SIZE_MAX;
           }
         }
       }
       catch (const std::exception& e)
       {
-        RCLCPP_DEBUG(get_logger(), "Attempt %zu failed: %s", combinations_tried, e.what());
-
-        // On exception, use standard advancement
-        last_failed_movel_step = -1;
-        smart_backtrack_attempts = 0;
-
-        std::vector<size_t> indices_before = current_ik_indices;
-        if (!advance_combination(current_ik_indices))
-        {
-          RCLCPP_DEBUG(get_logger(), "Phase %d exhausted after %zu attempts", phase, combinations_tried);
-          planning_logger_->endPhase(combinations_tried, false);
-          break;
-        }
-        planning_logger_->recordStandardAdvance(combinations_tried, indices_before, current_ik_indices);
+        RCLCPP_DEBUG(get_logger(), "Attempt %zu exception: %s", combinations_tried, e.what());
+        last_failed_step = -1;
+        exhausted_movej_indices.clear();
+        current_backtrack_movej = SIZE_MAX;
       }
     }
 
-    if (!planning_succeeded && combinations_tried >= phase_max)
+    // End phase if not already ended
+    if (!phase_ended && !planning_succeeded)
     {
+      RCLCPP_DEBUG(get_logger(), "Phase %d completed: %zu/%zu tried", phase, combinations_tried, phase_max);
       planning_logger_->endPhase(combinations_tried, false);
     }
   }
